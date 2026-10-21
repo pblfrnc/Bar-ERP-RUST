@@ -1986,6 +1986,8 @@ impl Importacao {
         };
         // ordem estável: pontos e, no empate, a ordem alfabética que já vem do banco
         achados.sort_by_key(|(idx, pontos)| (-pontos, *idx));
+        // "parecido com a nota" só nos mais parecidos (uma palavra em comum, como "CERV", não basta)
+        let melhor = achados.first().map_or(0, |(_, pontos)| *pontos);
         achados
             .into_iter()
             .take(LIMITE)
@@ -2004,7 +2006,7 @@ impl Importacao {
                     idx: idx as i32,
                     nome: p.name.clone().into(),
                     detalhe: detalhe.join(" · ").into(),
-                    sugerido: palavras.is_empty() && pontos > 0,
+                    sugerido: palavras.is_empty() && pontos > 0 && pontos == melhor,
                 }
             })
             .collect()
@@ -3243,11 +3245,13 @@ mod tests {
             ..Default::default()
         };
         let nomes = |r: Vec<FxProdutoAchado>| r.iter().map(|a| a.nome.to_string()).collect::<Vec<_>>();
-        // sem texto: o parecido com o item da nota vem primeiro e marcado, depois todos em ordem alfabética
+        // sem texto: o mais parecido com o item da nota vem primeiro e marcado; os que só têm "CERV" em comum vêm
+        // logo depois, sem a marca; o resto em ordem alfabética
         let r = im.busca_vinculo(0, "");
         assert_eq!(r.len(), 4);
         assert_eq!((r[0].nome.as_str(), r[0].sugerido, r[0].idx), ("Cerveja Heineken Lata 350ml", true, 1));
-        assert!(!r[1].sugerido);
+        assert_eq!((r[1].nome.as_str(), r[1].sugerido), ("Cerveja Original 600ml", false));
+        assert_eq!(nomes(r)[2..], ["Água Mineral 500ml", "Porção de Fritas"]);
         // palavras em qualquer ordem, sem acento e sem maiúscula
         assert_eq!(nomes(im.busca_vinculo(0, "agua")), vec!["Água Mineral 500ml"]);
         assert_eq!(nomes(im.busca_vinculo(0, "600 cerveja")), vec!["Cerveja Original 600ml"]);
