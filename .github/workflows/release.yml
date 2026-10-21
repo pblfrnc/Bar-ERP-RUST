@@ -1,0 +1,99 @@
+# Compila o BarERP Pro para Windows a cada push na main e publica na release "latest", de onde o
+# atualizador do app (crates/barerp-updater) baixa: version.json + BarERP-Instalador-Windows.exe.
+# Roda no Linux com cargo-xwin (o mesmo caminho do build feito no Mac) e o NSIS do Ubuntu.
+name: Release Windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Push novo cancela o build anterior que ainda estiver rodando: só a última versão é publicada
+concurrency:
+  group: release-windows
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      CARGO_TERM_COLOR: always
+      # Licença do SDK/CRT da Microsoft baixado pelo cargo-xwin (aceita pelo Pablo em 20/10/2026)
+      XWIN_ACCEPT_LICENSE: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ferramentas (LLVM para o alvo MSVC e NSIS)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nsis clang-18 lld-18 llvm-18
+          echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-msvc
+
+      - name: Cache do SDK da Microsoft
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cargo-xwin
+          key: cargo-xwin-sdk-v1
+
+      - name: cargo-xwin
+        run: cargo install --locked cargo-xwin
+
+      # Versão 2.0.<número do build>: o app compara a versão e o commit com o version.json
+      - name: Versão
+        id: v
+        run: |
+          base=$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version = "\([0-9]*\.[0-9]*\)\..*"/\1/p' Cargo.toml)
+          version="$base.${{ github.run_number }}"
+          sed -i "/^\[workspace.package\]/,/^\[/ s/^version = \".*\"/version = \"$version\"/" Cargo.toml
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "Versão $version"
+
+      - name: Compilar barerp.exe
+        env:
+          BARERP_COMMIT: ${{ github.sha }}
+          BARERP_BUILD_TIME: ${{ steps.v.outputs.build_time }}
+        run: cargo xwin build --release -p barerp-app --target x86_64-pc-windows-msvc
+
+      - name: Instalador e version.json
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          BUILD_TIME: ${{ steps.v.outputs.build_time }}
+        run: |
+          mkdir -p target/installer
+          makensis -V2 -DVERSION="$VERSION" installer/barerp.nsi
+          printf '{"version": "%s", "commit": "%s", "buildTime": "%s"}\n' "$VERSION" "$GITHUB_SHA" "$BUILD_TIME" \
+            > target/installer/version.json
+          ls -lh target/installer
+
+      # O instalador sobe antes do version.json: o app nunca vê a versão nova apontando para o instalador velho
+      - name: Publicar na release latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          notes="Compilação automática de $(git log -1 --pretty=%s) (${GITHUB_SHA::7})."
+          if gh release view latest >/dev/null 2>&1; then
+            git tag -f latest "$GITHUB_SHA"
+            git push -f origin refs/tags/latest
+            gh release upload latest target/installer/BarERP-Instalador-Windows.exe --clobber
+            gh release upload latest target/installer/version.json --clobber
+            gh release edit latest --title "BarERP Pro v$VERSION" --notes "$notes" --latest
+          else
+            gh release create latest target/installer/BarERP-Instalador-Windows.exe target/installer/version.json \
+              --target "$GITHUB_SHA" --title "BarERP Pro v$VERSION" --notes "$notes" --latest
+          fi
+          git tag "v$VERSION" "$GITHUB_SHA"
+          git push origin "v$VERSION"

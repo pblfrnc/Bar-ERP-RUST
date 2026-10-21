@@ -1,5 +1,6 @@
-//! Atualizador do BarERP, tradução de `electron/updater.cjs`. Usa a mesma release do GitHub
-//! (`pblfrnc/bar-erp`, tag `latest`): `version.json` e `BarERP-Instalador-Windows.exe`.
+//! Atualizador do BarERP, tradução de `electron/updater.cjs`. Usa a release do GitHub do app nativo
+//! (`pblfrnc/Bar-ERP-RUST`, tag `latest`, publicada pelo CI a cada push na `main`): `version.json` e
+//! `BarERP-Instalador-Windows.exe`. A versão Electron continua no `pblfrnc/bar-erp`.
 //!
 //! - [`check`]: três estratégias, como no Node: `version.json` da release (sem limite de API), feed
 //!   `releases.atom` + `HEAD` do instalador, e por último a API REST do GitHub.
@@ -28,12 +29,13 @@ pub struct Endpoints {
 
 impl Default for Endpoints {
     fn default() -> Self {
-        let base = "https://github.com/pblfrnc/bar-erp";
+        let repo = "pblfrnc/Bar-ERP-RUST";
+        let base = format!("https://github.com/{repo}");
         Self {
             version_json: format!("{base}/releases/download/latest/version.json"),
             installer: format!("{base}/releases/download/latest/{INSTALLER_NAME}"),
             releases_atom: format!("{base}/releases.atom"),
-            api_latest: "https://api.github.com/repos/pblfrnc/bar-erp/releases/latest".into(),
+            api_latest: format!("https://api.github.com/repos/{repo}/releases/latest"),
         }
     }
 }

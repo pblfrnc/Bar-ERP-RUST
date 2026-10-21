@@ -65,6 +65,8 @@ Page custom ModePage ModePageLeave
 !define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfUpdate
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+; Atualização: sem a página final, reabre o app direto (o operador só clicou em "Instalar" no app)
+!define MUI_PAGE_CUSTOMFUNCTION_PRE FinishPre
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "Abrir o ${PRODUCT}"
 !define MUI_FINISHPAGE_RUN_FUNCTION LaunchApp
@@ -145,6 +147,13 @@ FunctionEnd
 
 Function SkipIfUpdate
   ${If} $IsUpdate == "1"
+    Abort
+  ${EndIf}
+FunctionEnd
+
+Function FinishPre
+  ${If} $IsUpdate == "1"
+    Call LaunchApp
     Abort
   ${EndIf}
 FunctionEnd
@@ -367,6 +376,10 @@ Section "Instalar"
   ; Sem janela (/S): reabre sozinho, como o instalador do Electron fazia
   ${If} ${Silent}
     Call LaunchApp
+  ${EndIf}
+  ; Atualização: avança sozinho da barra de progresso para o fim (FinishPre reabre o app)
+  ${If} $IsUpdate == "1"
+    SetAutoClose true
   ${EndIf}
 SectionEnd
 
