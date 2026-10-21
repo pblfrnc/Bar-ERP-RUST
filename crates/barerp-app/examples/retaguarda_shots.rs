@@ -1,5 +1,6 @@
 //! Prints da Retaguarda sem abrir janela, em tema escuro e claro, com dados inventados (não usa banco):
-//! `cargo run -p barerp-app --example retaguarda_shots -- <pasta>` (largura da janela: `SHOTS_WIDTH`, padrão 1440).
+//! `cargo run -p barerp-app --example retaguarda_shots -- <pasta>` (largura da janela: `SHOTS_WIDTH`, padrão 1440;
+//! altura: `SHOTS_HEIGHT`, padrão 900; zoom do Windows × "Aumentar Tamanho": `SHOTS_SCALE`, padrão 1).
 
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -18,7 +19,14 @@ use barerp_db::printer::PrinterSettings;
 use barerp_license::{DeveloperContact, LicenseStatus};
 use barerp_menu_publish::DigitalMenuStatus;
 
-const HEIGHT: u32 = 900;
+fn height() -> u32 {
+    static H: OnceLock<u32> = OnceLock::new();
+    *H.get_or_init(|| std::env::var("SHOTS_HEIGHT").ok().and_then(|h| h.parse().ok()).unwrap_or(900))
+}
+
+fn scale() -> f32 {
+    std::env::var("SHOTS_SCALE").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0)
+}
 
 /// Largura da janela dos prints (1280 e 1366 são as telas comuns dos PCs de caixa).
 fn width() -> u32 {
@@ -37,13 +45,13 @@ impl Platform for OffscreenPlatform {
 }
 
 fn save(window: &MinimalSoftwareWindow, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let mut buffer = vec![Rgb8Pixel::default(); (width() * HEIGHT) as usize];
+    let mut buffer = vec![Rgb8Pixel::default(); (width() * height()) as usize];
     window.request_redraw();
     window.draw_if_needed(|renderer| {
         renderer.render(&mut buffer, width() as usize);
     });
     let file = std::io::BufWriter::new(std::fs::File::create(path)?);
-    let mut encoder = png::Encoder::new(file, width(), HEIGHT);
+    let mut encoder = png::Encoder::new(file, width(), height());
     encoder.set_color(png::ColorType::Rgb);
     encoder.set_depth(png::BitDepth::Eight);
     let bytes: Vec<u8> = buffer.iter().flat_map(|p| [p.r, p.g, p.b]).collect();
@@ -150,15 +158,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
-    window.set_size(PhysicalSize::new(width(), HEIGHT));
+    window.set_size(PhysicalSize::new(width(), height()));
     slint::platform::set_platform(Box::new(OffscreenPlatform { window: window.clone() }))?;
 
     let ui = AppWindow::new()?;
     ui.set_version(env!("CARGO_PKG_VERSION").into());
     ui.set_user_name("Administrador".into());
     ui.set_user_role("ADMIN".into());
-    ui.set_compact(width() < 1500);
-    ui.set_tiny(width() < 1180);
+    window.dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor: scale() });
+    let logical = width() as f32 / scale();
+    ui.set_compact(logical < 1500.0);
+    ui.set_tiny(logical < 1180.0);
     ui.set_page(Page::Settings);
     ui.show()?;
     let store = ui.global::<RetaguardaStore>();
@@ -179,7 +189,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         preview::audit(&ui, audit.clone());
         save(&window, &out.join(format!("r3-auditoria-{suffix}.png")))?;
         preview::printers(&ui, &PrinterSettings { cashier_printer: Some("POS-80".into()), ..PrinterSettings::default() });
+        // As impressoras do notebook em que o Pablo testou
+        let printers = ["Wondershare PDFelement", "PDV", "OneNote (Desktop)", "Microsoft Print to PDF", "Canon G3010 series"];
+        store.set_p_detected(slint::ModelRc::new(slint::VecModel::from(printers.iter().map(|p| slint::SharedString::from(*p)).collect::<Vec<_>>())));
+        store.set_p_default_printer("Canon G3010 series".into());
         save(&window, &out.join(format!("r4-impressoras-{suffix}.png")))?;
+        store.set_view(barerp_app::RtView::Customers);
+        save(&window, &out.join(format!("r4b-clientes-{suffix}.png")))?;
         preview::subscription(&ui);
         save(&window, &out.join(format!("r5-assinatura-{suffix}.png")))?;
         preview::gate(&ui, &license(0, "EXPIRED", false));

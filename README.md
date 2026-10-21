@@ -1,8 +1,9 @@
 # BarERP Pro nativo (Rust + Slint)
 
 Reescrita do BarERP (Node + Electron + React) em Rust, com telas nativas em Slint (sem webview nem Chromium).
-Decidida em 18/10/2026. **Só local**: branch `rust-nativo`, sem push. Cada push na `main` gera uma release
-que o PC do cliente baixa sozinho.
+Decidida em 18/10/2026. Desde 21/10/2026 esta pasta é o repositório **privado** `pblfrnc/Bar-ERP-RUST` (sem CI nem
+releases). Push no `pblfrnc/bar-erp` continua proibido: cada push na `main` de lá gera uma release que o PC do cliente
+baixa sozinho.
 
 ## Decisões
 - **Interface:** Slint, desenhada pelo próprio app. Licença royalty-free: exige o crédito "Made with Slint" na tela Sobre.
@@ -76,8 +77,9 @@ Os exemplos aplicam as migrações no arquivo, então use sempre uma **cópia** 
 # PASSAGEM PARA OUTRO AGENTE (estado em 20/10/2026)
 
 ## Regras obrigatórias
-1. **Só local.** Branch `rust-nativo`. NUNCA `git push`, deploy Netlify/Render ou release: push na `main` gera
-   release que o PC do cliente (JUBAR) baixa sozinho. Nada de commit sem o Pablo pedir.
+1. **Nada de push no `bar-erp`.** NUNCA `git push`, deploy Netlify/Render ou release no `pblfrnc/bar-erp`: push na
+   `main` de lá gera release que o PC do cliente (JUBAR) baixa sozinho. A reescrita vive no repo privado
+   `pblfrnc/Bar-ERP-RUST`; commit e push lá só quando o Pablo pedir, e nada de CI ou release sem ele decidir.
 2. **Nenhuma chamada real à Focus NFe** (nem homologação) sem o Pablo autorizar. Testes com wiremock.
 3. **Nunca abrir o banco real do cliente**; use cópias (`BARERP_DB=<cópia>`). As migrações gravam no arquivo.
 4. **Não mexer no projeto Node** (`server/`, `client/`, `electron/`): ele segue em produção até a troca.
@@ -126,12 +128,16 @@ e o `controller.rs` virou só a casca do app (login, tema, impressão pedida pel
    - `crates/barerp-app/build.rs` embute o ícone e o VERSIONINFO no `.exe` (embed-resource, só com `target_os=windows`).
    - `.cargo/config.toml` liga o `+crt-static` no alvo `x86_64-pc-windows-msvc`, para o app abrir sem o Visual C++
      Redistributable instalado.
-   - `installer/barerp.nsi` (NSIS, pt-BR) gera `target/installer/BarERP-Instalador-Windows.exe`:
-     - instala por usuário em `%LOCALAPPDATA%\Programs\BarERP Nativo`, sem tocar na pasta do Electron;
-     - cria o atalho "BarERP Pro" na Área de Trabalho e no Menu Iniciar;
-     - numa atualização, encontra a instalação pela chave `HKCU\Software\BarERP Nativo`, espera ou encerra o `barerp.exe`
-       e reabre o app no fim;
-     - a desinstalação não mexe no `%APPDATA%`.
+   - `installer/barerp.nsi` (NSIS, pt-BR) gera `target/installer/BarERP-Instalador-Windows.exe`, com dois modos:
+     - **Todos os usuários** (a troca): pede administrador, instala em `Arquivos de Programas\BarERP Nativo` (registro em
+       HKLM, atalhos públicos) e substitui o Electron. Fecha o `BarERP Pro.exe` e o `barerp.exe`, guarda uma cópia do
+       `bar.db*` em `copia-antes-da-troca\` (uma vez só), roda o desinstalador do Electron em silêncio com `--updated`
+       (assim ele não apaga o `%APPDATA%`) e só apaga atalhos antigos que apontem para o exe velho.
+     - **Só para mim**: sem administrador, em `%LOCALAPPDATA%\Programs\BarERP Nativo`, sem tocar no Electron.
+     - Atualizações seguem o modo já instalado (no modo de todos os usuários pedem administrador; se o UAC for recusado,
+       avisa e reabre o app). O app é aberto sempre pelo `explorer.exe`, nunca como administrador.
+     - Atalho "BarERP Pro" na Área de Trabalho e no Menu Iniciar; a desinstalação não mexe no `%APPDATA%`.
+     - Ainda não testado num Windows de verdade (só compila).
    - **Atenção:** o atalho tem o mesmo nome do atalho do Electron. O instalador nativo sobrescreve o do Electron (é o que se
      quer na troca), mas desinstalar o Electron depois apaga o atalho, que agora aponta para o app nativo. Não
      desinstale o Electron no PC do cliente, ou recrie o atalho depois. O desinstalador nativo só apaga o atalho se

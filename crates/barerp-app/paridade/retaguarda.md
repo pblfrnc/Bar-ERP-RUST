@@ -15,13 +15,17 @@ Legenda: `[x]` feito, `[ ]` falta, `[~]` diferente de propósito (com o motivo).
 - [x] Margem de Lucro Padrão (1% a 99%) com Salvar e os avisos do original
 - [x] Backup Automático (cartão completo, abaixo)
 - [x] Cardápio Digital (cartão completo, abaixo)
-- [x] Equipe & Colaboradores, Garçons e Conectar Celular abrem as janelas da área Mesas
-- [~] Clientes (Fiado) e Fornecedores abrem as telas da área Cardápio & Estoque (no original eram abas soltas)
+- [x] Equipe & Colaboradores, Garçons e Conectar Celular abrem as mesmas janelas da área Mesas, por cima da Retaguarda
+- [x] Clientes (Fiado) e Fornecedores abrem dentro da Retaguarda (mesmas telas da área Cardápio), com seta de voltar
+- [~] Submenu no topo da Retaguarda (Visão Geral, Métricas, Equipe, Garçons, Clientes, Fornecedores, Impressoras,
+  Conectar Celular, Assinatura) para ir direto a cada parte; em tela estreita mostra só os ícones (pedido do Pablo, 21/10/2026)
+- [~] Clientes (Fiado) saiu das abas da área Cardápio & Estoque (fica só na Retaguarda, como no original)
 - [x] Configurar Impressoras & Bobina
 - [x] Auto-Impressão de Cozinha (liga/desliga, lembrada neste PC): imprime a comanda dos pedidos novos (`kds:new_order`)
 - [~] Auto-impressão sem o "plim" sonoro do navegador (o app nativo não toca som)
 - [x] "Bar ERP Pro Desktop" com a versão; selo "Atualização Disponível" e "Atualizar Agora" quando houver
-- [x] Verificar Atualizações ("Verificando...", mensagem por 6 s; com novidade abre a janela)
+- [~] Verificar Atualizações ("Verificando..."; com novidade abre a janela). O resultado fica na tela com a hora da
+  checagem (o original apagava em 6 s e parecia que o botão não fazia nada)
 
 ## Atualização do app (updater.cjs + UpdateNotificationModal; crate `barerp-updater`, `src/pages/update.rs`)
 - [x] Checagem 15 s depois de abrir e a cada 4 horas, nas três estratégias do Node (version.json da release,

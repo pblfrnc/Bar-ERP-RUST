@@ -894,7 +894,6 @@ fn bind_menu(ctx: &AppCtx, s: &RetaguardaStore) {
         });
     });
     let c = ctx.clone();
-    let c = ctx.clone();
     s.on_m_chips_relayout(move || {
         if let Some(ui) = c.ui() {
             render_categories(&ui);

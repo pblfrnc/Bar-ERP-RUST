@@ -545,6 +545,8 @@ export component RetaguardaPrinters inherits Rectangle {
             x: (root.width - root.content-w) / 2;
             y: 16px;
             width: root.content-w;
+            // Altura do próprio conteúdo: sem isso a sobra da rolagem esticava os campos em vez de virar margem
+            height: self.preferred-height;
             spacing: 20px;
 
             // Barra de navegação

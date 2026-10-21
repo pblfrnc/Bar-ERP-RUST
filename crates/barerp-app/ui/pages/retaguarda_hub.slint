@@ -475,6 +475,8 @@ export component RetaguardaHub inherits Rectangle {
             x: (root.width - root.content-w) / 2;
             y: 20px;
             width: root.content-w;
+            // Altura do próprio conteúdo: sem isso a sobra da rolagem esticava os campos em vez de virar margem
+            height: self.preferred-height;
             spacing: 16px;
 
             // Cabeçalho com tema e tamanho da fonte
