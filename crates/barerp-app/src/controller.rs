@@ -51,6 +51,8 @@ fn load_staff(ctx: &AppCtx) {
 pub fn start(ui: &AppWindow, db: Db, rt: Handle, db_label: String, server: Option<ServerHandle>) -> Timer {
     let ctx = AppCtx::new(ui, db, rt, server);
     ui.set_version(env!("CARGO_PKG_VERSION").into());
+    // Abre em tela cheia (app.slint); ao sair dela com F11 a janela fica maximizada, não no tamanho padrão
+    ui.window().set_maximized(true);
     status(ui, format!("Banco: {db_label}"), false);
 
     // Tema e escala de fonte lembrados neste PC

@@ -1,10 +1,11 @@
 //! Comandas finalizadas (histórico, 2ª via) e baixa de comanda como perda (calote).
 //! Tradução de `GET /orders/history` e `POST /orders/:id/loss` de `server/src/routes/orders.ts`, com estas
 //! diferenças de propósito:
-//! - o filtro por data usa o dia LOCAL do PC (o Node usava o dia em UTC: vendas depois das 21h caíam no dia seguinte);
+//! - o filtro por data usa o dia de movimento LOCAL do PC, das 6h às 5h59 (o Node usava o dia em UTC: vendas depois
+//!   das 21h caíam no dia seguinte; e a madrugada pertence ao fechamento do dia anterior);
 //! - a perda usa o total gravado da comanda (o Node recalculava com 10% fixo, ignorando a taxa configurada).
 
-use chrono::{Local, NaiveDate, TimeZone, Utc};
+use chrono::NaiveDate;
 
 use barerp_core::money::brl;
 
@@ -14,27 +15,24 @@ use crate::{audit, Db, DbError, DbResult, DbTime};
 
 #[derive(Debug, Clone, Default)]
 pub struct HistoryFilter {
-    /// Dia (local) do fechamento; `None` = todos
+    /// Dia de movimento (local, das 6h às 5h59) do fechamento; `None` = todos
     pub date: Option<NaiveDate>,
     /// Comanda #, mesa, cliente ou garçom
     pub search: String,
     pub limit: i64,
 }
 
-/// Início e fim do dia local em milissegundos UTC (formato do banco).
-fn local_day_bounds(day: NaiveDate) -> (i64, i64) {
-    let start = Local
-        .from_local_datetime(&day.and_hms_opt(0, 0, 0).expect("meia-noite existe"))
-        .earliest()
-        .map(|d| d.with_timezone(&Utc))
-        .unwrap_or_else(|| Utc.from_utc_datetime(&day.and_hms_opt(3, 0, 0).expect("hora válida")));
-    (start.timestamp_millis(), start.timestamp_millis() + 24 * 3600 * 1000 - 1)
+/// Início e fim (inclusive) do dia de movimento em milissegundos UTC: das 6h às 5h59 do dia seguinte,
+/// a madrugada entra no dia anterior.
+fn business_day_bounds(day: NaiveDate) -> (i64, i64) {
+    let (from, to) = barerp_core::business_day::bounds(day);
+    (from, to - 1)
 }
 
 /// Comandas pagas/fechadas, mais recentes primeiro.
 pub async fn finished_orders(db: &Db, filter: &HistoryFilter) -> DbResult<Vec<OrderHead>> {
     let limit = if filter.limit > 0 { filter.limit.min(500) } else { 100 };
-    let (from, to) = filter.date.map(local_day_bounds).unwrap_or((i64::MIN, i64::MAX));
+    let (from, to) = filter.date.map(business_day_bounds).unwrap_or((i64::MIN, i64::MAX));
     let search = filter.search.trim().to_lowercase();
     let like = format!("%{search}%");
     let rows: Vec<OrderHead> = sqlx::query_as(
@@ -142,7 +140,7 @@ mod tests {
         assert_eq!(all.len(), 1);
         let by_name = finished_orders(&f.db, &HistoryFilter { search: "mari".into(), ..Default::default() }).await.unwrap();
         assert_eq!(by_name.len(), 1);
-        let today = Local::now().date_naive();
+        let today = barerp_core::business_day::today();
         let today_rows = finished_orders(&f.db, &HistoryFilter { date: Some(today), ..Default::default() }).await.unwrap();
         assert_eq!(today_rows.len(), 1);
         let yesterday = today.pred_opt().unwrap();

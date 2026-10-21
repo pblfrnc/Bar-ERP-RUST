@@ -49,7 +49,7 @@ impl Default for State {
             license: None,
             checking_remote: false,
             margin_loaded: false,
-            day: Local::now().date_naive(),
+            day: barerp_core::business_day::today(),
             categories: Vec::new(),
             hidden: Vec::new(),
             menu: None,
@@ -933,7 +933,7 @@ fn bind_menu(ctx: &AppCtx, s: &RetaguardaStore) {
 
 fn render_dashboard(ui: &AppWindow, day: NaiveDate, d: &DashboardData) {
     let s = store(ui);
-    let today = Local::now().date_naive();
+    let today = barerp_core::business_day::today();
     let label = if day == today {
         "Hoje".to_string()
     } else {
@@ -1251,7 +1251,7 @@ pub fn bind(ctx: &AppCtx) {
         if let Some(ui) = c.ui() {
             store(&ui).set_d_audit_tab(false);
             store(&ui).set_view(RtView::Dashboard);
-            with_state(|s| s.day = Local::now().date_naive());
+            with_state(|s| s.day = barerp_core::business_day::today());
             load_dashboard(&c);
         }
     });
@@ -1351,7 +1351,7 @@ pub fn bind(ctx: &AppCtx) {
     s.on_d_refresh(move || load_dashboard(&c));
     let c = ctx.clone();
     s.on_d_shift_day(move |delta| {
-        let today = Local::now().date_naive();
+        let today = barerp_core::business_day::today();
         with_state(|s| {
             let next = s.day + chrono::Duration::days(delta as i64);
             s.day = next.min(today);
@@ -1360,7 +1360,7 @@ pub fn bind(ctx: &AppCtx) {
     });
     let c = ctx.clone();
     s.on_d_today(move || {
-        with_state(|s| s.day = Local::now().date_naive());
+        with_state(|s| s.day = barerp_core::business_day::today());
         load_dashboard(&c);
     });
     let c = ctx.clone();

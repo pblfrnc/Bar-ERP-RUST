@@ -20,22 +20,6 @@ fn ms_expr(col: &str) -> String {
     )
 }
 
-/// Início e fim (exclusivo) do dia local em ms UTC.
-pub fn local_day_bounds(day: NaiveDate) -> (i64, i64) {
-    let start = Local
-        .from_local_datetime(&day.and_hms_opt(0, 0, 0).expect("meia-noite existe"))
-        .earliest()
-        .map(|d| d.with_timezone(&Utc))
-        .unwrap_or_else(|| Utc.from_utc_datetime(&day.and_hms_opt(3, 0, 0).expect("hora válida")));
-    let next = day.succ_opt().unwrap_or(day);
-    let end = Local
-        .from_local_datetime(&next.and_hms_opt(0, 0, 0).expect("meia-noite existe"))
-        .earliest()
-        .map(|d| d.with_timezone(&Utc))
-        .unwrap_or(start + chrono::Duration::days(1));
-    (start.timestamp_millis(), end.timestamp_millis())
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TopProduct {
@@ -100,7 +84,8 @@ struct PaymentRow {
 
 /// Números do dia (local) escolhido.
 pub async fn dashboard(db: &Db, day: NaiveDate) -> DbResult<DashboardData> {
-    let (from, to) = local_day_bounds(day);
+    // Dia de movimento: das 6h às 6h do dia seguinte (a madrugada entra no dia anterior)
+    let (from, to) = barerp_core::business_day::bounds(day);
 
     // Pagamentos recebidos no dia
     let payments: Vec<PaymentRow> = sqlx::query_as(&format!(
@@ -170,17 +155,21 @@ pub async fn dashboard(db: &Db, day: NaiveDate) -> DbResult<DashboardData> {
         }
     }
 
-    // Vendas por hora (só o intervalo com vendas, uma hora antes e uma depois; sem vendas: 17h a 23h)
-    let mut hours = [0.0f64; 24];
+    // Vendas por hora (só o intervalo com vendas, uma hora antes e uma depois; sem vendas: 17h a 23h).
+    // As horas seguem o dia de movimento: 6h, 7h ... 23h, 0h ... 5h (a madrugada fica no fim do gráfico)
+    let start = barerp_core::business_day::START_HOUR as usize;
+    let mut slots = [0.0f64; 24];
     for p in &payments {
-        hours[p.received_at.0.with_timezone(&Local).hour() as usize] += p.amount;
+        let hour = p.received_at.0.with_timezone(&Local).hour() as usize;
+        slots[(hour + 24 - start) % 24] += p.amount;
     }
-    let active: Vec<usize> = (0..24).filter(|h| hours[*h] > 0.0).collect();
-    let (min_h, max_h) = match (active.first(), active.last()) {
+    let active: Vec<usize> = (0..24).filter(|s| slots[*s] > 0.0).collect();
+    let (min_s, max_s) = match (active.first(), active.last()) {
         (Some(first), Some(last)) => (first.saturating_sub(1), (*last + 1).min(23)),
-        _ => (17, 23),
+        _ => (17 - start, 23 - start),
     };
-    let sales_by_hour = (min_h..=max_h).map(|h| HourSales { hour: format!("{h}h"), total: hours[h] }).collect();
+    let sales_by_hour =
+        (min_s..=max_s).map(|s| HourSales { hour: format!("{}h", (s + start) % 24), total: slots[s] }).collect();
 
     // Garçons
     let mut waiter_performance: Vec<WaiterPerformance> = Vec::new();
@@ -333,6 +322,45 @@ mod tests {
         let empty = dashboard(&db, NaiveDate::from_ymd_opt(2026, 1, 1).unwrap()).await.unwrap();
         assert_eq!(empty.sales_by_hour.first().unwrap().hour, "17h");
         assert!(empty.top_products.is_empty());
+    }
+
+    #[tokio::test]
+    async fn madrugada_entra_no_dia_anterior() {
+        let db = Db::open_in_memory().await.unwrap();
+        let day = NaiveDate::from_ymd_opt(2026, 10, 18).unwrap();
+        let next = day.succ_opt().unwrap();
+        exec(
+            &db,
+            &format!(
+                r#"INSERT INTO "Order" ("id","orderNumber","status","total","closedAt","updatedAt")
+                   VALUES ('o1',1,'PAID',40,{},0), ('o2',2,'PAID',25,{},0), ('o3',3,'PAID',7,{},0)"#,
+                at(day, 23, 0),
+                at(next, 2, 30),
+                at(next, 6, 10)
+            ),
+        )
+        .await;
+        exec(
+            &db,
+            &format!(
+                r#"INSERT INTO "Payment" ("id","orderId","amount","method","receivedAt") VALUES
+                   ('pa','o1',40,'PIX',{}), ('pb','o2',25,'CASH',{}), ('pc','o3',7,'PIX',{})"#,
+                at(day, 23, 0),
+                at(next, 2, 30),
+                at(next, 6, 10)
+            ),
+        )
+        .await;
+
+        let d = dashboard(&db, day).await.unwrap();
+        assert_eq!(d.today_revenue, 65.0);
+        assert_eq!(d.orders_completed_today, 2);
+        // a madrugada vem depois das 23h no gráfico
+        let hours: Vec<&str> = d.sales_by_hour.iter().map(|h| h.hour.as_str()).collect();
+        assert_eq!(hours, ["22h", "23h", "0h", "1h", "2h", "3h"]);
+
+        let d = dashboard(&db, next).await.unwrap();
+        assert_eq!(d.today_revenue, 7.0);
     }
 
     #[tokio::test]

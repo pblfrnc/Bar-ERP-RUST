@@ -94,8 +94,12 @@ export component AppWindow inherits Window {
     icon: @image-url("../assets/icon.png");
     preferred-width: 1280px;
     preferred-height: 800px;
-    min-width: 960px;
-    min-height: 640px;
+    // Mínimo baixo: com o zoom do Windows (125%) e o "Aumentar Tamanho" um mínimo maior que a tela deixava a
+    // janela torta, maior que o monitor
+    min-width: 800px;
+    min-height: 500px;
+    // Abre em tela cheia (F11 ou o botão da barra alterna com a janela maximizada)
+    full-screen: true;
     background: Theme.bg;
     default-font-size: Theme.font-body;
 

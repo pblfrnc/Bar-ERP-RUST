@@ -227,7 +227,7 @@ pub(crate) fn bind(ctx: &AppCtx) {
         let ctx = ctx.clone();
         move |which| {
             let Some(ui) = ctx.ui() else { return };
-            let today = Local::now().date_naive();
+            let today = barerp_core::business_day::today();
             let text = match which.as_str() {
                 "today" => today.format("%d/%m/%Y").to_string(),
                 "yesterday" => (today - Duration::days(1)).format("%d/%m/%Y").to_string(),

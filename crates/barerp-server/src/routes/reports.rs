@@ -4,7 +4,7 @@
 use axum::extract::{Query, State};
 use axum::routing::get;
 use axum::{Json, Router};
-use chrono::{Local, NaiveDate};
+use chrono::NaiveDate;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 
@@ -27,12 +27,12 @@ struct DashboardQuery {
 }
 
 async fn get_dashboard(State(state): State<AppState>, Query(q): Query<DashboardQuery>) -> ApiResult<Json<Value>> {
-    // `?date=AAAA-MM-DD` (dia local); sem data ou inválida = hoje
+    // `?date=AAAA-MM-DD` (dia de movimento local, das 6h às 5h59); sem data ou inválida = hoje
     let day = q
         .date
         .as_deref()
         .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
-        .unwrap_or_else(|| Local::now().date_naive());
+        .unwrap_or_else(barerp_core::business_day::today);
     let d = dashboard::dashboard(&state.db, day).await?;
     // Objeto { "PIX": 50, "CASH": 30 } como o Node (na ordem em que as formas apareceram)
     let breakdown: Map<String, Value> = d.payment_methods_breakdown.iter().map(|(m, v)| (m.clone(), json!(v))).collect();

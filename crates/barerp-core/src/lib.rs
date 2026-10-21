@@ -3,6 +3,7 @@
 //! Cada módulo é a tradução direta de um arquivo do servidor Node, com o mesmo comportamento,
 //! para que o `bar.db` e os APKs atuais continuem funcionando depois da troca.
 
+pub mod business_day;
 pub mod fiscal_doc;
 pub mod ids;
 pub mod money;
