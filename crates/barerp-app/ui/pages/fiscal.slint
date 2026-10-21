@@ -3,7 +3,7 @@
 // Cada tela fica num `fiscal_*.slint`; aqui só a troca de telas e os modais comuns.
 
 import { Theme } from "../theme.slint";
-import { FiscalStore, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda } from "fiscal_store.slint";
+import { FiscalStore, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda, FxProdutoAchado } from "fiscal_store.slint";
 import { FiscalHub, InutilizacaoSheet } from "fiscal_hub.slint";
 import { ReimprimirNota, CancelarNota } from "fiscal_notas.slint";
 import { ConfiguracoesFiscais } from "fiscal_config.slint";
@@ -14,7 +14,7 @@ import { EmissorNfce } from "fiscal_nfce.slint";
 import { EmissaoNfe } from "fiscal_nfe.slint";
 import { ImportarNota } from "fiscal_importar.slint";
 
-export { FiscalStore, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda }
+export { FiscalStore, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda, FxProdutoAchado }
 
 export component FiscalAreaPage inherits Rectangle {
     background: Theme.bg;

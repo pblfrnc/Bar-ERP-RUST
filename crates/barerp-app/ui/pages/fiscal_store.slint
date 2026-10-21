@@ -125,8 +125,18 @@ export struct FxItemImport {
     atualizar-caixa: bool,
     preco-caixa: string,
     caixa-atual: string,
+    // NCM da nota ("2203.00.00" ou "") e o do produto escolhido para vincular
+    ncm: string,
+    ncm-produto: string,
+    // Vincular: o produto já tem outro NCM válido; manter-ncm = ficar com o do cadastro em vez do da nota
+    ncm-conflito: bool,
+    manter-ncm: bool,
+    // Nome do produto vinculado ("" = nenhum escolhido)
+    produto-nome: string,
 }
 export struct FxQueda { nome: string, de: string, para: string }
+// Resultado da busca de produto para vincular (idx = posição em im-produtos; sugerido = parecido com o item da nota)
+export struct FxProdutoAchado { idx: int, nome: string, detalhe: string, sugerido: bool }
 
 export global FiscalStore {
     in-out property <string> status;
@@ -414,6 +424,15 @@ export global FiscalStore {
     callback im-margem(int, string);
     callback im-preco(int, string);
     callback im-atualizar-caixa(int, bool);
+    callback im-manter-ncm(int, bool);
+    // Busca de produto para vincular: item aberto (-1 = fechada), texto digitado, item da nota e resultados
+    in-out property <int> im-busca-item: -1;
+    in-out property <string> im-busca;
+    in property <string> im-busca-nota;
+    in property <[FxProdutoAchado]> im-busca-resultados;
+    callback im-busca-abrir(int);
+    callback im-busca-editada(string);
+    callback im-busca-escolher(int);
     callback im-preco-caixa(int, string);
     callback im-aplicar();
     callback im-confirmar-quedas(bool);

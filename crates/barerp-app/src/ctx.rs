@@ -88,7 +88,7 @@ impl FontScale {
     pub fn factor(self) -> f32 {
         match self {
             FontScale::Normal => 1.0,
-            FontScale::Large => 1.25,
+            FontScale::Large => 1.2,
             FontScale::XLarge => 1.4,
         }
     }
@@ -160,6 +160,9 @@ impl Preferences {
 thread_local! {
     /// Escala do sistema (DPI do monitor) antes do zoom do usuário.
     static BASE_SCALE: Cell<Option<f32>> = const { Cell::new(None) };
+    /// Zoom escolhido ("Aumentar Tamanho") e a escala que o app aplicou por último na janela.
+    static ZOOM: Cell<FontScale> = const { Cell::new(FontScale::Normal) };
+    static APPLIED_SCALE: Cell<Option<f32>> = const { Cell::new(None) };
 }
 
 /// Aplica tema e escala de fonte na janela (o zoom vale para a tela inteira, como no original).
@@ -168,14 +171,33 @@ pub fn apply_preferences(ui: &AppWindow, prefs: Preferences) {
     ui.set_font_scale_label(prefs.font_scale.label().into());
     ui.global::<crate::RetaguardaStore>().set_font_label(prefs.font_scale.multiplier_label().into());
     ui.global::<crate::RetaguardaStore>().set_auto_print_kitchen(prefs.auto_print_kitchen);
-    let base = BASE_SCALE.with(|b| {
-        let value = b.get().unwrap_or_else(|| ui.window().scale_factor());
-        b.set(Some(value));
-        value
-    });
-    ui.window().dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged {
-        scale_factor: base * prefs.font_scale.factor(),
-    });
+    ZOOM.with(|z| z.set(prefs.font_scale));
+    sync_zoom(ui);
+}
+
+/// Aplica o zoom na janela e a remonta na largura nova, como o navegador fazia no original.
+///
+/// O Slint só troca a escala: sem o tamanho lógico novo a tela continuava montada para a largura antiga e o
+/// que passava da janela ficava cortado. Também é chamada pelo timer da casca (4 vezes por segundo): antes de
+/// a janela existir não faz nada, e quando o Windows redefine a escala (ao criar a janela ou trocar de monitor,
+/// apagando o zoom) ela vira a nova escala base e o zoom é reaplicado.
+pub fn sync_zoom(ui: &AppWindow) {
+    let window = ui.window();
+    let size = window.size();
+    if size.width == 0 || size.height == 0 {
+        return;
+    }
+    let current = window.scale_factor();
+    let ours = APPLIED_SCALE.with(|a| a.get()).is_some_and(|a| (a - current).abs() < 0.001);
+    let base = if ours { BASE_SCALE.with(|b| b.get()).unwrap_or(current) } else { current };
+    BASE_SCALE.with(|b| b.set(Some(base)));
+    let wanted = base * ZOOM.with(|z| z.get()).factor();
+    APPLIED_SCALE.with(|a| a.set(Some(wanted)));
+    if (wanted - current).abs() < 0.001 {
+        return;
+    }
+    window.dispatch_event(slint::platform::WindowEvent::ScaleFactorChanged { scale_factor: wanted });
+    window.dispatch_event(slint::platform::WindowEvent::Resized { size: size.to_logical(wanted) });
 }
 
 /// Abre um endereço no navegador padrão do sistema (WhatsApp, links externos).

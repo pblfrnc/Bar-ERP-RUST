@@ -18,7 +18,7 @@ use chrono::Datelike;
 use slint::{ComponentHandle, SharedString, Timer, TimerMode};
 
 use crate::ctx::AppCtx;
-use crate::{AppWindow, FiscalStore, FxBackup, FxBip, FxCategoria, FxConfirma, FxItemNfce, FxNcmPedido, FxNota, FxNotaAchada, FxPendente, FxProdutoBusca, FxRecebida, FxItemImport, FxNfeOk, FxQueda, FxSefaz, FxValidacao, FxVendaOk};
+use crate::{AppWindow, FiscalStore, FxBackup, FxBip, FxCategoria, FxConfirma, FxItemNfce, FxNcmPedido, FxNota, FxNotaAchada, FxPendente, FxProdutoAchado, FxProdutoBusca, FxRecebida, FxItemImport, FxNfeOk, FxQueda, FxSefaz, FxValidacao, FxVendaOk};
 
 thread_local! {
     /// Atualiza o selo da SEFAZ a cada 5 minutos, como o SefazStatusBadge.
@@ -1784,6 +1784,8 @@ struct Vinculo {
     conv_ativo: bool,
     /// 0 caixa, 1 porções
     conv_modo: i32,
+    /// Vincular com NCM diferente do cadastro: fica o do cadastro (senão vale o da nota, como no original)
+    manter_ncm: bool,
 }
 
 #[derive(Default)]
@@ -1898,6 +1900,8 @@ impl Importacao {
             None => (0, String::new()),
         };
         let unidade_conv = if v.conv_modo == 1 { "porções" } else { "unidades" };
+        let ncm_nota = so_digitos(&it.ncm);
+        let ncm_produto = prod.and_then(|p| p.ncm.as_deref()).map(so_digitos).unwrap_or_default();
         FxItemImport {
             titulo: format!("ITEM #{}{}", i + 1, if it.code.is_empty() { String::new() } else { format!(" • CÓD: {}", it.code) }).into(),
             nome: it.name.clone().into(),
@@ -1926,8 +1930,109 @@ impl Importacao {
             atualizar_caixa: v.atualizar_caixa,
             preco_caixa: v.preco_caixa_txt.clone().into(),
             caixa_atual: reais(prod.and_then(|p| p.box_price).unwrap_or(0.0)).into(),
+            ncm: ncm_formatado(&ncm_nota).into(),
+            ncm_produto: ncm_formatado(&ncm_produto).into(),
+            ncm_conflito: ncm_em_conflito(v.acao, &ncm_nota, &ncm_produto),
+            manter_ncm: v.manter_ncm,
+            produto_nome: prod.map(|p| format!("{} (Estoque atual: {})", p.name, fmt_num(p.stock))).unwrap_or_default().into(),
         }
     }
+
+    /// Produtos para vincular ao item `i`: com texto, os que têm todas as palavras no nome, código, código de barras
+    /// ou marca (código de barras ou código exato primeiro); sem texto, os parecidos com o nome do item da nota
+    /// primeiro (marcados como sugeridos) e depois o resto em ordem alfabética.
+    fn busca_vinculo(&self, i: usize, termo: &str) -> Vec<FxProdutoAchado> {
+        const LIMITE: usize = 80;
+        let item = self.itens.get(i).map(|v| v.item.clone()).unwrap_or_default();
+        let termo = crate::view::fold(termo.trim());
+        let palavras: Vec<&str> = termo.split_whitespace().collect();
+        let texto = |p: &barerp_db::importacao::ProdutoFiscal| {
+            crate::view::fold(&format!(
+                "{} {} {} {}",
+                p.name,
+                p.code.as_deref().unwrap_or(""),
+                p.ean.as_deref().unwrap_or(""),
+                p.brand.as_deref().unwrap_or("")
+            ))
+        };
+        let mut achados: Vec<(usize, i32)> = if palavras.is_empty() {
+            let da_nota: Vec<String> =
+                crate::view::fold(&item.name).split_whitespace().filter(|w| w.chars().count() >= 3).map(str::to_string).collect();
+            self.produtos
+                .iter()
+                .enumerate()
+                .map(|(idx, p)| {
+                    let nome = crate::view::fold(&p.name);
+                    let mut pontos = da_nota.iter().filter(|w| nome.contains(w.as_str())).count() as i32;
+                    if !item.ean.is_empty() && p.ean.as_deref() == Some(item.ean.as_str()) {
+                        pontos += 100;
+                    }
+                    (idx, pontos)
+                })
+                .collect()
+        } else {
+            self.produtos
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| {
+                    let t = texto(p);
+                    palavras.iter().all(|w| t.contains(w))
+                })
+                .map(|(idx, p)| {
+                    let exato = |v: &Option<String>| v.as_deref().is_some_and(|v| crate::view::fold(v) == termo);
+                    (idx, if exato(&p.ean) || exato(&p.code) { 100 } else { 0 })
+                })
+                .collect()
+        };
+        // ordem estável: pontos e, no empate, a ordem alfabética que já vem do banco
+        achados.sort_by_key(|(idx, pontos)| (-pontos, *idx));
+        achados
+            .into_iter()
+            .take(LIMITE)
+            .map(|(idx, pontos)| {
+                let p = &self.produtos[idx];
+                let mut detalhe = Vec::new();
+                if let Some(c) = p.code.as_deref().filter(|c| !c.is_empty()) {
+                    detalhe.push(format!("Cód. {c}"));
+                }
+                if let Some(e) = p.ean.as_deref().filter(|e| !e.is_empty()) {
+                    detalhe.push(format!("EAN {e}"));
+                }
+                detalhe.push(format!("Estoque {}", fmt_num(p.stock)));
+                detalhe.push(format!("Venda {}", reais(p.price)));
+                FxProdutoAchado {
+                    idx: idx as i32,
+                    nome: p.name.clone().into(),
+                    detalhe: detalhe.join(" · ").into(),
+                    sugerido: palavras.is_empty() && pontos > 0,
+                }
+            })
+            .collect()
+    }
+}
+
+fn mostrar_busca_vinculo(ui: &AppWindow) {
+    let s = store_de(ui);
+    let (i, termo) = (s.get_im_busca_item(), s.get_im_busca());
+    if i < 0 {
+        return;
+    }
+    let achados = IMPORTACAO.with(|im| im.borrow().busca_vinculo(i as usize, &termo));
+    s.set_im_busca_resultados(slint::ModelRc::new(slint::VecModel::from(achados)));
+}
+
+/// "22030000" → "2203.00.00" (o que não tem 8 dígitos fica como veio).
+fn ncm_formatado(digitos: &str) -> String {
+    if digitos.len() == 8 {
+        format!("{}.{}.{}", &digitos[..4], &digitos[4..6], &digitos[6..])
+    } else {
+        digitos.to_string()
+    }
+}
+
+/// Vincular a um produto que já tem NCM válido e diferente do da nota: o usuário escolhe qual fica.
+fn ncm_em_conflito(acao: i32, ncm_nota: &str, ncm_produto: &str) -> bool {
+    acao == 0 && !ncm_nota.is_empty() && ncm_valido(ncm_produto) && ncm_nota != ncm_produto
 }
 
 fn mostrar_conferencia(ctx: &AppCtx) {
@@ -2071,9 +2176,38 @@ fn ligar_importacao(ctx: &AppCtx, store: &FiscalStore<'_>) {
             v.atualizar_caixa = p.has_box_price;
             v.preco_caixa = None;
             v.preco_caixa_txt.clear();
+            v.manter_ncm = false;
             recalcular_preco(im, v);
         })
     });
+    let c = ctx.clone();
+    store.on_im_busca_abrir(move |i| {
+        let Some(ui) = c.ui() else { return };
+        let s = store_de(&ui);
+        let nome = IMPORTACAO.with(|im| im.borrow().itens.get(i as usize).map(|v| v.item.name.clone()).unwrap_or_default());
+        s.set_im_busca_nota(nome.into());
+        s.set_im_busca(SharedString::new());
+        s.set_im_busca_item(i);
+        mostrar_busca_vinculo(&ui);
+    });
+    let c = ctx.clone();
+    store.on_im_busca_editada(move |_| {
+        if let Some(ui) = c.ui() {
+            mostrar_busca_vinculo(&ui);
+        }
+    });
+    let c = ctx.clone();
+    store.on_im_busca_escolher(move |idx| {
+        let Some(ui) = c.ui() else { return };
+        let s = store_de(&ui);
+        let i = s.get_im_busca_item();
+        s.set_im_busca_item(-1);
+        if i >= 0 && idx >= 0 {
+            s.invoke_im_produto(i, idx);
+        }
+    });
+    let c = ctx.clone();
+    store.on_im_manter_ncm(move |i, sim| editar_item(&c, i, |_, v| v.manter_ncm = sim));
     let c = ctx.clone();
     store.on_im_categoria(move |i, idx| editar_item(&c, i, |_, v| v.categoria = Some(idx as usize)));
     let c = ctx.clone();
@@ -2311,8 +2445,11 @@ fn aplicar_importacao(ctx: &AppCtx, confirmou_queda: bool) {
             .iter()
             .map(|v| {
                 let it = &v.item;
+                // NCM nulo: o vínculo mantém o NCM que o produto já tem (COALESCE no banco)
+                let ncm_produto = im.produto(v).and_then(|p| p.ncm.as_deref()).map(so_digitos).unwrap_or_default();
+                let ncm = if v.manter_ncm && ncm_em_conflito(v.acao, &so_digitos(&it.ncm), &ncm_produto) { None } else { Some(&it.ncm) };
                 json!({
-                    "xmlItem": { "name": it.name, "quantity": it.quantity, "unitCost": it.unit_cost, "ncm": it.ncm, "cfop": it.cfop, "ean": if it.ean.is_empty() { None } else { Some(&it.ean) }, "code": it.code, "unit": it.unit },
+                    "xmlItem": { "name": it.name, "quantity": it.quantity, "unitCost": it.unit_cost, "ncm": ncm, "cfop": it.cfop, "ean": if it.ean.is_empty() { None } else { Some(&it.ean) }, "code": it.code, "unit": it.unit },
                     "action": if v.acao == 0 { "LINK" } else { "NEW" },
                     "productId": im.produto(v).map(|p| p.id.clone()),
                     "categoryId": v.categoria.and_then(|c| im.categorias.get(c)).map(|c| c.0.clone()),
@@ -3068,5 +3205,55 @@ mod tests {
         assert_eq!(resultado_emissao(&r(200, json!({ "status": "autorizado", "referencia": "nfce_x" }))), ResultadoNfce::Autorizada { referencia: "nfce_x".into() });
         assert_eq!(resultado_emissao(&r(200, json!({ "status": "processando", "ref": "nfce_y" }))), ResultadoNfce::Processando { referencia: "nfce_y".into() });
         assert_eq!(resultado_emissao(&r(400, json!({ "error": "SEFAZ recusou" }))), ResultadoNfce::Erro("SEFAZ recusou".into()));
+    }
+
+    #[test]
+    fn ncm_da_nota_no_vinculo() {
+        assert_eq!(ncm_formatado("22030000"), "2203.00.00");
+        assert_eq!(ncm_formatado("2203"), "2203");
+        assert_eq!(ncm_formatado(""), "");
+        // vincular com NCM diferente e válido no cadastro: pergunta
+        assert!(ncm_em_conflito(0, "22030000", "22021000"));
+        // mesmo NCM, cadastro sem NCM (ou inválido), nota sem NCM ou item criado: grava o da nota sem perguntar
+        assert!(!ncm_em_conflito(0, "22030000", "22030000"));
+        assert!(!ncm_em_conflito(0, "22030000", ""));
+        assert!(!ncm_em_conflito(0, "22030000", "2203"));
+        assert!(!ncm_em_conflito(0, "", "22021000"));
+        assert!(!ncm_em_conflito(1, "22030000", "22021000"));
+    }
+
+    #[test]
+    fn busca_de_produto_para_vincular() {
+        use barerp_db::importacao::ProdutoFiscal;
+        let p = |nome: &str, codigo: &str, ean: &str| ProdutoFiscal {
+            name: nome.into(),
+            code: Some(codigo.into()),
+            ean: Some(ean.into()).filter(|e: &String| !e.is_empty()),
+            ..Default::default()
+        };
+        let im = Importacao {
+            // em ordem alfabética, como vem do banco
+            produtos: vec![
+                p("Água Mineral 500ml", "101", ""),
+                p("Cerveja Heineken Lata 350ml", "201", "7896045506873"),
+                p("Cerveja Original 600ml", "202", ""),
+                p("Porção de Fritas", "301", ""),
+            ],
+            itens: vec![Vinculo { item: ItemXmlNota { name: "CERV HEINEKEN LATA 350ML CX12".into(), ..Default::default() }, ..Default::default() }],
+            ..Default::default()
+        };
+        let nomes = |r: Vec<FxProdutoAchado>| r.iter().map(|a| a.nome.to_string()).collect::<Vec<_>>();
+        // sem texto: o parecido com o item da nota vem primeiro e marcado, depois todos em ordem alfabética
+        let r = im.busca_vinculo(0, "");
+        assert_eq!(r.len(), 4);
+        assert_eq!((r[0].nome.as_str(), r[0].sugerido, r[0].idx), ("Cerveja Heineken Lata 350ml", true, 1));
+        assert!(!r[1].sugerido);
+        // palavras em qualquer ordem, sem acento e sem maiúscula
+        assert_eq!(nomes(im.busca_vinculo(0, "agua")), vec!["Água Mineral 500ml"]);
+        assert_eq!(nomes(im.busca_vinculo(0, "600 cerveja")), vec!["Cerveja Original 600ml"]);
+        // código de barras e código interno
+        assert_eq!(nomes(im.busca_vinculo(0, "7896045506873")), vec!["Cerveja Heineken Lata 350ml"]);
+        assert_eq!(nomes(im.busca_vinculo(0, "301")), vec!["Porção de Fritas"]);
+        assert!(im.busca_vinculo(0, "vodka").is_empty());
     }
 }

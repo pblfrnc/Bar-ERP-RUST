@@ -4,7 +4,7 @@
 
 import { Theme } from "../theme.slint";
 import { ComboBox } from "std-widgets.slint";
-import { FiscalStore, FxItemImport, FxQueda } from "fiscal_store.slint";
+import { FiscalStore, FxItemImport, FxQueda, FxProdutoAchado } from "fiscal_store.slint";
 import { FxCor, FxCores, FxCard, FxBadge, FxLabel, FxButton, FxBotao, FxInput, FxField, FxAviso, FxOpcao, FxSheet, Icon } from "fiscal_ui.slint";
 import { FiscalIcons } from "fiscal_icons.slint";
 
@@ -80,6 +80,17 @@ component ItemConferencia inherits Rectangle {
             HorizontalLayout { spacing: 6px; Text { text: "Qtd:"; color: Theme.text-muted; font-size: 12px; } Text { text: root.it.qtd; color: Theme.text; font-size: 12px; font-weight: 800; } }
             HorizontalLayout { spacing: 6px; Text { text: "Custo Unit.:"; color: Theme.text-muted; font-size: 12px; } Text { text: root.it.custo; color: Theme.text; font-size: 12px; font-weight: 800; } }
             HorizontalLayout { spacing: 6px; Text { text: "Total:"; color: Theme.text-muted; font-size: 12px; } Text { text: root.it.total; color: Theme.text; font-size: 12px; font-weight: 800; } }
+            HorizontalLayout {
+                spacing: 6px;
+                Text { text: "NCM:"; color: Theme.text-muted; font-size: 12px; }
+                Text {
+                    text: root.it.ncm != "" ? root.it.ncm : "não informado na nota";
+                    color: root.it.ncm != "" ? Theme.text : Theme.closing;
+                    font-size: 12px;
+                    font-weight: 800;
+                    font-family: root.it.ncm != "" ? "Menlo" : "";
+                }
+            }
         }
         VerticalLayout { alignment: center; Icon { source: FiscalIcons.arrow-right; color: Theme.text-muted; size: 18px; } }
         // ação no sistema
@@ -146,11 +157,66 @@ component ItemConferencia inherits Rectangle {
                 spacing: 10px;
                 FxField {
                     label: "PRODUTO NO SISTEMA (ESTOQUE SERÁ SOMADO):";
-                    ComboBox {
-                        model: FiscalStore.im-produtos;
-                        current-index: root.it.produto-idx;
-                        selected => { FiscalStore.im-produto(root.i, self.current-index); }
+                    // Campo que abre a busca (antes era uma lista suspensa com todos os produtos)
+                    Rectangle {
+                        height: 44px;
+                        border-radius: 12px;
+                        border-width: 1px;
+                        border-color: escolher.has-hover ? Theme.occupied : (root.it.produto-nome == "" ? Theme.closing.with-alpha(0.6) : Theme.border);
+                        background: Theme.bg;
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 8px;
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.search; color: Theme.text-muted; size: 15px; } }
+                            Text {
+                                text: root.it.produto-nome != "" ? root.it.produto-nome : "Buscar produto pelo nome, código ou código de barras...";
+                                color: root.it.produto-nome != "" ? Theme.text : Theme.text-muted;
+                                font-size: 13px;
+                                font-weight: root.it.produto-nome != "" ? 700 : 400;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                            Text { text: root.it.produto-nome != "" ? "Trocar" : "Buscar"; color: Theme.occupied; font-size: 12px; font-weight: 900; vertical-alignment: center; }
+                        }
+                        escolher := TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.im-busca-abrir(root.i); } }
                     }
+                }
+                if root.it.ncm-conflito: Rectangle {
+                    border-radius: 14px;
+                    background: Theme.closing.with-alpha(0.08);
+                    border-width: 1px;
+                    border-color: Theme.closing.with-alpha(0.4);
+                    height: conflito.preferred-height;
+                    conflito := VerticalLayout {
+                        padding: 12px;
+                        spacing: 10px;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.shield-alert; color: Theme.closing; size: 14px; } }
+                            Text {
+                                text: "NCM diferente: a nota traz " + root.it.ncm + " e o cadastro tem " + root.it.ncm-produto + ". Qual fica no produto?";
+                                color: Theme.text;
+                                font-size: 12px;
+                                font-weight: 800;
+                                wrap: word-wrap;
+                                horizontal-stretch: 1;
+                                vertical-alignment: center;
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            FxOpcao { text: "Usar o da nota (" + root.it.ncm + ")"; cor: FxCor.ambar; ativo: !root.it.manter-ncm; clicked => { FiscalStore.im-manter-ncm(root.i, false); } }
+                            FxOpcao { text: "Manter o do cadastro (" + root.it.ncm-produto + ")"; cor: FxCor.azul; ativo: root.it.manter-ncm; clicked => { FiscalStore.im-manter-ncm(root.i, true); } }
+                        }
+                    }
+                }
+                if !root.it.ncm-conflito && root.it.produto-idx >= 0 && root.it.ncm != "" && root.it.ncm-produto != root.it.ncm: Text {
+                    text: "O NCM da nota (" + root.it.ncm + ") será gravado no cadastro do produto.";
+                    color: Theme.text-muted;
+                    font-size: 11px;
+                    wrap: word-wrap;
                 }
                 Rectangle {
                     border-radius: 14px;
@@ -213,6 +279,15 @@ component ItemConferencia inherits Rectangle {
             // criar produto novo
             if root.it.acao == 1: VerticalLayout {
                 spacing: 10px;
+                Text {
+                    text: root.it.ncm != ""
+                        ? "O produto será cadastrado com o NCM da nota (" + root.it.ncm + "), além do CFOP, código de barras e unidade."
+                        : "A nota não informa o NCM: cadastre no produto antes de vendê-lo com NFC-e.";
+                    color: root.it.ncm != "" ? Theme.text-muted : Theme.closing;
+                    font-size: 11px;
+                    font-weight: root.it.ncm != "" ? 400 : 700;
+                    wrap: word-wrap;
+                }
                 FxField {
                     label: "CATEGORIA DO NOVO PRODUTO:";
                     ComboBox {
@@ -255,6 +330,28 @@ component ItemConferencia inherits Rectangle {
             if root.it.acao == 2: Text { text: "Este item não entrará no estoque e não alterará preços."; color: Theme.text-muted; font-size: 12px; font-italic: true; }
         }
     }
+}
+
+component ProdutoAchado inherits Rectangle {
+    in property <FxProdutoAchado> p;
+    callback escolher;
+    height: 52px;
+    border-radius: 12px;
+    background: t.has-hover ? Theme.surface-2 : transparent;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 10px;
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            Text { text: root.p.nome; color: Theme.text; font-size: 13px; font-weight: 800; overflow: elide; }
+            Text { text: root.p.detalhe; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+        }
+        if root.p.sugerido: VerticalLayout { alignment: center; FxBadge { text: "PARECIDO COM A NOTA"; cor: FxCor.verde; } }
+    }
+    t := TouchArea { mouse-cursor: pointer; clicked => { root.escolher(); } }
 }
 
 export component ImportarNota inherits Rectangle {
@@ -434,6 +531,50 @@ export component ImportarNota inherits Rectangle {
                 enabled: !FiscalStore.im-aplicando && FiscalStore.im-confirma-estado == 1;
                 clicked => { FiscalStore.im-aplicar(); }
             }
+        }
+    }
+
+    // ---------- busca do produto para vincular ----------
+    if FiscalStore.im-busca-item >= 0: FxSheet {
+        titulo: "Vincular a um produto do sistema";
+        subtitulo: "Item da nota: " + FiscalStore.im-busca-nota;
+        icone: FiscalIcons.search;
+        cor: FxCor.azul;
+        largura: 680px;
+        fechar => { FiscalStore.im-busca-item = -1; }
+        FxInput {
+            text <=> FiscalStore.im-busca;
+            placeholder: "Digite o nome, o código ou o código de barras (Enter escolhe o primeiro)";
+            init => { self.focus(); }
+            edited(t) => { FiscalStore.im-busca-editada(t); }
+            accepted => {
+                if FiscalStore.im-busca-resultados.length > 0 {
+                    FiscalStore.im-busca-escolher(FiscalStore.im-busca-resultados[0].idx);
+                }
+            }
+        }
+        if FiscalStore.im-busca-resultados.length == 0: Text {
+            text: "Nenhum produto encontrado. Use \"Criar Novo\" no item para cadastrar.";
+            color: Theme.text-muted;
+            font-size: 13px;
+            horizontal-alignment: center;
+            height: 60px;
+            vertical-alignment: center;
+        }
+        if FiscalStore.im-busca-resultados.length > 0: Flickable {
+            height: min(420px, lista.preferred-height);
+            content-height: lista.preferred-height;
+            lista := VerticalLayout {
+                spacing: 2px;
+                for p in FiscalStore.im-busca-resultados: ProdutoAchado {
+                    p: p;
+                    escolher => { FiscalStore.im-busca-escolher(p.idx); }
+                }
+            }
+        }
+        HorizontalLayout {
+            alignment: end;
+            FxButton { text: "Fechar"; clicked => { FiscalStore.im-busca-item = -1; } }
         }
     }
 

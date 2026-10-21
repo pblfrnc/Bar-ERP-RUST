@@ -233,12 +233,13 @@ pub fn start(ui: &AppWindow, db: Db, rt: Handle, db_label: String, server: Optio
         }
     });
 
-    // Barra superior compacta conforme a largura real da janela (verificada 4 vezes por segundo)
+    // Zoom da fonte e barra superior compacta conforme a largura real da janela (verificados 4 vezes por segundo)
     let layout_timer = Timer::default();
     layout_timer.start(TimerMode::Repeated, Duration::from_millis(250), {
         let weak = ui.as_weak();
         move || {
             let Some(ui) = weak.upgrade() else { return };
+            crate::ctx::sync_zoom(&ui);
             let width = ui.window().size().width as f32 / ui.window().scale_factor();
             let (compact, tiny) = (width < 1500.0, width < 1180.0);
             if ui.get_compact() != compact {

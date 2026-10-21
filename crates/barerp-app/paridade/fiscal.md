@@ -56,6 +56,11 @@ Legenda: `[x]` feito · `[ ]` falta · `[~]` diferente de propósito (com o moti
 - [x] "Buscando e Processando XML da SEFAZ..." (parsed-by-chave, com reserva XML bruto + import-xml)
 - [x] Conferência: fornecedor, CNPJ e NF; 2º bip de confirmação (confere / divergente / aguardando) que libera a entrada
 - [x] Por item: Vincular Existente / Criar Novo / Ignorar; produto (lista com estoque atual) ou categoria
+- [~] Produto para vincular escolhido por busca (nome, código, código de barras ou marca, sem acento; Enter pega o
+  primeiro; sem texto, os parecidos com o item da nota vêm primeiro) em vez da lista suspensa (pedido do Pablo, 21/10/2026)
+- [x] NCM, CFOP, código de barras e unidade da nota vão para o produto criado ou vinculado
+- [~] O NCM da nota aparece em cada item; ao vincular a um produto que já tem outro NCM válido, o usuário escolhe se fica o
+  da nota ou o do cadastro (o original trocava sem avisar). Item criado sem NCM na nota mostra o aviso para cadastrar
 - [x] Fator de conversão: liga/desliga, atalhos (10/12/6/24 un, 12/6 porções), fator digitado, custo unitário real, entrada no estoque; sugestão automática pelo nome (CX12, FD 24, cigarro, kg)
 - [x] Preço: margem ↔ preço (um recalcula o outro), venda atual e custo anterior, "Preço abaixará / Reajuste / Preço mantido"; caixa proporcional
 - [x] Validações e modal "Atenção: Redução de Preço de Venda!" antes de efetivar

@@ -14,7 +14,8 @@ Legenda: `[x]` feito · `[ ]` falta · `[~]` diferente de propósito (motivo ao 
 - [x] Aviso de mensalidade vencendo (≤ 5 dias) com dados de PIX (`LicenseInfoModal`, área Retaguarda)
 - [x] Tela cheia (F11 / botão)
 - [x] Tema claro e escuro
-- [x] Escala de fonte Normal (100%) / Grande (125%) / Extra Grande (140%), lembrada entre aberturas
+- [x] Escala de fonte Normal (100%) / Grande (120%) / Extra Grande (140%), lembrada entre aberturas; a tela se remonta
+  na largura da janela ao trocar (antes ficava cortada) e o zoom volta sozinho se o Windows redefinir a escala
 - [x] Conectar celular (QR Code com IP da rede) — ConnectMobileModal, com ajuda do Firewall (pela Retaguarda e pelo KDS)
 - [x] Login: escolher funcionário + senha/PIN, bloqueio após 5 tentativas (15 s)
 - [~] Login: senha mestra 9999 removida (decisão do Pablo, 18/10/2026); admin inicial 1234 com troca sugerida
