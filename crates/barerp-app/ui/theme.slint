@@ -1,0 +1,26 @@
+// Paleta do BarERP (mesmas cores do app React): âmbar como cor principal, tema escuro (slate-950) ou claro
+// (slate-100), escolhido pelo usuário e lembrado entre aberturas. Use sempre as cores daqui — nunca
+// cores fixas — para as telas funcionarem nos dois temas. A escala de fonte (100/125/140%) é aplicada como
+// zoom da janela inteira pelo Rust (`ctx::apply_font_scale`), então as telas usam tamanhos normais.
+
+export global Theme {
+    in-out property <bool> dark: true;
+
+    out property <color> bg: dark ? #020617 : #f1f5f9;             // slate-950 / slate-100
+    out property <color> surface: dark ? #0f172a : #ffffff;         // slate-900 / branco
+    out property <color> surface-2: dark ? #1e293b : #e2e8f0;       // slate-800 / slate-200
+    out property <color> border: dark ? #334155 : #cbd5e1;          // slate-700 / slate-300
+    out property <color> text: dark ? #f1f5f9 : #0f172a;            // slate-100 / slate-900
+    out property <color> text-muted: dark ? #94a3b8 : #64748b;      // slate-400 / slate-500
+    out property <color> overlay: dark ? #020617cc : #0f172a99;     // fundo escurecido dos modais
+    out property <color> primary: #f59e0b;                          // amber-500
+    out property <color> primary-text: #1c1917;
+    out property <color> available: dark ? #10b981 : #059669;       // emerald-500 / 600
+    out property <color> occupied: dark ? #3b82f6 : #2563eb;        // blue-500 / 600
+    out property <color> closing: dark ? #f59e0b : #d97706;         // amber-500 / 600
+    out property <color> danger: dark ? #f43f5e : #e11d48;          // rose-500 / 600
+    out property <color> purple: dark ? #a855f7 : #9333ea;          // purple-500 / 600
+    out property <color> orange: dark ? #f97316 : #ea580c;          // orange-500 / 600
+    out property <length> radius: 14px;
+    out property <length> font-body: 15px;
+}

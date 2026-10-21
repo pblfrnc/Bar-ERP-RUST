@@ -1,0 +1,23 @@
+[package]
+name = "barerp-fiscal"
+description = "Emissão fiscal do BarERP pela Focus NFe (NFC-e, NF-e, notas recebidas e leitura de XML)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+barerp-core = { path = "../barerp-core" }
+chrono = "0.4.39"
+quick-xml = "0.37.5"
+rand = "0.8.5"
+regex = "1.11.1"
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+thiserror = "2.0.11"
+tokio = { version = "1.43.0", features = ["time"] }
+
+[dev-dependencies]
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread", "time"] }
+wiremock = "0.6.2"

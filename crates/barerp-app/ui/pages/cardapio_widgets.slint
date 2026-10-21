@@ -1,0 +1,293 @@
+// Componentes visuais da área Cardápio & Estoque (mesmo desenho do original: cartões arredondados,
+// selos coloridos, chaves liga/desliga). Só cores do Theme.
+
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons, Icon } from "../icons.slint";
+
+// Selo pequeno colorido ("#5001", "NOVO ITEM", "60% margem")
+export component Pill inherits Rectangle {
+    in property <string> text;
+    in property <color> tone: Theme.text-muted;
+    in property <bool> mono;
+    in property <bool> solid;
+    height: 20px;
+    width: t.preferred-width + 14px;
+    border-radius: 6px;
+    background: root.solid ? root.tone : root.tone.with-alpha(0.14);
+    border-width: root.solid ? 0px : 1px;
+    border-color: root.tone.with-alpha(0.32);
+    t := Text {
+        text: root.text;
+        color: root.solid ? Theme.primary-text : root.tone;
+        font-size: 10px;
+        font-weight: 800;
+        font-family: root.mono ? "Menlo" : "";
+    }
+}
+
+// Botão com ícone opcional. `fill` = fundo; `tone` = texto/ícone.
+export component Btn inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon;
+    in property <color> tone: Theme.text;
+    in property <color> fill: Theme.surface-2;
+    in property <bool> enabled: true;
+    in property <bool> busy;
+    in property <length> font-size: 12px;
+    in property <int> weight: 700;
+    in property <length> h: 36px;
+    callback clicked;
+    height: root.h;
+    min-width: row.preferred-width + 24px;
+    border-radius: 12px;
+    opacity: root.enabled && !root.busy ? 1 : 0.5;
+    background: touch.has-hover && root.enabled ? root.fill.brighter(Theme.dark ? 0.25 : -0.06) : root.fill;
+    border-width: root.fill == Theme.surface-2 ? 1px : 0px;
+    border-color: Theme.border;
+    row := HorizontalLayout {
+        alignment: center;
+        spacing: 6px;
+        if root.has-icon || root.busy: Icon {
+            source: root.busy ? Icons.refresh-cw : root.icon;
+            color: root.tone;
+            size: 15px;
+            y: (parent.height - self.height) / 2;
+        }
+        Text { text: root.text; color: root.tone; font-size: root.font-size; font-weight: root.weight; vertical-alignment: center; }
+    }
+    touch := TouchArea { enabled: root.enabled && !root.busy; clicked => { root.clicked(); } }
+}
+
+// Botão quadrado só com ícone (ações da linha da tabela)
+export component IconBtn inherits Rectangle {
+    in property <image> icon;
+    in property <color> hover-tone: Theme.text;
+    in property <length> size: 30px;
+    callback clicked;
+    width: root.size;
+    height: root.size;
+    border-radius: 9px;
+    background: touch.has-hover ? root.hover-tone.with-alpha(0.14) : transparent;
+    Icon { source: root.icon; color: touch.has-hover ? root.hover-tone : Theme.text-muted; size: 16px; }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+export component CloseX inherits Rectangle {
+    callback clicked;
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    background: touch.has-hover ? Theme.border : Theme.surface-2;
+    Icon { source: Icons.x; color: Theme.text-muted; size: 18px; }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+// Rótulo de campo em maiúsculas
+export component FieldLabel inherits Text {
+    color: Theme.text-muted;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+}
+
+// Dica pequena abaixo do campo
+export component Hint inherits Text {
+    color: Theme.text-muted;
+    font-size: 10px;
+    wrap: word-wrap;
+}
+
+// Chave liga/desliga (as "toggles" do original)
+export component Toggle inherits Rectangle {
+    in-out property <bool> checked;
+    callback toggled(bool);
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: root.checked ? Theme.primary : Theme.border;
+    Rectangle {
+        width: 20px;
+        height: 20px;
+        y: 2px;
+        x: root.checked ? 22px : 2px;
+        border-radius: 10px;
+        background: #ffffff;
+        animate x { duration: 120ms; }
+    }
+    TouchArea {
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled(root.checked);
+        }
+    }
+}
+
+// Caixa de marcar
+export component Check inherits Rectangle {
+    in property <bool> checked;
+    in property <length> size: 20px;
+    callback clicked;
+    width: root.size;
+    height: root.size;
+    border-radius: 6px;
+    background: root.checked ? Theme.primary : transparent;
+    border-width: root.checked ? 0px : 2px;
+    border-color: Theme.border;
+    if root.checked: Icon { source: Icons.check; color: Theme.primary-text; size: root.size - 6px; }
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+// Chip de atalho pequeno ("un", "lata", "5102 (Revenda Normal)")
+export component MiniChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <bool> mono;
+    in property <color> tone: Theme.primary;
+    callback clicked;
+    height: 24px;
+    width: t.preferred-width + 16px;
+    border-radius: 8px;
+    background: root.active ? root.tone : (touch.has-hover ? Theme.border : Theme.surface-2);
+    border-width: root.active ? 0px : 1px;
+    border-color: Theme.border;
+    t := Text {
+        text: root.text;
+        color: root.active ? Theme.primary-text : Theme.text;
+        font-size: 11px;
+        font-weight: 700;
+        font-family: root.mono ? "Menlo" : "";
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+// Cartão com título e ícone (blocos do formulário do produto)
+export component Card inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <image> icon;
+    in property <color> tone: Theme.primary;
+    in property <color> border: Theme.surface-2;
+    background: Theme.surface;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: root.border;
+    height: body.preferred-height;
+    body := VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 10px;
+            Icon { source: root.icon; color: root.tone; size: 20px; y: (parent.height - self.height) / 2; }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                Text { text: root.title; color: Theme.text; font-size: 15px; font-weight: 900; wrap: word-wrap; }
+                if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+            }
+        }
+        @children
+    }
+}
+
+// Caixa de aviso colorida (retorno da busca EAN, erros, prévia)
+export component Notice inherits Rectangle {
+    in property <string> text;
+    in property <color> tone: Theme.primary;
+    visible: root.text != "";
+    height: root.text == "" ? 0px : t.preferred-height + 20px;
+    border-radius: 12px;
+    background: root.tone.with-alpha(0.12);
+    border-width: 1px;
+    border-color: root.tone.with-alpha(0.35);
+    t := Text {
+        x: 12px;
+        width: parent.width - 24px;
+        text: root.text;
+        color: root.tone;
+        font-size: 12px;
+        font-weight: 600;
+        wrap: word-wrap;
+    }
+}
+
+// Campo de texto com prefixo/sufixo ("R$", "%")
+export component Field inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder;
+    in property <string> prefix;
+    in property <string> suffix;
+    in property <bool> mono;
+    in property <bool> big;
+    in property <InputType> input-type: InputType.text;
+    callback edited(string);
+    callback accepted();
+    height: root.big ? 46px : 40px;
+    HorizontalLayout {
+        spacing: 4px;
+        if root.prefix != "": Text { text: root.prefix; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
+        edit := LineEdit {
+            horizontal-stretch: 1;
+            text <=> root.text;
+            placeholder-text: root.placeholder;
+            input-type: root.input-type;
+            font-size: root.big ? 17px : 13px;
+            edited(t) => { root.edited(t); }
+            accepted => { root.accepted(); }
+        }
+        if root.suffix != "": Text { text: root.suffix; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
+    }
+}
+
+// Janela modal com cabeçalho (ícone + título + subtítulo), corpo rolável e fechar
+export component Sheet inherits Rectangle {
+    in property <length> panel-width: 640px;
+    in property <length> panel-height: 0px;
+    in property <image> icon;
+    in property <color> tone: Theme.primary;
+    in property <string> title;
+    in property <string> subtitle;
+    callback close();
+    background: Theme.overlay;
+    TouchArea { }
+    panel := Rectangle {
+        width: min(root.panel-width, root.width - 24px);
+        height: root.panel-height > 0 ? min(root.panel-height, root.height - 24px) : min(content.preferred-height, root.height - 24px);
+        background: Theme.surface;
+        border-radius: 24px;
+        border-width: 1px;
+        border-color: Theme.surface-2;
+        clip: true;
+        content := VerticalLayout {
+            Rectangle {
+                background: Theme.surface-2.with-alpha(0.35);
+                height: head.preferred-height;
+                head := HorizontalLayout {
+                    padding: 16px;
+                    padding-left: 20px;
+                    spacing: 12px;
+                    Rectangle {
+                        width: 40px;
+                        height: 40px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 14px;
+                        background: root.tone.with-alpha(0.12);
+                        border-width: 1px;
+                        border-color: root.tone.with-alpha(0.25);
+                        Icon { source: root.icon; color: root.tone; size: 20px; }
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        spacing: 2px;
+                        Text { text: root.title; color: Theme.text; font-size: 18px; font-weight: 900; overflow: elide; }
+                        if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                    }
+                    CloseX { y: (parent.height - self.height) / 2; clicked => { root.close(); } }
+                }
+            }
+            @children
+        }
+    }
+}

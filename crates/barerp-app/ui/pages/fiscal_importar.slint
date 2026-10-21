@@ -1,0 +1,462 @@
+// 2º BIP: Importação de NF-e e Entrada no Estoque (FiscalImportView): bipar a DANFE ou carregar o .xml,
+// conferir os itens (vincular, criar ou ignorar), fator de conversão (caixa/porções), preço pela margem,
+// preço de caixa, confirmação física com o 2º bip e alerta de redução de preço.
+
+import { Theme } from "../theme.slint";
+import { ComboBox } from "std-widgets.slint";
+import { FiscalStore, FxItemImport, FxQueda } from "fiscal_store.slint";
+import { FxCor, FxCores, FxCard, FxBadge, FxLabel, FxButton, FxBotao, FxInput, FxField, FxAviso, FxOpcao, FxSheet, Icon } from "fiscal_ui.slint";
+import { FiscalIcons } from "fiscal_icons.slint";
+
+component Caixinha inherits Rectangle {
+    in property <bool> marcado;
+    in property <FxCor> cor: FxCor.azul;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: root.marcado ? FxCores.de(root.cor) : transparent;
+    border-width: 2px;
+    border-color: root.marcado ? FxCores.de(root.cor) : Theme.border;
+    if root.marcado: Icon { source: FiscalIcons.check; color: #ffffff; size: 13px; }
+}
+
+component Preset inherits Rectangle {
+    in property <string> text;
+    in property <bool> ativo;
+    callback clicked;
+    height: 30px;
+    width: pt.preferred-width + 20px;
+    border-radius: 15px;
+    background: root.ativo ? Theme.occupied : (t.has-hover ? Theme.border : Theme.surface-2);
+    pt := Text { text: root.text; color: root.ativo ? #ffffff : Theme.text; font-size: 11px; font-weight: 800; }
+    t := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+// Campo que mostra o valor calculado fora (margem ↔ preço) enquanto não está sendo digitado
+component CampoSync inherits Rectangle {
+    in property <string> valor;
+    in property <bool> erro;
+    in property <TextHorizontalAlignment> align: left;
+    callback editado(string);
+    min-height: 42px;
+    campo := FxInput {
+        width: 100%;
+        height: 100%;
+        mono: true;
+        error: root.erro;
+        align: root.align;
+        edited(t) => { root.editado(t); }
+        init => { self.text = root.valor; }
+    }
+    changed valor => { if !campo.has-focus { campo.text = root.valor; } }
+}
+
+component Moeda inherits HorizontalLayout {
+    in property <string> text;
+    in property <bool> alerta;
+    callback editado(string);
+    spacing: 6px;
+    Text { text: "R$"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
+    CampoSync { horizontal-stretch: 1; valor: root.text; erro: root.alerta; editado(t) => { root.editado(t); } }
+}
+
+component ItemConferencia inherits Rectangle {
+    in property <FxItemImport> it;
+    in property <int> i;
+    border-radius: 22px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: root.it.acao == 2 ? Theme.border : root.it.acao == 1 ? Theme.available.with-alpha(0.4) : Theme.occupied.with-alpha(0.4);
+    height: corpo.preferred-height;
+    corpo := HorizontalLayout {
+        padding: 18px;
+        spacing: 16px;
+        // dados do XML
+        VerticalLayout {
+            width: 30%;
+            spacing: 6px;
+            FxLabel { text: root.it.titulo; }
+            Text { text: root.it.nome; color: Theme.text; font-size: 14px; font-weight: 900; wrap: word-wrap; }
+            HorizontalLayout { spacing: 6px; Text { text: "Qtd:"; color: Theme.text-muted; font-size: 12px; } Text { text: root.it.qtd; color: Theme.text; font-size: 12px; font-weight: 800; } }
+            HorizontalLayout { spacing: 6px; Text { text: "Custo Unit.:"; color: Theme.text-muted; font-size: 12px; } Text { text: root.it.custo; color: Theme.text; font-size: 12px; font-weight: 800; } }
+            HorizontalLayout { spacing: 6px; Text { text: "Total:"; color: Theme.text-muted; font-size: 12px; } Text { text: root.it.total; color: Theme.text; font-size: 12px; font-weight: 800; } }
+        }
+        VerticalLayout { alignment: center; Icon { source: FiscalIcons.arrow-right; color: Theme.text-muted; size: 18px; } }
+        // ação no sistema
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 12px;
+            HorizontalLayout {
+                spacing: 8px;
+                FxOpcao { text: "Vincular Existente"; cor: FxCor.azul; ativo: root.it.acao == 0; clicked => { FiscalStore.im-acao(root.i, 0); } }
+                FxOpcao { text: "Criar Novo"; cor: FxCor.verde; ativo: root.it.acao == 1; clicked => { FiscalStore.im-acao(root.i, 1); } }
+                FxOpcao { text: "Ignorar"; cor: FxCor.neutro; ativo: root.it.acao == 2; clicked => { FiscalStore.im-acao(root.i, 2); } }
+            }
+            // fator de conversão / rendimento
+            if root.it.acao != 2: Rectangle {
+                border-radius: 16px;
+                background: root.it.conv-ativo ? Theme.occupied.with-alpha(0.06) : Theme.bg;
+                border-width: 1px;
+                border-color: root.it.conv-ativo ? Theme.occupied.with-alpha(0.3) : Theme.border;
+                height: conv.preferred-height;
+                conv := VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Rectangle {
+                            width: 20px;
+                            Caixinha { marcado: root.it.conv-ativo; }
+                            TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.im-conv-ativo(root.i, !root.it.conv-ativo); } }
+                        }
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.layers; color: Theme.occupied; size: 14px; } }
+                        Text { text: "Fator de Conversão / Rendimento (Fracionar Caixa / Porção)"; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+                        if root.it.conv-ativo: FxBadge { text: root.it.conv-modo == 1 ? "MODO: RENDIMENTO DE PORÇÕES" : "MODO: CAIXA / EMBALAGEM"; cor: FxCor.azul; }
+                    }
+                    if root.it.conv-ativo: VerticalLayout {
+                        spacing: 10px;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            Text { text: "Atalhos rápidos:"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                            Preset { text: "10 un (Cigarro)"; ativo: root.it.fator == "10" && root.it.conv-modo == 0; clicked => { FiscalStore.im-conv-preset(root.i, 10, 0); } }
+                            Preset { text: "12 un (Caixa)"; ativo: root.it.fator == "12" && root.it.conv-modo == 0; clicked => { FiscalStore.im-conv-preset(root.i, 12, 0); } }
+                            Preset { text: "6 un (Pack)"; ativo: root.it.fator == "6" && root.it.conv-modo == 0; clicked => { FiscalStore.im-conv-preset(root.i, 6, 0); } }
+                            Preset { text: "24 un (Fardo)"; ativo: root.it.fator == "24" && root.it.conv-modo == 0; clicked => { FiscalStore.im-conv-preset(root.i, 24, 0); } }
+                            Preset { text: "12 porções (5kg)"; ativo: root.it.fator == "12" && root.it.conv-modo == 1; clicked => { FiscalStore.im-conv-preset(root.i, 12, 1); } }
+                            Preset { text: "6 porções (2kg)"; ativo: root.it.fator == "6" && root.it.conv-modo == 1; clicked => { FiscalStore.im-conv-preset(root.i, 6, 1); } }
+                        }
+                        HorizontalLayout {
+                            spacing: 10px;
+                            Text { text: root.it.conv-modo == 1 ? "Qtd. Porções por Embalagem / Peso:" : "Unidades por Caixa / Pacote:"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                            CampoSync { width: 80px; valor: root.it.fator; align: center; editado(t) => { FiscalStore.im-fator(root.i, t); } }
+                            Text { text: root.it.conv-modo == 1 ? "porções" : "unidades"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            VerticalLayout {
+                                alignment: center;
+                                HorizontalLayout { spacing: 4px; alignment: end; Text { text: "Custo Unitário Real:"; color: Theme.text-muted; font-size: 11px; } Text { text: root.it.custo-real; color: Theme.available; font-size: 12px; font-weight: 900; } Text { text: "(divisão da nota)"; color: Theme.text-muted; font-size: 10px; } }
+                                HorizontalLayout { spacing: 4px; alignment: end; Text { text: "Entrada no Estoque:"; color: Theme.text-muted; font-size: 11px; } Text { text: root.it.entrada; color: Theme.occupied; font-size: 12px; font-weight: 900; } }
+                            }
+                        }
+                    }
+                }
+            }
+            // vincular a um produto existente
+            if root.it.acao == 0: VerticalLayout {
+                spacing: 10px;
+                FxField {
+                    label: "PRODUTO NO SISTEMA (ESTOQUE SERÁ SOMADO):";
+                    ComboBox {
+                        model: FiscalStore.im-produtos;
+                        current-index: root.it.produto-idx;
+                        selected => { FiscalStore.im-produto(root.i, self.current-index); }
+                    }
+                }
+                Rectangle {
+                    border-radius: 14px;
+                    background: Theme.bg;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    height: preco.preferred-height;
+                    preco := VerticalLayout {
+                        padding: 12px;
+                        spacing: 10px;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.trending-up; color: Theme.available; size: 14px; } }
+                            Text { text: "Atualização de Preço de Venda"; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+                            if root.it.venda-atual != "": Text { text: root.it.venda-atual; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                        }
+                        HorizontalLayout {
+                            spacing: 12px;
+                            FxField {
+                                horizontal-stretch: 1;
+                                label: "MARGEM ALVO (%)";
+                                HorizontalLayout { spacing: 6px; CampoSync { horizontal-stretch: 1; valor: root.it.margem; editado(t) => { FiscalStore.im-margem(root.i, t); } } Text { text: "%"; color: Theme.text-muted; vertical-alignment: center; } }
+                            }
+                            FxField {
+                                horizontal-stretch: 1;
+                                label: "NOVO PREÇO VENDA";
+                                Moeda { text: root.it.preco; alerta: root.it.tendencia == 1; editado(t) => { FiscalStore.im-preco(root.i, t); } }
+                            }
+                            VerticalLayout {
+                                alignment: end;
+                                min-width: 150px;
+                                if root.it.tendencia != 0: HorizontalLayout {
+                                    spacing: 4px;
+                                    if root.it.tendencia != 3: VerticalLayout { alignment: center; Icon { source: root.it.tendencia == 1 ? FiscalIcons.trending-down : FiscalIcons.trending-up; color: root.it.tendencia == 1 ? Theme.closing : Theme.available; size: 13px; } }
+                                    Text { text: root.it.tendencia-texto; color: root.it.tendencia == 1 ? Theme.closing : root.it.tendencia == 2 ? Theme.available : Theme.text-muted; font-size: 11px; font-weight: 800; vertical-alignment: center; }
+                                }
+                            }
+                        }
+                        if root.it.tem-caixa: VerticalLayout {
+                            spacing: 8px;
+                            HorizontalLayout {
+                                spacing: 10px;
+                                Rectangle {
+                                    width: 20px;
+                                    Caixinha { marcado: root.it.atualizar-caixa; }
+                                    TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.im-atualizar-caixa(root.i, !root.it.atualizar-caixa); } }
+                                }
+                                VerticalLayout { alignment: center; Icon { source: FiscalIcons.package; color: Theme.text-muted; size: 13px; } }
+                                Text { text: "Atualizar preço de caixa proporcional (" + root.it.caixa-qtd + " un)?"; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; horizontal-stretch: 1; }
+                            }
+                            if root.it.atualizar-caixa: HorizontalLayout {
+                                spacing: 8px;
+                                Text { text: "Caixa Atual: " + root.it.caixa-atual + " → Novo Caixa:"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                                Moeda { width: 160px; text: root.it.preco-caixa; editado(t) => { FiscalStore.im-preco-caixa(root.i, t); } }
+                            }
+                        }
+                    }
+                }
+            }
+            // criar produto novo
+            if root.it.acao == 1: VerticalLayout {
+                spacing: 10px;
+                FxField {
+                    label: "CATEGORIA DO NOVO PRODUTO:";
+                    ComboBox {
+                        model: FiscalStore.im-categorias;
+                        current-index: root.it.categoria-idx;
+                        selected => { FiscalStore.im-categoria(root.i, self.current-index); }
+                    }
+                }
+                Rectangle {
+                    border-radius: 14px;
+                    background: Theme.bg;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    height: novo.preferred-height;
+                    novo := VerticalLayout {
+                        padding: 12px;
+                        spacing: 10px;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.trending-up; color: Theme.available; size: 14px; } }
+                            Text { text: "Preço de Venda Sugerido (Novo Produto)"; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: "Custo Real: " + root.it.custo-real + root.it.custo-nf; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                        }
+                        HorizontalLayout {
+                            spacing: 12px;
+                            FxField {
+                                horizontal-stretch: 1;
+                                label: "MARGEM ALVO (%)";
+                                HorizontalLayout { spacing: 6px; CampoSync { horizontal-stretch: 1; valor: root.it.margem; editado(t) => { FiscalStore.im-margem(root.i, t); } } Text { text: "%"; color: Theme.text-muted; vertical-alignment: center; } }
+                            }
+                            FxField {
+                                horizontal-stretch: 1;
+                                label: "PREÇO DE VENDA";
+                                Moeda { text: root.it.preco; editado(t) => { FiscalStore.im-preco(root.i, t); } }
+                            }
+                        }
+                    }
+                }
+            }
+            if root.it.acao == 2: Text { text: "Este item não entrará no estoque e não alterará preços."; color: Theme.text-muted; font-size: 12px; font-italic: true; }
+        }
+    }
+}
+
+export component ImportarNota inherits Rectangle {
+    // ---------- buscando o XML ----------
+    if FiscalStore.im-fase == "carregando": VerticalLayout {
+        alignment: center;
+        spacing: 10px;
+        HorizontalLayout { alignment: center; Icon { source: FiscalIcons.loader-circle; color: Theme.available; size: 42px; } }
+        Text { text: "Buscando e Processando XML da SEFAZ..."; color: Theme.text; font-size: 17px; font-weight: 900; horizontal-alignment: center; }
+        Text { text: "Aguarde enquanto extraímos os produtos e quantidades para conferência física."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
+    }
+
+    // ---------- tela inicial: 2º bip ou arquivo XML ----------
+    if FiscalStore.im-fase == "inicio": Flickable {
+        content-height: ini.preferred-height;
+        ini := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 60px;
+            spacing: 18px;
+            HorizontalLayout { FxButton { text: "Voltar ao Painel Fiscal"; icone: FiscalIcons.arrow-left; tipo: FxBotao.fantasma; clicked => { FiscalStore.abrir("hub"); } } Rectangle { } }
+            VerticalLayout {
+                spacing: 6px;
+                Text { text: "Importação de NF-e e Entrada no Estoque"; color: Theme.text; font-size: 24px; font-weight: 900; }
+                Text { text: "Realize o 2º Bip (Conferência Física) para puxar os produtos da nota e dar entrada definitiva no estoque."; color: Theme.text-muted; font-size: 14px; wrap: word-wrap; }
+            }
+            Rectangle {
+                border-radius: 24px;
+                background: Theme.surface;
+                border-width: 2px;
+                border-color: Theme.available.with-alpha(0.5);
+                height: hero.preferred-height;
+                hero := VerticalLayout {
+                    padding: 26px;
+                    spacing: 14px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.scan; color: Theme.available; size: 26px; } }
+                        Text { text: "2º Bip: Bipar DANFE para Entrada no Estoque"; color: Theme.text; font-size: 19px; font-weight: 900; vertical-alignment: center; }
+                        VerticalLayout { alignment: center; FxBadge { text: "AUTOMÁTICO"; cor: FxCor.verde; } }
+                    }
+                    Text { text: "Aproxime o leitor de código de barras da DANFE impressa. O XML é carregado instantaneamente do sistema."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        FxInput {
+                            horizontal-stretch: 1;
+                            text <=> FiscalStore.im-bip;
+                            placeholder: "Bipe o código de barras de 44 dígitos da nota...";
+                            mono: true;
+                            font-size: 16px;
+                            edited(t) => { FiscalStore.im-bip-editado(t); }
+                            accepted => { FiscalStore.im-carregar(); }
+                            init => { self.focus(); }
+                        }
+                        FxButton { text: "Carregar Itens"; icone: FiscalIcons.scan; tipo: FxBotao.sucesso; enabled: FiscalStore.im-bip-digitos >= 44; clicked => { FiscalStore.im-carregar(); } }
+                    }
+                    if FiscalStore.im-erro != "": FxAviso { text: FiscalStore.im-erro; cor: FxCor.vermelho; icone: FiscalIcons.circle-alert; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.available; } }
+                        Text { text: "Leitor USB pronto:"; color: Theme.available; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                        Text { text: "Bipe diretamente o DANFE, sem precisar de mouse ou teclado."; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; horizontal-stretch: 1; }
+                        Text { text: FiscalStore.im-bip-digitos + "/44 dígitos"; color: FiscalStore.im-bip-digitos == 44 ? Theme.available : Theme.text-muted; font-size: 11px; font-family: "Menlo"; vertical-alignment: center; }
+                    }
+                }
+            }
+            FxCard {
+                height: cont.preferred-height;
+                cont := VerticalLayout {
+                    padding: 18px;
+                    spacing: 12px;
+                    Rectangle {
+                        height: cab.preferred-height;
+                        cab := HorizontalLayout {
+                            spacing: 8px;
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.file-code-2; color: Theme.text-muted; size: 15px; } }
+                            Text { text: "Problemas com o leitor de código de barras? Enviar arquivo .xml manualmente"; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.chevron-down; color: Theme.text-muted; size: 14px; transform-rotation: FiscalStore.im-contingencia ? 180deg : 0deg; } }
+                        }
+                        TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.im-contingencia = !FiscalStore.im-contingencia; } }
+                    }
+                    if FiscalStore.im-contingencia: VerticalLayout {
+                        spacing: 12px;
+                        Text { text: "Caso você não tenha o código de barras impresso ou o leitor não esteja funcionando, você pode carregar o arquivo .xml fornecido pelo distribuidor:"; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        if FiscalStore.im-arquivo == "": FxButton { text: "Selecionar Arquivo .XML de contingência"; icone: FiscalIcons.upload; clicked => { FiscalStore.im-escolher-xml(); } }
+                        if FiscalStore.im-arquivo != "": HorizontalLayout {
+                            spacing: 10px;
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.circle-check; color: Theme.available; size: 16px; } }
+                            Text { text: FiscalStore.im-arquivo; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                            FxButton { text: "Trocar"; tipo: FxBotao.fantasma; clicked => { FiscalStore.im-escolher-xml(); } }
+                            FxButton { text: FiscalStore.im-lendo ? "Lendo..." : "Carregar XML"; tipo: FxBotao.sucesso; enabled: !FiscalStore.im-lendo; clicked => { FiscalStore.im-carregar-xml(); } }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------- conferência dos itens ----------
+    if FiscalStore.im-fase == "conferencia": Flickable {
+        content-height: conf.preferred-height;
+        conf := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 60px;
+            spacing: 16px;
+            HorizontalLayout {
+                spacing: 12px;
+                FxButton { text: "Voltar"; icone: FiscalIcons.arrow-left; tipo: FxBotao.fantasma; clicked => { FiscalStore.im-voltar-inicio(); } }
+                Rectangle { horizontal-stretch: 1; }
+                FxButton {
+                    text: FiscalStore.im-aplicando ? "Efetivando Entrada..." : "Confirmar Conferência & Dar Entrada no Estoque";
+                    icone: FiscalIcons.package-plus;
+                    tipo: FxBotao.sucesso;
+                    enabled: !FiscalStore.im-aplicando && FiscalStore.im-confirma-estado == 1;
+                    clicked => { FiscalStore.im-aplicar(); }
+                }
+            }
+            if FiscalStore.im-aviso != "": FxAviso {
+                text: FiscalStore.im-aviso;
+                cor: FiscalStore.im-aviso-ok ? FxCor.verde : FxCor.vermelho;
+                icone: FiscalStore.im-aviso-ok ? FiscalIcons.circle-check : FiscalIcons.circle-alert;
+            }
+            Rectangle {
+                property <FxCor> cor: FiscalStore.im-confirma-estado == 1 ? FxCor.verde : FiscalStore.im-confirma-estado == 2 ? FxCor.vermelho : FxCor.neutro;
+                border-radius: 24px;
+                background: FxCores.de(self.cor).with-alpha(0.06);
+                border-width: 1px;
+                border-color: FiscalStore.im-confirma-estado == 0 ? Theme.border : FxCores.de(self.cor).with-alpha(0.45);
+                height: cab2.preferred-height;
+                cab2 := HorizontalLayout {
+                    padding: 20px;
+                    spacing: 20px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 4px;
+                        FxLabel { text: "CONFERÊNCIA DE ENTRADA (2º BIP)"; }
+                        Text { text: FiscalStore.im-fornecedor; color: Theme.text; font-size: 19px; font-weight: 900; wrap: word-wrap; }
+                        Text { text: FiscalStore.im-cnpj-nf; color: Theme.text-muted; font-size: 12px; }
+                    }
+                    VerticalLayout {
+                        width: 46%;
+                        spacing: 6px;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.scan; color: Theme.text-muted; size: 13px; } }
+                            FxLabel { text: "2º BIP: CONFIRMAÇÃO DA NOTA IMPRESSA"; vertical-alignment: center; }
+                        }
+                        FxInput {
+                            text <=> FiscalStore.im-confirmacao;
+                            placeholder: "Bipe a DANFE impressa (44 dígitos)...";
+                            mono: true;
+                            error: FiscalStore.im-confirma-estado == 2;
+                            edited(t) => { FiscalStore.im-confirmacao-editada(t); }
+                        }
+                        Text {
+                            text: FiscalStore.im-confirma-estado == 2 ? "⚠ Chave divergente! Esta não é a nota física correspondente."
+                                : FiscalStore.im-confirma-estado == 1 ? "✓ 2º Bip Confirmado: liberado para dar entrada no estoque."
+                                : "Bipe a DANFE física para garantir que os itens recebidos batem com a nota.";
+                            color: FiscalStore.im-confirma-estado == 2 ? Theme.danger : FiscalStore.im-confirma-estado == 1 ? Theme.available : Theme.text-muted;
+                            font-size: 11px;
+                            font-weight: 700;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+            HorizontalLayout {
+                Text { text: "Itens da Nota (" + FiscalStore.im-itens.length + ") — Associe ou Cadastre"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; }
+                Text { text: "Ajuste os vínculos antes de aplicar"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+            }
+            for it[i] in FiscalStore.im-itens: ItemConferencia { it: it; i: i; }
+            FxButton {
+                text: FiscalStore.im-aplicando ? "Efetivando Entrada..." : "Confirmar Conferência & Dar Entrada no Estoque";
+                icone: FiscalIcons.package-plus;
+                tipo: FxBotao.sucesso;
+                font-size: 16px;
+                min-height: 54px;
+                enabled: !FiscalStore.im-aplicando && FiscalStore.im-confirma-estado == 1;
+                clicked => { FiscalStore.im-aplicar(); }
+            }
+        }
+    }
+
+    // ---------- alerta de redução de preço ----------
+    if FiscalStore.im-quedas.length > 0: FxSheet {
+        titulo: "Atenção: Redução de Preço de Venda!";
+        subtitulo: "O preço de venda calculado para um ou mais produtos ficou abaixo do valor atual.";
+        icone: FiscalIcons.triangle-alert;
+        cor: FxCor.ambar;
+        largura: 560px;
+        fechar => { FiscalStore.im-confirmar-quedas(false); }
+        FxLabel { text: "PRODUTOS QUE TERÃO O PREÇO REDUZIDO:"; }
+        for q in FiscalStore.im-quedas: HorizontalLayout {
+            spacing: 10px;
+            Text { text: q.nome; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-stretch: 1; overflow: elide; }
+            Text { text: q.de + " → "; color: Theme.text-muted; font-size: 13px; }
+            Text { text: q.para; color: Theme.closing; font-size: 13px; font-weight: 900; }
+        }
+        Text { text: "Deseja realmente abaixar o preço de venda desses produtos no PDV/Mesas ou prefere manter os preços atuais e revisar as margens?"; color: Theme.text; font-size: 13px; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 12px;
+            FxButton { horizontal-stretch: 1; text: "Voltar e Revisar Margens"; clicked => { FiscalStore.im-confirmar-quedas(false); } }
+            FxButton { horizontal-stretch: 1; text: FiscalStore.im-aplicando ? "Efetivando..." : "Confirmar e Reduzir Preço"; tipo: FxBotao.primario; enabled: !FiscalStore.im-aplicando; clicked => { FiscalStore.im-confirmar-quedas(true); } }
+        }
+    }
+}

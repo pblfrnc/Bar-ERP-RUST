@@ -1,0 +1,2 @@
+Ícones do Lucide (https://lucide.dev), licença ISC: Copyright (c) Lucide Contributors.
+Os mesmos que o app React usa (lucide-react). Traço em #000 para o Slint recolorir com `colorize`.

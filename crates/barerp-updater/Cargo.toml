@@ -1,0 +1,20 @@
+[package]
+name = "barerp-updater"
+description = "Atualizador do BarERP: confere a release do GitHub, baixa o instalador e o executa (tradução do updater.cjs)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono = "0.4.39"
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+thiserror = "2.0.11"
+tokio = { version = "1.43.0", features = ["fs", "io-util"] }
+tracing = "0.1.41"
+
+[dev-dependencies]
+tokio = { version = "1.43.0", features = ["full"] }
+wiremock = "0.6.2"

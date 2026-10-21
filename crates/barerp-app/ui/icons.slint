@@ -1,0 +1,77 @@
+// Ícones Lucide (ISC, ver assets/icons/LICENSE-lucide.txt), os mesmos do app original.
+// Uso: Icon { source: Icons.beer; color: Theme.primary; size: 16px; }  — a cor vem do tema.
+
+export global Icons {
+    out property <image> arrow-right-left: @image-url("../assets/icons/arrow-right-left.svg");
+    out property <image> banknote: @image-url("../assets/icons/banknote.svg");
+    out property <image> beef: @image-url("../assets/icons/beef.svg");
+    out property <image> beer: @image-url("../assets/icons/beer.svg");
+    out property <image> book-down: @image-url("../assets/icons/book-down.svg");
+    out property <image> calendar: @image-url("../assets/icons/calendar.svg");
+    out property <image> check: @image-url("../assets/icons/check.svg");
+    out property <image> check-check: @image-url("../assets/icons/check-check.svg");
+    out property <image> chef-hat: @image-url("../assets/icons/chef-hat.svg");
+    out property <image> chevron-left: @image-url("../assets/icons/chevron-left.svg");
+    out property <image> arrow-left: @image-url("../assets/icons/arrow-left.svg");
+    out property <image> circle-alert: @image-url("../assets/icons/circle-alert.svg");
+    out property <image> circle-check: @image-url("../assets/icons/circle-check.svg");
+    out property <image> circle-dollar-sign: @image-url("../assets/icons/circle-dollar-sign.svg");
+    out property <image> clock: @image-url("../assets/icons/clock.svg");
+    out property <image> credit-card: @image-url("../assets/icons/credit-card.svg");
+    out property <image> dollar-sign: @image-url("../assets/icons/dollar-sign.svg");
+    out property <image> eye: @image-url("../assets/icons/eye.svg");
+    out property <image> file-text: @image-url("../assets/icons/file-text.svg");
+    out property <image> filter: @image-url("../assets/icons/filter.svg");
+    out property <image> flame: @image-url("../assets/icons/flame.svg");
+    out property <image> glass-water: @image-url("../assets/icons/glass-water.svg");
+    out property <image> hand-coins: @image-url("../assets/icons/hand-coins.svg");
+    out property <image> hourglass: @image-url("../assets/icons/hourglass.svg");
+    out property <image> key-round: @image-url("../assets/icons/key-round.svg");
+    out property <image> landmark: @image-url("../assets/icons/landmark.svg");
+    out property <image> layout-grid: @image-url("../assets/icons/layout-grid.svg");
+    out property <image> list-checks: @image-url("../assets/icons/list-checks.svg");
+    out property <image> log-out: @image-url("../assets/icons/log-out.svg");
+    out property <image> map-pin: @image-url("../assets/icons/map-pin.svg");
+    out property <image> maximize: @image-url("../assets/icons/maximize.svg");
+    out property <image> merge: @image-url("../assets/icons/merge.svg");
+    out property <image> minus: @image-url("../assets/icons/minus.svg");
+    out property <image> moon: @image-url("../assets/icons/moon.svg");
+    out property <image> package: @image-url("../assets/icons/package.svg");
+    out property <image> pencil: @image-url("../assets/icons/pencil.svg");
+    out property <image> plus: @image-url("../assets/icons/plus.svg");
+    out property <image> printer: @image-url("../assets/icons/printer.svg");
+    out property <image> qr-code: @image-url("../assets/icons/qr-code.svg");
+    out property <image> receipt-text: @image-url("../assets/icons/receipt-text.svg");
+    out property <image> refresh-cw: @image-url("../assets/icons/refresh-cw.svg");
+    out property <image> rotate-ccw: @image-url("../assets/icons/rotate-ccw.svg");
+    out property <image> save: @image-url("../assets/icons/save.svg");
+    out property <image> search: @image-url("../assets/icons/search.svg");
+    out property <image> send: @image-url("../assets/icons/send.svg");
+    out property <image> settings: @image-url("../assets/icons/settings.svg");
+    out property <image> share-2: @image-url("../assets/icons/share-2.svg");
+    out property <image> shield-check: @image-url("../assets/icons/shield-check.svg");
+    out property <image> smartphone: @image-url("../assets/icons/smartphone.svg");
+    out property <image> sparkles: @image-url("../assets/icons/sparkles.svg");
+    out property <image> store: @image-url("../assets/icons/store.svg");
+    out property <image> sun: @image-url("../assets/icons/sun.svg");
+    out property <image> tag: @image-url("../assets/icons/tag.svg");
+    out property <image> trash-2: @image-url("../assets/icons/trash-2.svg");
+    out property <image> triangle-alert: @image-url("../assets/icons/triangle-alert.svg");
+    out property <image> user: @image-url("../assets/icons/user.svg");
+    out property <image> users: @image-url("../assets/icons/users.svg");
+    out property <image> utensils-crossed: @image-url("../assets/icons/utensils-crossed.svg");
+    out property <image> utensils: @image-url("../assets/icons/utensils.svg");
+    out property <image> wifi-off: @image-url("../assets/icons/wifi-off.svg");
+    out property <image> wifi: @image-url("../assets/icons/wifi.svg");
+    out property <image> wine: @image-url("../assets/icons/wine.svg");
+    out property <image> x: @image-url("../assets/icons/x.svg");
+}
+
+export component Icon inherits Image {
+    in property <color> color;
+    in property <length> size: 16px;
+    width: size;
+    height: size;
+    colorize: color;
+    image-fit: contain;
+}

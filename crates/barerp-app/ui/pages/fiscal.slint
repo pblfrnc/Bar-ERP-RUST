@@ -1,0 +1,34 @@
+// Página "fiscal": port completo do Módulo Fiscal do app original (FiscalHubView e todas as telas dele).
+// O estado e os callbacks ficam no global `FiscalStore` (`fiscal_store.slint`), ligado em `src/pages/fiscal.rs`.
+// Cada tela fica num `fiscal_*.slint`; aqui só a troca de telas e os modais comuns.
+
+import { Theme } from "../theme.slint";
+import { FiscalStore, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda } from "fiscal_store.slint";
+import { FiscalHub, InutilizacaoSheet } from "fiscal_hub.slint";
+import { ReimprimirNota, CancelarNota } from "fiscal_notas.slint";
+import { ConfiguracoesFiscais } from "fiscal_config.slint";
+import { PainelContador } from "fiscal_contador.slint";
+import { ReceberNota } from "fiscal_receber.slint";
+import { NotasPendentes } from "fiscal_pendentes.slint";
+import { EmissorNfce } from "fiscal_nfce.slint";
+import { EmissaoNfe } from "fiscal_nfe.slint";
+import { ImportarNota } from "fiscal_importar.slint";
+
+export { FiscalStore, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda }
+
+export component FiscalAreaPage inherits Rectangle {
+    background: Theme.bg;
+
+    if FiscalStore.tela == "hub": FiscalHub { }
+    if FiscalStore.tela == "receber": ReceberNota { }
+    if FiscalStore.tela == "importar": ImportarNota { }
+    if FiscalStore.tela == "pendentes": NotasPendentes { }
+    if FiscalStore.tela == "nfe": EmissaoNfe { }
+    if FiscalStore.tela == "nfce": EmissorNfce { }
+    if FiscalStore.tela == "contador": PainelContador { }
+    if FiscalStore.tela == "reimprimir-nfce" || FiscalStore.tela == "reimprimir-nfe": ReimprimirNota { }
+    if FiscalStore.tela == "cancelar-nfce" || FiscalStore.tela == "cancelar-nfe": CancelarNota { }
+    if FiscalStore.tela == "config": ConfiguracoesFiscais { }
+
+    if FiscalStore.inut-modelo != "": InutilizacaoSheet { }
+}

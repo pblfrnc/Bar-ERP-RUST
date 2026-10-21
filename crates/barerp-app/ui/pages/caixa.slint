@@ -1,0 +1,1896 @@
+// Página "caixa": port completo do CashView.tsx e do QuickSaleModal.tsx (venda de balcão em tela cheia).
+// O estado e os callbacks ficam no global `CaixaStore`, ligado em `src/pages/caixa.rs` com
+// `ui.global::<CaixaStore>()`. Valores em dinheiro já chegam formatados do Rust ("R$ 12,34").
+
+import { Theme } from "../theme.slint";
+
+export struct CxWaiter { initials: string, name: string, orders: string, sales: string, fee: string }
+export struct CxPayment { place: string, method: string, notes: string, amount: string }
+export struct CxCategory { id: string, label: string }
+export struct CxProduct {
+    id: string, name: string, code: string, description: string,
+    price: string, full-price: string, promo: bool,
+    sells-box: bool, box-label: string, box-price: string, box-per-unit: string,
+    track-stock: bool, low-stock: bool, stock: string,
+    in-cart: int, units: int, boxes: int,
+}
+export struct CxCartLine {
+    key: string, name: string, is-box: bool, box-label: string, unit-price: string,
+    options: string, promo: string, qty: int, total: string,
+}
+// kind: emitting | authorized | processing | error
+export struct CxNfce { order-number: int, kind: string, text: string, can-reprint: bool, can-retry: bool }
+export struct CxOption { name: string, price: string, selected: bool }
+export struct CxGroup { name: string, rule: string, required: bool, missing: bool, options: [CxOption] }
+
+export global CaixaStore {
+    in-out property <string> status;
+
+    // ---------- Turno ----------
+    in property <bool> loading: true;
+    in property <bool> is-open;
+    in property <string> opened-by;
+    in property <string> initial;
+    in property <string> total-sales;
+    in property <string> supplies;
+    in property <string> withdrawals;
+    in property <string> expected;
+    in property <string> pix;
+    in property <string> credit;
+    in property <string> debit;
+    in property <string> cash;
+    in property <string> voucher;
+    in property <string> fee-total;
+    in property <[CxWaiter]> waiters;
+    in property <[CxPayment]> payments;
+
+    // Abertura
+    in-out property <string> open-balance: "200.00";
+    in-out property <string> open-by: "Operador de Caixa";
+    in-out property <string> open-notes;
+    in property <int> focus-open-tick;
+
+    // Sangria / suprimento
+    in-out property <bool> tx-visible;
+    in-out property <bool> tx-withdrawal: true;
+    in-out property <string> tx-amount;
+    in-out property <string> tx-reason;
+
+    // Fechamento: step 1 = contagem, 2 = conferência, 3 = encerrado
+    in-out property <bool> close-visible;
+    in-out property <int> close-step: 1;
+    in-out property <string> close-count;
+    in-out property <string> close-by: "Operador de Caixa";
+    in property <string> check-expected;
+    in property <string> check-counted;
+    in property <string> check-diff;
+    in property <int> check-sign; // -1 falta, 0 exato, 1 sobra
+    in property <bool> close-submitting;
+    in property <string> rep-expected;
+    in property <string> rep-counted;
+    in property <string> rep-diff;
+    in property <bool> rep-negative;
+    in property <string> rep-fee-total;
+    in property <[CxWaiter]> rep-waiters;
+
+    // Aviso (alert do original) e confirmação (window.confirm)
+    in-out property <string> alert-text;
+    in-out property <string> confirm-text;
+    in-out property <string> confirm-action;
+
+    // ---------- Venda rápida de balcão ----------
+    in-out property <bool> quick-visible;
+    in property <bool> quick-loading;
+    in property <[CxCategory]> categories;
+    in property <string> all-label: "Todos (0)";
+    in-out property <string> category: "ALL";
+    in property <[CxProduct]> products;
+    in-out property <string> search;
+    in property <int> focus-search-tick;
+    in property <[CxCartLine]> cart;
+    in property <int> cart-count;
+    in-out property <string> discount;
+    in-out property <string> customer;
+    in-out property <string> method: "PIX";
+    in-out property <string> tendered;
+    in property <string> total-label: "R$ 0,00";
+    in property <string> subtotal-label;
+    in property <bool> has-discount;
+    in property <string> change-label;
+    in property <string> total-placeholder;
+    in-out property <bool> emit-nfce;
+    in-out property <string> nfce-doc;
+    in property <string> nfce-doc-error;
+    in-out property <bool> print-receipt: true;
+    in property <bool> submitting;
+    in property <string> success-text;
+    in property <string> success-change;
+    in property <[CxNfce]> nfce-list;
+
+    // Escolha de adicionais
+    in property <bool> picker-visible;
+    in property <string> picker-title;
+    in property <[CxGroup]> picker-groups;
+    in property <string> picker-total;
+    in property <string> picker-error;
+
+    // ---------- Callbacks (src/pages/caixa.rs) ----------
+    callback refresh();
+    callback open-history();
+    callback open-shift();
+    callback reopen-last();
+    callback ask-tx(bool);
+    callback tx-confirm();
+    callback close-start();
+    callback close-verify();
+    callback close-confirm();
+    callback close-finish();
+    callback shortcut(string);
+    callback confirm-yes();
+    callback quick-open();
+    callback quick-close();
+    callback search-edited(string);
+    callback search-enter();
+    callback pick-category(string);
+    callback add-product(string, bool);
+    callback cart-qty(string, int);
+    callback cart-remove(string);
+    callback cart-clear();
+    callback recompute();
+    callback finish-sale();
+    callback dismiss-success();
+    callback nfce-reprint(int);
+    callback nfce-retry(int);
+    callback nfce-dismiss(int);
+    callback picker-toggle(int, int);
+    callback picker-confirm();
+    callback picker-cancel();
+}
+
+// ======================================================================
+// Peças de interface
+// ======================================================================
+
+// Ícone do Lucide (ui/pages/icons), recolorido com a cor do texto
+component Icon inherits Image {
+    in property <color> tint: Theme.text;
+    colorize: root.tint;
+    image-fit: contain;
+    width: 16px;
+    height: 16px;
+}
+
+component Kbd inherits Rectangle {
+    in property <string> text;
+    in property <color> fg: Theme.text;
+    width: kt.preferred-width + 10px;
+    height: 18px;
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: root.fg.with-alpha(0.35);
+    background: Theme.surface-2.with-alpha(0.6);
+    kt := Text { text: root.text; color: root.fg; font-size: 10px; font-weight: 800; font-family: "Menlo"; }
+}
+
+// Botão com cor própria (fundo, texto e borda) e etiqueta de atalho opcional
+component CxButton inherits Rectangle {
+    in property <string> text;
+    in property <string> kbd;
+    in property <image> icon;
+    in property <color> bg: Theme.surface-2;
+    in property <color> fg: Theme.text;
+    in property <color> hover-bg: self.bg.brighter(0.12);
+    in property <color> outline: transparent;
+    in property <bool> enabled: true;
+    in property <length> font-size: 13px;
+    in property <int> weight: 800;
+    callback clicked;
+    min-height: 40px;
+    min-width: row.preferred-width + 24px;
+    border-radius: 12px;
+    border-width: root.outline == transparent ? 0 : 1px;
+    border-color: root.outline;
+    opacity: root.enabled ? 1 : 0.5;
+    background: touch.has-hover && root.enabled ? root.hover-bg : root.bg;
+    row := HorizontalLayout {
+        alignment: center;
+        spacing: 8px;
+        padding-left: 12px;
+        padding-right: 12px;
+        if root.icon.width > 0: VerticalLayout { alignment: center; Icon { source: root.icon; tint: root.fg; width: root.font-size + 3px; height: root.font-size + 3px; } }
+        if root.text != "": Text { text: root.text; color: root.fg; font-size: root.font-size; font-weight: root.weight; vertical-alignment: center; }
+        if root.kbd != "": VerticalLayout {
+            alignment: center;
+            Kbd { text: root.kbd; fg: root.fg; }
+        }
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Campo de texto no tema do app
+component CxInput inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    in property <length> font-size: 14px;
+    in property <int> weight: 500;
+    in property <bool> mono;
+    in property <bool> error;
+    in property <TextHorizontalAlignment> align: left;
+    out property <bool> has-focus: input.has-focus;
+    callback accepted();
+    callback edited(string);
+    callback key-pressed(KeyEvent) -> EventResult;
+    public function select-all() { input.select-all(); }
+
+    forward-focus: input;
+    min-height: max(38px, input.preferred-height + 16px);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: root.error ? Theme.danger : input.has-focus ? Theme.primary : Theme.border;
+    background: Theme.bg;
+    TouchArea { mouse-cursor: MouseCursor.text; clicked => { input.focus(); } }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        Rectangle {
+            Text {
+                x: 0;
+                width: 100%;
+                text: input.text == "" ? root.placeholder : "";
+                color: Theme.text-muted;
+                font-size: root.font-size;
+                vertical-alignment: center;
+                horizontal-alignment: root.align;
+                overflow: elide;
+            }
+            input := TextInput {
+                width: 100%;
+                color: Theme.text;
+                font-size: root.font-size;
+                font-weight: root.weight;
+                font-family: root.mono ? "Menlo" : "";
+                vertical-alignment: center;
+                horizontal-alignment: root.align;
+                single-line: true;
+                selection-background-color: Theme.primary.with-alpha(0.4);
+                accepted => { root.accepted(); }
+                edited => { root.edited(self.text); }
+                key-pressed(event) => { return root.key-pressed(event); }
+            }
+        }
+    }
+}
+
+component FieldLabel inherits Text {
+    color: Theme.text-muted;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+component Card inherits Rectangle {
+    background: Theme.surface;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: Theme.border;
+}
+
+component Badge inherits Rectangle {
+    in property <string> text;
+    in property <color> tint;
+    height: 22px;
+    width: bt.preferred-width + 18px;
+    border-radius: 11px;
+    background: root.tint.with-alpha(0.15);
+    border-width: 1px;
+    border-color: root.tint.with-alpha(0.35);
+    bt := Text { text: root.text; color: root.tint; font-size: 11px; font-weight: 800; }
+}
+
+component IconBox inherits Rectangle {
+    in property <image> icon;
+    in property <color> tint;
+    in property <length> size: 44px;
+    width: root.size;
+    height: root.size;
+    border-radius: root.size * 0.32;
+    background: root.tint.with-alpha(0.12);
+    border-width: 1px;
+    border-color: root.tint.with-alpha(0.3);
+    Icon { source: root.icon; tint: root.tint; width: root.size * 0.5; height: root.size * 0.5; }
+}
+
+component StatCard inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <color> value-color: Theme.text;
+    in property <bool> highlight;
+    background: root.highlight ? Theme.primary.with-alpha(0.1) : Theme.surface;
+    border-radius: 18px;
+    border-width: 1px;
+    border-color: root.highlight ? Theme.primary.with-alpha(0.35) : Theme.border;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 4px;
+        Text { text: root.label; color: root.highlight ? Theme.primary : Theme.text-muted; font-size: 11px; font-weight: 800; }
+        @children
+        if root.value != "": Text { text: root.value; color: root.value-color; font-size: 21px; font-weight: 900; }
+    }
+}
+
+component MethodTile inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <string> value;
+    in property <color> tint;
+    background: Theme.bg.with-alpha(0.7);
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: Theme.border;
+    VerticalLayout {
+        padding: 12px;
+        spacing: 4px;
+        HorizontalLayout {
+            spacing: 6px;
+            Icon { source: root.icon; tint: root.tint; width: 14px; height: 14px; }
+            Text { text: root.label; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; horizontal-stretch: 1; }
+        }
+        Text { text: root.value; color: Theme.text; font-size: 16px; font-weight: 900; }
+    }
+}
+
+component WaiterCard inherits Rectangle {
+    in property <CxWaiter> data;
+    background: Theme.bg.with-alpha(0.7);
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: Theme.border;
+    VerticalLayout {
+        padding: 14px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 10px;
+            Rectangle {
+                width: 36px;
+                height: 36px;
+                border-radius: 12px;
+                background: Theme.primary.with-alpha(0.2);
+                Text { text: root.data.initials; color: Theme.primary; font-size: 12px; font-weight: 900; }
+            }
+            VerticalLayout {
+                alignment: center;
+                Text { text: root.data.name; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
+                Text { text: root.data.orders; color: Theme.text-muted; font-size: 11px; }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.border; }
+        HorizontalLayout {
+            VerticalLayout {
+                Text { text: "TOTAL VENDIDO"; color: Theme.text-muted; font-size: 10px; font-weight: 800; }
+                Text { text: root.data.sales; color: Theme.text; font-size: 13px; font-family: "Menlo"; }
+            }
+            VerticalLayout {
+                Text { text: "REPASSE (10%)"; color: Theme.primary; font-size: 10px; font-weight: 800; horizontal-alignment: right; }
+                Text { text: root.data.fee; color: Theme.available; font-size: 16px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; }
+            }
+        }
+    }
+}
+
+// Painel de janela sobre o fundo escurecido (largura fixa, altura do conteúdo)
+component Dialog inherits Rectangle {
+    in property <length> panel-width: 480px;
+    background: Theme.overlay;
+    TouchArea { }
+    panel := Rectangle {
+        width: min(root.panel-width, root.width - 32px);
+        height: min(body.preferred-height, root.height - 32px);
+        background: Theme.surface;
+        border-radius: 24px;
+        border-width: 1px;
+        border-color: Theme.border;
+        drop-shadow-blur: 30px;
+        drop-shadow-color: #00000066;
+        body := VerticalLayout {
+            padding: 24px;
+            spacing: 14px;
+            @children
+        }
+    }
+}
+
+component DialogHeader inherits HorizontalLayout {
+    in property <image> icon;
+    in property <color> tint: Theme.primary;
+    in property <string> title;
+    in property <string> subtitle;
+    spacing: 12px;
+    IconBox { icon: root.icon; tint: root.tint; size: 40px; }
+    VerticalLayout {
+        alignment: center;
+        Text { text: root.title; color: Theme.text; font-size: 20px; font-weight: 900; wrap: word-wrap; }
+        if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+    }
+}
+
+component LabeledRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <color> value-color: Theme.text;
+    in property <length> value-size: 14px;
+    in property <bool> bold;
+    Text { text: root.label; color: Theme.text-muted; font-size: 13px; font-weight: root.bold ? 800 : 400; horizontal-stretch: 1; vertical-alignment: center; }
+    Text { text: root.value; color: root.value-color; font-size: root.value-size; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
+}
+
+// ======================================================================
+// Venda rápida: peças
+// ======================================================================
+
+component ProductCard inherits Rectangle {
+    in property <CxProduct> data;
+    callback add(bool);
+    background: root.data.in-cart > 0 ? Theme.primary.with-alpha(0.1) : (card-touch.has-hover ? Theme.surface-2 : Theme.surface);
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: root.data.in-cart > 0 ? Theme.primary.with-alpha(0.45) : Theme.border;
+
+    card-touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { if !root.data.sells-box { root.add(false); } }
+    }
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 6px;
+        HorizontalLayout {
+            spacing: 6px;
+            Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 800; wrap: word-wrap; max-height: 36px; overflow: elide; horizontal-stretch: 1; }
+            if root.data.code != "": Rectangle {
+                height: 18px;
+                width: ct.preferred-width + 8px;
+                border-radius: 4px;
+                background: Theme.surface-2;
+                ct := Text { text: "#" + root.data.code; color: Theme.text-muted; font-size: 9px; font-family: "Menlo"; }
+            }
+        }
+        if root.data.description != "": Text { text: root.data.description; color: Theme.text-muted; font-size: 10px; overflow: elide; }
+        Rectangle { vertical-stretch: 1; }
+        Rectangle { height: 1px; background: Theme.border.with-alpha(0.6); }
+
+        if root.data.sells-box: VerticalLayout {
+            spacing: 4px;
+            HorizontalLayout {
+                spacing: 4px;
+                unit-btn := Rectangle {
+                    height: 50px;
+                    border-radius: 12px;
+                    background: unit-touch.has-hover ? Theme.primary : Theme.surface-2;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    VerticalLayout {
+                        alignment: center;
+                        Text { text: "UNIDADE"; color: unit-touch.has-hover ? Theme.primary-text : Theme.text-muted; font-size: 9px; font-weight: 800; horizontal-alignment: center; }
+                        Text { text: root.data.price; color: unit-touch.has-hover ? Theme.primary-text : Theme.available; font-size: 11px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: center; }
+                        if root.data.units > 0: Text { text: "(" + root.data.units + "x)"; color: unit-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 800; horizontal-alignment: center; }
+                    }
+                    unit-touch := TouchArea { mouse-cursor: pointer; clicked => { root.add(false); } }
+                }
+                Rectangle {
+                    height: 50px;
+                    border-radius: 12px;
+                    background: box-touch.has-hover ? Theme.primary : Theme.primary.with-alpha(0.12);
+                    border-width: 1px;
+                    border-color: Theme.primary.with-alpha(0.35);
+                    VerticalLayout {
+                        alignment: center;
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 3px;
+                            Icon { source: @image-url("icons/package.svg"); tint: box-touch.has-hover ? Theme.primary-text : Theme.primary; width: 10px; height: 10px; }
+                            Text { text: root.data.box-label; color: box-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 900; }
+                        }
+                        Text { text: root.data.box-price; color: box-touch.has-hover ? Theme.primary-text : Theme.text; font-size: 11px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: center; }
+                        if root.data.boxes > 0: Text { text: "(" + root.data.boxes + " cx)"; color: box-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 900; horizontal-alignment: center; }
+                    }
+                    box-touch := TouchArea { mouse-cursor: pointer; clicked => { root.add(true); } }
+                }
+            }
+            HorizontalLayout {
+                if root.data.track-stock: Text { text: "Estoque: " + root.data.stock + " un"; color: root.data.low-stock ? Theme.danger : Theme.text-muted; font-size: 9px; font-weight: root.data.low-stock ? 800 : 400; }
+                Rectangle { horizontal-stretch: 1; }
+                Text { text: root.data.box-per-unit; color: Theme.available; font-size: 9px; font-family: "Menlo"; }
+            }
+        }
+
+        if !root.data.sells-box: HorizontalLayout {
+            alignment: space-between;
+            VerticalLayout {
+                alignment: end;
+                if root.data.promo: Text { text: root.data.full-price; color: Theme.text-muted; font-size: 10px; font-weight: 700; stroke: Theme.text-muted; }
+                Text { text: root.data.price; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; }
+            }
+            if root.data.track-stock: VerticalLayout {
+                alignment: end;
+                Rectangle {
+                    height: 18px;
+                    width: st.preferred-width + 10px;
+                    border-radius: 6px;
+                    background: root.data.low-stock ? Theme.danger.with-alpha(0.15) : Theme.surface-2;
+                    st := Text { text: root.data.stock + " un"; color: root.data.low-stock ? Theme.danger : Theme.text-muted; font-size: 9px; font-weight: 800; }
+                }
+            }
+        }
+    }
+
+    if root.data.in-cart > 0: Rectangle {
+        x: root.width - 14px;
+        y: -6px;
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        background: Theme.primary;
+        Text { text: root.data.in-cart; color: Theme.primary-text; font-size: 10px; font-weight: 900; }
+    }
+}
+
+component CartRow inherits Rectangle {
+    in property <CxCartLine> data;
+    callback qty(int);
+    callback remove();
+    min-height: 64px;
+    border-radius: 16px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.border;
+    HorizontalLayout {
+        padding: 10px;
+        spacing: 8px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 2px;
+            HorizontalLayout {
+                spacing: 6px;
+                Text { text: root.data.name; color: Theme.text; font-size: 12px; font-weight: 800; overflow: elide; horizontal-stretch: 1; }
+                Rectangle {
+                    height: 16px;
+                    width: tag.preferred-width + 8px;
+                    border-radius: 4px;
+                    background: root.data.is-box ? Theme.primary.with-alpha(0.15) : Theme.surface-2;
+                    tag := HorizontalLayout {
+                        alignment: center;
+                        spacing: 3px;
+                        if root.data.is-box: Icon { source: @image-url("icons/package.svg"); tint: Theme.primary; width: 10px; height: 10px; y: 3px; }
+                        Text { text: root.data.is-box ? root.data.box-label : "Un"; color: root.data.is-box ? Theme.primary : Theme.text-muted; font-size: 9px; font-weight: 900; vertical-alignment: center; }
+                    }
+                }
+            }
+            Text { text: root.data.unit-price; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; }
+            if root.data.options != "": Text { text: root.data.options; color: Theme.occupied; font-size: 10px; font-weight: 700; overflow: elide; }
+            if root.data.promo != "": Text { text: root.data.promo; color: Theme.danger; font-size: 10px; font-weight: 800; overflow: elide; }
+        }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 30px;
+                width: 92px;
+                border-radius: 10px;
+                background: Theme.bg;
+                border-width: 1px;
+                border-color: Theme.border;
+                HorizontalLayout {
+                    Rectangle {
+                        width: 30px;
+                        Icon { source: @image-url("icons/minus.svg"); tint: minus.has-hover ? Theme.text : Theme.text-muted; width: 13px; height: 13px; }
+                        minus := TouchArea { mouse-cursor: pointer; clicked => { root.qty(-1); } }
+                    }
+                    Text { text: root.data.qty; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-alignment: center; vertical-alignment: center; horizontal-stretch: 1; }
+                    Rectangle {
+                        width: 30px;
+                        Icon { source: @image-url("icons/plus.svg"); tint: plus.has-hover ? Theme.text : Theme.text-muted; width: 13px; height: 13px; }
+                        plus := TouchArea { mouse-cursor: pointer; clicked => { root.qty(1); } }
+                    }
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            width: 76px;
+            Text { text: root.data.total; color: Theme.available; font-size: 12px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; }
+            HorizontalLayout {
+                alignment: end;
+                Icon {
+                    source: @image-url("icons/trash.svg");
+                    tint: rm.has-hover ? Theme.danger : Theme.text-muted;
+                    width: 14px;
+                    height: 14px;
+                    rm := TouchArea { mouse-cursor: pointer; clicked => { root.remove(); } }
+                }
+            }
+        }
+    }
+}
+
+component PayMethod inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <string> key-label;
+    in property <bool> active;
+    in property <color> tint;
+    callback clicked;
+    height: 56px;
+    border-radius: 12px;
+    background: root.active ? root.tint.with-alpha(0.2) : (t.has-hover ? Theme.surface-2 : Theme.bg);
+    border-width: 1px;
+    border-color: root.active ? root.tint.with-alpha(0.6) : Theme.border;
+    VerticalLayout {
+        alignment: center;
+        padding-top: 12px;
+        spacing: 2px;
+        HorizontalLayout { alignment: center; Icon { source: root.icon; tint: root.active ? root.tint : Theme.text-muted; width: 15px; height: 15px; } }
+        Text { text: root.label; color: root.active ? root.tint : Theme.text-muted; font-size: 12px; font-weight: 800; horizontal-alignment: center; }
+    }
+    Kbd { x: parent.width - self.width - 4px; y: 4px; text: root.key-label; }
+    t := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+component Toggle inherits Rectangle {
+    in property <bool> on;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: root.on ? Theme.available : Theme.border;
+    animate background { duration: 120ms; }
+    Rectangle {
+        x: root.on ? 20px : 2px;
+        y: 2px;
+        width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        background: #ffffff;
+        animate x { duration: 120ms; }
+    }
+}
+
+component ModifierPicker inherits Rectangle {
+    background: Theme.overlay;
+    TouchArea { clicked => { CaixaStore.picker-cancel(); } }
+    Rectangle {
+        width: min(460px, root.width - 32px);
+        height: min(panel.preferred-height, root.height - 32px);
+        background: Theme.surface;
+        border-radius: 24px;
+        border-width: 1px;
+        border-color: Theme.border;
+        TouchArea { }
+        panel := VerticalLayout {
+            HorizontalLayout {
+                padding: 16px;
+                spacing: 8px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    Text { text: CaixaStore.picker-title; color: Theme.text; font-size: 18px; font-weight: 900; overflow: elide; }
+                    Text { text: "Escolha as opções do pedido"; color: Theme.text-muted; font-size: 12px; }
+                }
+                CxButton { icon: @image-url("icons/x.svg"); min-height: 34px; width: 34px; clicked => { CaixaStore.picker-cancel(); } }
+            }
+            Rectangle { height: 1px; background: Theme.border; }
+            Flickable {
+                min-height: min(groups.preferred-height, 420px);
+                content-height: groups.preferred-height;
+                groups := VerticalLayout {
+                    padding: 16px;
+                    spacing: 16px;
+                    for group[gi] in CaixaStore.picker-groups: VerticalLayout {
+                        spacing: 8px;
+                        HorizontalLayout {
+                            Text { text: group.name; color: Theme.text; font-size: 14px; font-weight: 900; horizontal-stretch: 1; }
+                            Text {
+                                text: group.rule;
+                                color: group.missing ? Theme.danger : group.required ? Theme.primary : Theme.text-muted;
+                                font-size: 10px;
+                                font-weight: 800;
+                            }
+                        }
+                        for row in ceil(group.options.length / 2): HorizontalLayout {
+                            spacing: 8px;
+                            for col in 2: Rectangle {
+                                property <int> idx: row * 2 + col;
+                                property <CxOption> opt: group.options[idx];
+                                property <bool> exists: idx < group.options.length;
+                                min-height: 48px;
+                                horizontal-stretch: 1;
+                                border-radius: 12px;
+                                opacity: exists ? 1 : 0;
+                                background: opt.selected ? Theme.primary.with-alpha(0.15) : Theme.bg.with-alpha(0.6);
+                                border-width: opt.selected ? 2px : 1px;
+                                border-color: opt.selected ? Theme.primary : Theme.border;
+                                HorizontalLayout {
+                                    padding-left: 12px;
+                                    padding-right: 12px;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        horizontal-stretch: 1;
+                                        Text { text: opt.name; color: opt.selected ? Theme.primary : Theme.text; font-size: 12px; font-weight: 800; wrap: word-wrap; }
+                                        if opt.price != "": Text { text: opt.price; color: Theme.available; font-size: 10px; font-family: "Menlo"; }
+                                    }
+                                    if opt.selected: VerticalLayout { alignment: center; Icon { source: @image-url("icons/check.svg"); tint: Theme.primary; } }
+                                }
+                                TouchArea {
+                                    enabled: exists;
+                                    mouse-cursor: pointer;
+                                    clicked => { CaixaStore.picker-toggle(gi, idx); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Rectangle { height: 1px; background: Theme.border; }
+            VerticalLayout {
+                padding: 16px;
+                spacing: 8px;
+                if CaixaStore.picker-error != "": Text { text: CaixaStore.picker-error; color: Theme.danger; font-size: 12px; font-weight: 800; wrap: word-wrap; }
+                CxButton {
+                    text: "Adicionar · " + CaixaStore.picker-total;
+                    bg: Theme.primary;
+                    fg: Theme.primary-text;
+                    min-height: 48px;
+                    font-size: 14px;
+                    clicked => { CaixaStore.picker-confirm(); }
+                }
+            }
+        }
+    }
+}
+
+// Venda Rápida de Balcão (PDV Tela Cheia)
+component QuickSale inherits Rectangle {
+    background: Theme.bg;
+    property <int> search-tick: CaixaStore.focus-search-tick;
+    changed search-tick => {
+        search-input.focus();
+        search-input.select-all();
+    }
+    init => { search-input.focus(); }
+
+    // F12 conclui, F8 liga a NFC-e, Shift+A..D forma de pagamento, Ctrl+L busca, Esc fecha
+    keys := FocusScope {
+        key-pressed(event) => {
+            if CaixaStore.picker-visible {
+                if event.text == Key.Escape { CaixaStore.picker-cancel(); return accept; }
+                if event.text == Key.Return { CaixaStore.picker-confirm(); return accept; }
+                return reject;
+            }
+            if (event.modifiers.control || event.modifiers.meta) && !event.modifiers.shift && (event.text == "l" || event.text == "L") {
+                search-input.focus();
+                search-input.select-all();
+                return accept;
+            }
+            if event.modifiers.control || event.modifiers.alt || event.modifiers.meta { return reject; }
+            if event.text == Key.F8 { CaixaStore.emit-nfce = !CaixaStore.emit-nfce; CaixaStore.recompute(); return accept; }
+            if event.text == Key.F12 { CaixaStore.finish-sale(); return accept; }
+            if event.text == Key.Escape { CaixaStore.quick-close(); return accept; }
+            if event.modifiers.shift {
+                if event.text == "A" || event.text == "a" { CaixaStore.method = "PIX"; CaixaStore.recompute(); return accept; }
+                if event.text == "B" || event.text == "b" { CaixaStore.method = "CASH"; CaixaStore.recompute(); return accept; }
+                if event.text == "C" || event.text == "c" { CaixaStore.method = "CREDIT_CARD"; CaixaStore.recompute(); return accept; }
+                if event.text == "D" || event.text == "d" { CaixaStore.method = "DEBIT_CARD"; CaixaStore.recompute(); return accept; }
+            }
+            reject
+        }
+
+        VerticalLayout {
+            // Cabeçalho
+            Rectangle {
+                background: Theme.surface;
+                height: 72px;
+                HorizontalLayout {
+                    padding-left: 24px;
+                    padding-right: 24px;
+                    spacing: 12px;
+                    alignment: space-between;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout { alignment: center; IconBox { icon: @image-url("icons/zap-fill.svg"); tint: Theme.primary; size: 40px; } }
+                        VerticalLayout {
+                            alignment: center;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text { text: "Venda Rápida de Balcão (PDV Tela Cheia)"; color: Theme.text; font-size: 18px; font-weight: 900; vertical-alignment: center; }
+                                VerticalLayout { alignment: center; Badge { text: "PDV EXPRESSO"; tint: Theme.available; } }
+                            }
+                            Text { text: "Atendimento ágil direto no balcão sem necessidade de abrir mesa"; color: Theme.text-muted; font-size: 12px; }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        CxButton { icon: @image-url("icons/x.svg"); width: 40px; min-height: 40px; clicked => { CaixaStore.quick-close(); } }
+                    }
+                }
+                Rectangle { y: parent.height - 1px; height: 1px; background: Theme.border; }
+            }
+
+            // Venda concluída
+            if CaixaStore.success-text != "": Rectangle {
+                background: Theme.available.with-alpha(0.1);
+                height: 42px;
+                HorizontalLayout {
+                    padding-left: 24px;
+                    padding-right: 24px;
+                    spacing: 10px;
+                    VerticalLayout { alignment: center; Icon { source: @image-url("icons/check-circle.svg"); tint: Theme.available; } }
+                    Text { text: CaixaStore.success-text; color: Theme.available; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                    if CaixaStore.success-change != "": VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            height: 22px;
+                            width: chg.preferred-width + 14px;
+                            border-radius: 8px;
+                            background: Theme.available.with-alpha(0.2);
+                            border-width: 1px;
+                            border-color: Theme.available.with-alpha(0.4);
+                            chg := Text { text: "Troco: " + CaixaStore.success-change; color: Theme.text; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
+                        }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    Text {
+                        text: "Dispensar";
+                        color: Theme.available;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        TouchArea { mouse-cursor: pointer; clicked => { CaixaStore.dismiss-success(); } }
+                    }
+                }
+            }
+
+            // NFC-e das últimas vendas
+            if CaixaStore.nfce-list.length > 0: Rectangle {
+                background: Theme.surface;
+                VerticalLayout {
+                    padding-left: 24px;
+                    padding-right: 24px;
+                    padding-top: 8px;
+                    padding-bottom: 8px;
+                    spacing: 4px;
+                    for st in CaixaStore.nfce-list: HorizontalLayout {
+                        spacing: 10px;
+                        VerticalLayout {
+                            alignment: center;
+                            Icon {
+                                source: st.kind == "emitting" ? @image-url("icons/loader.svg") : st.kind == "authorized" ? @image-url("icons/file-text.svg") : @image-url("icons/alert-triangle.svg");
+                                tint: st.kind == "authorized" ? Theme.available : st.kind == "error" ? Theme.danger : Theme.primary;
+                                width: 14px;
+                                height: 14px;
+                            }
+                        }
+                        Text {
+                            horizontal-stretch: 1;
+                            text: st.text;
+                            color: st.kind == "authorized" ? Theme.available : st.kind == "error" ? Theme.danger : Theme.primary;
+                            font-size: 12px;
+                            font-weight: 800;
+                            overflow: elide;
+                        }
+                        if st.can-reprint: CxButton {
+                            icon: @image-url("icons/printer.svg");
+                            text: "Reimprimir";
+                            min-height: 24px;
+                            font-size: 11px;
+                            bg: transparent;
+                            fg: Theme.text-muted;
+                            clicked => { CaixaStore.nfce-reprint(st.order-number); }
+                        }
+                        if st.can-retry: CxButton {
+                            icon: @image-url("icons/rotate-ccw.svg");
+                            text: "Tentar de novo";
+                            min-height: 24px;
+                            font-size: 11px;
+                            bg: transparent;
+                            fg: Theme.danger;
+                            clicked => { CaixaStore.nfce-retry(st.order-number); }
+                        }
+                        if st.kind != "emitting": CxButton {
+                            icon: @image-url("icons/x.svg");
+                            min-height: 24px;
+                            width: 28px;
+                            font-size: 11px;
+                            bg: transparent;
+                            fg: Theme.text-muted;
+                            clicked => { CaixaStore.nfce-dismiss(st.order-number); }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                vertical-stretch: 1;
+                // Catálogo
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    Rectangle {
+                        background: Theme.surface;
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 12px;
+                            Rectangle {
+                                height: 46px;
+                                search-input := CxInput {
+                                    width: 100%;
+                                    y: (parent.height - self.height) / 2;
+                                    text <=> CaixaStore.search;
+                                    placeholder: "Digite iniciais (ex: HEIN, AGUA), código (#5001) ou bipe o código de barras + Enter...";
+                                    font-size: 14px;
+                                    edited(text) => { CaixaStore.search-edited(text); }
+                                    accepted => { CaixaStore.search-enter(); }
+                                    // Na busca vazia (logo após bipar) Shift+A..D escolhe a forma de pagamento
+                                    key-pressed(event) => {
+                                        if CaixaStore.search == "" && event.modifiers.shift && !event.modifiers.control && !event.modifiers.meta {
+                                            if event.text == "A" || event.text == "a" { CaixaStore.method = "PIX"; CaixaStore.recompute(); return accept; }
+                                            if event.text == "B" || event.text == "b" { CaixaStore.method = "CASH"; CaixaStore.recompute(); return accept; }
+                                            if event.text == "C" || event.text == "c" { CaixaStore.method = "CREDIT_CARD"; CaixaStore.recompute(); return accept; }
+                                            if event.text == "D" || event.text == "d" { CaixaStore.method = "DEBIT_CARD"; CaixaStore.recompute(); return accept; }
+                                        }
+                                        reject
+                                    }
+                                }
+                                if CaixaStore.search == "": Kbd { x: parent.width - self.width - 12px; text: "Ctrl+L"; }
+                                if CaixaStore.search != "": Icon {
+                                    x: parent.width - self.width - 14px;
+                                    source: @image-url("icons/x.svg");
+                                    tint: clr.has-hover ? Theme.text : Theme.text-muted;
+                                    clr := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { CaixaStore.search = ""; CaixaStore.search-edited(""); search-input.focus(); }
+                                    }
+                                }
+                            }
+                            Flickable {
+                                height: 34px;
+                                content-width: chips.preferred-width;
+                                chips := HorizontalLayout {
+                                    spacing: 6px;
+                                    CxButton {
+                                        text: CaixaStore.all-label;
+                                        min-height: 32px;
+                                        font-size: 12px;
+                                        bg: CaixaStore.category == "ALL" ? Theme.primary : Theme.surface-2;
+                                        fg: CaixaStore.category == "ALL" ? Theme.primary-text : Theme.text-muted;
+                                        clicked => { CaixaStore.pick-category("ALL"); }
+                                    }
+                                    for cat in CaixaStore.categories: CxButton {
+                                        text: cat.label;
+                                        min-height: 32px;
+                                        font-size: 12px;
+                                        bg: CaixaStore.category == cat.id ? Theme.primary : Theme.surface-2;
+                                        fg: CaixaStore.category == cat.id ? Theme.primary-text : Theme.text-muted;
+                                        clicked => { CaixaStore.pick-category(cat.id); }
+                                    }
+                                }
+                            }
+                        }
+                        Rectangle { y: parent.height - 1px; height: 1px; background: Theme.border; }
+                    }
+                    grid-area := Rectangle {
+                        vertical-stretch: 1;
+                        background: Theme.bg;
+                        property <length> gap: 10px;
+                        property <int> cols: max(2, floor((self.width - 32px + gap) / (180px + gap)));
+                        property <length> card-w: (self.width - 32px - (cols - 1) * gap) / cols;
+                        property <length> card-h: 150px;
+                        if CaixaStore.quick-loading: Text { text: "Carregando cardápio..."; color: Theme.text-muted; font-size: 14px; }
+                        if !CaixaStore.quick-loading && CaixaStore.products.length == 0: VerticalLayout {
+                            alignment: center;
+                            HorizontalLayout { alignment: center; Icon { source: @image-url("icons/package.svg"); tint: Theme.text-muted; width: 40px; height: 40px; } }
+                            Text { text: "Nenhum produto encontrado."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+                        }
+                        Flickable {
+                            content-height: ceil(CaixaStore.products.length / parent.cols) * (parent.card-h + parent.gap) + 32px;
+                            for p[i] in CaixaStore.products: ProductCard {
+                                x: 16px + mod(i, grid-area.cols) * (grid-area.card-w + grid-area.gap);
+                                y: 16px + floor(i / grid-area.cols) * (grid-area.card-h + grid-area.gap);
+                                width: grid-area.card-w;
+                                height: grid-area.card-h;
+                                data: p;
+                                add(is-box) => { CaixaStore.add-product(p.id, is-box); }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { width: 1px; background: Theme.border; }
+
+                // Carrinho e pagamento
+                Rectangle {
+                    width: 400px;
+                    background: Theme.bg;
+                    VerticalLayout {
+                        Rectangle {
+                            height: 48px;
+                            background: Theme.surface;
+                            HorizontalLayout {
+                                padding-left: 16px;
+                                padding-right: 16px;
+                                Text { text: "ITENS DA VENDA (" + CaixaStore.cart-count + ")"; color: Theme.text; font-size: 12px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                                if CaixaStore.cart.length > 0: VerticalLayout {
+                                    alignment: center;
+                                    CxButton {
+                                        icon: @image-url("icons/trash.svg");
+                                        text: "Limpar";
+                                        min-height: 26px;
+                                        font-size: 11px;
+                                        bg: transparent;
+                                        hover-bg: Theme.danger.with-alpha(0.1);
+                                        fg: Theme.danger;
+                                        clicked => { CaixaStore.cart-clear(); }
+                                    }
+                                }
+                            }
+                        }
+                        Rectangle {
+                            vertical-stretch: 1;
+                            min-height: 130px;
+                            if CaixaStore.cart.length == 0: VerticalLayout {
+                                alignment: center;
+                                spacing: 8px;
+                                padding: 24px;
+                                HorizontalLayout { alignment: center; IconBox { icon: @image-url("icons/zap.svg"); tint: Theme.text-muted; size: 48px; } }
+                                Text { text: "Clique nos produtos ao lado para adicionar à venda rápida."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+                            }
+                            Flickable {
+                                content-height: cart-list.preferred-height;
+                                cart-list := VerticalLayout {
+                                    padding: 16px;
+                                    spacing: 8px;
+                                    alignment: start;
+                                    for line in CaixaStore.cart: CartRow {
+                                        data: line;
+                                        qty(d) => { CaixaStore.cart-qty(line.key, d); }
+                                        remove => { CaixaStore.cart-remove(line.key); }
+                                    }
+                                }
+                            }
+                        }
+                        Rectangle {
+                            background: Theme.surface;
+                            vertical-stretch: 0;
+                            min-height: min(pay-body.preferred-height, 240px) + 66px;
+                            preferred-height: pay-body.preferred-height + 66px;
+                            Rectangle { y: 0; height: 1px; background: Theme.border; }
+                            VerticalLayout {
+                            Flickable {
+                                vertical-stretch: 1;
+                                content-height: pay-body.preferred-height;
+                                pay-body := VerticalLayout {
+                                width: parent.width;
+                                padding: 16px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    VerticalLayout {
+                                        spacing: 4px;
+                                        FieldLabel { text: "DESCONTO (R$)"; }
+                                        CxInput { text <=> CaixaStore.discount; placeholder: "0,00"; mono: true; font-size: 12px; edited => { CaixaStore.recompute(); } }
+                                    }
+                                    VerticalLayout {
+                                        spacing: 4px;
+                                        FieldLabel { text: "CLIENTE (OPCIONAL)"; }
+                                        CxInput { text <=> CaixaStore.customer; placeholder: "Nome ou CPF"; font-size: 12px; }
+                                    }
+                                }
+                                VerticalLayout {
+                                    spacing: 6px;
+                                    FieldLabel { text: "FORMA DE PAGAMENTO"; }
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        PayMethod { icon: @image-url("icons/qr-code.svg"); label: "PIX"; key-label: "⇧A"; tint: Theme.available; active: CaixaStore.method == "PIX"; clicked => { CaixaStore.method = "PIX"; CaixaStore.recompute(); } }
+                                        PayMethod { icon: @image-url("icons/banknote.svg"); label: "Dinheiro"; key-label: "⇧B"; tint: Theme.primary; active: CaixaStore.method == "CASH"; clicked => { CaixaStore.method = "CASH"; CaixaStore.recompute(); } }
+                                        PayMethod { icon: @image-url("icons/credit-card.svg"); label: "Crédito"; key-label: "⇧C"; tint: Theme.occupied; active: CaixaStore.method == "CREDIT_CARD"; clicked => { CaixaStore.method = "CREDIT_CARD"; CaixaStore.recompute(); } }
+                                        PayMethod { icon: @image-url("icons/credit-card.svg"); label: "Débito"; key-label: "⇧D"; tint: Theme.purple; active: CaixaStore.method == "DEBIT_CARD"; clicked => { CaixaStore.method = "DEBIT_CARD"; CaixaStore.recompute(); } }
+                                    }
+                                }
+                                if CaixaStore.method == "CASH": Rectangle {
+                                    background: Theme.bg;
+                                    border-radius: 12px;
+                                    border-width: 1px;
+                                    border-color: Theme.border;
+                                    VerticalLayout {
+                                        padding: 10px;
+                                        spacing: 8px;
+                                        HorizontalLayout {
+                                            spacing: 8px;
+                                            Text { text: "Valor Entregue:"; color: Theme.text-muted; font-size: 11px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
+                                            CxInput {
+                                                width: 130px;
+                                                text <=> CaixaStore.tendered;
+                                                placeholder: CaixaStore.total-placeholder;
+                                                mono: true;
+                                                weight: 800;
+                                                font-size: 12px;
+                                                align: right;
+                                                edited => { CaixaStore.recompute(); }
+                                            }
+                                        }
+                                        HorizontalLayout {
+                                            alignment: end;
+                                            spacing: 4px;
+                                            for v in ["20", "50", "100"]: CxButton {
+                                                text: "R$" + v;
+                                                min-height: 24px;
+                                                font-size: 10px;
+                                                clicked => { CaixaStore.tendered = v; CaixaStore.recompute(); }
+                                            }
+                                            CxButton {
+                                                text: "Exato";
+                                                min-height: 24px;
+                                                font-size: 10px;
+                                                fg: Theme.primary;
+                                                clicked => { CaixaStore.tendered = ""; CaixaStore.shortcut("exactCash"); }
+                                            }
+                                        }
+                                        if CaixaStore.change-label != "": HorizontalLayout {
+                                            Text { text: "Troco a Devolver:"; color: Theme.primary; font-size: 12px; font-weight: 900; horizontal-stretch: 1; }
+                                            Text { text: CaixaStore.change-label; color: Theme.primary; font-size: 14px; font-weight: 900; font-family: "Menlo"; }
+                                        }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    VerticalLayout {
+                                        alignment: end;
+                                        horizontal-stretch: 1;
+                                        FieldLabel { text: "TOTAL A PAGAR"; }
+                                        if CaixaStore.has-discount: Text { text: CaixaStore.subtotal-label; color: Theme.text-muted; font-size: 10px; stroke: Theme.text-muted; }
+                                    }
+                                    Text { text: CaixaStore.total-label; color: Theme.available; font-size: 26px; font-weight: 900; font-family: "Menlo"; }
+                                }
+                                Rectangle {
+                                    border-radius: 12px;
+                                    border-width: 1px;
+                                    border-color: CaixaStore.emit-nfce ? Theme.available.with-alpha(0.6) : Theme.border;
+                                    background: CaixaStore.emit-nfce ? Theme.available.with-alpha(0.1) : Theme.bg;
+                                    VerticalLayout {
+                                        padding: 10px;
+                                        spacing: 8px;
+                                        HorizontalLayout {
+                                            spacing: 8px;
+                                            VerticalLayout { alignment: center; Icon { source: @image-url("icons/file-text.svg"); tint: CaixaStore.emit-nfce ? Theme.available : Theme.text-muted; } }
+                                            Text { text: "Emitir NFC-e"; color: Theme.text; font-size: 12px; font-weight: 900; vertical-alignment: center; }
+                                            VerticalLayout { alignment: center; Kbd { text: "F8"; } }
+                                            Rectangle { horizontal-stretch: 1; }
+                                            VerticalLayout { alignment: center; Toggle { on: CaixaStore.emit-nfce; } }
+                                        }
+                                        if CaixaStore.emit-nfce: CxInput {
+                                            text <=> CaixaStore.nfce-doc;
+                                            placeholder: "CPF/CNPJ na nota (opcional)";
+                                            mono: true;
+                                            font-size: 12px;
+                                            error: CaixaStore.nfce-doc-error != "";
+                                            edited => { CaixaStore.recompute(); }
+                                        }
+                                        if CaixaStore.emit-nfce && CaixaStore.nfce-doc-error != "": Text { text: CaixaStore.nfce-doc-error; color: Theme.danger; font-size: 10px; font-weight: 800; wrap: word-wrap; }
+                                    }
+                                    TouchArea {
+                                        height: 42px;
+                                        y: 0;
+                                        mouse-cursor: pointer;
+                                        clicked => { CaixaStore.emit-nfce = !CaixaStore.emit-nfce; CaixaStore.recompute(); }
+                                    }
+                                }
+                                Rectangle {
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    Rectangle {
+                                        width: 18px;
+                                        height: 18px;
+                                        border-radius: 5px;
+                                        border-width: 1px;
+                                        border-color: CaixaStore.print-receipt ? Theme.primary : Theme.border;
+                                        background: CaixaStore.print-receipt ? Theme.primary : Theme.bg;
+                                        if CaixaStore.print-receipt: Icon { source: @image-url("icons/check.svg"); tint: Theme.primary-text; width: 12px; height: 12px; }
+                                    }
+                                    VerticalLayout { alignment: center; Icon { source: @image-url("icons/printer.svg"); tint: Theme.text-muted; width: 14px; height: 14px; } }
+                                    Text {
+                                        text: (CaixaStore.emit-nfce ? "Imprimir comprovante se a NFC-e falhar" : "Imprimir comprovante térmico");
+                                        color: Theme.text-muted;
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                    }
+                                }
+                                    TouchArea { mouse-cursor: pointer; clicked => { CaixaStore.print-receipt = !CaixaStore.print-receipt; } }
+                                }
+                                }
+                            }
+                            HorizontalLayout {
+                                padding-left: 16px;
+                                padding-right: 16px;
+                                padding-bottom: 12px;
+                                CxButton {
+                                    horizontal-stretch: 1;
+                                    min-height: 50px;
+                                    bg: Theme.available;
+                                    fg: Theme.primary-text;
+                                    font-size: 13px;
+                                    weight: 900;
+                                    enabled: CaixaStore.cart.length > 0 && !CaixaStore.submitting;
+                                    icon: CaixaStore.submitting ? @image-url("icons/loader.svg") : @image-url("icons/zap-fill.svg");
+                                    text: CaixaStore.submitting ? "FINALIZANDO..."
+                                        : "CONCLUIR VENDA" + (CaixaStore.emit-nfce ? " + NFC-E" : "") + " (" + CaixaStore.total-label + ")";
+                                    kbd: CaixaStore.submitting ? "" : "F12";
+                                    clicked => { CaixaStore.finish-sale(); }
+                                }
+                            }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if CaixaStore.picker-visible: ModifierPicker { width: 100%; height: 100%; }
+}
+
+// ======================================================================
+// Página
+// ======================================================================
+
+export component CaixaAreaPage inherits Rectangle {
+    background: Theme.bg;
+
+    // Esc fecha a janela aberta (sangria, fechamento, aviso)
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                if CaixaStore.alert-text != "" { CaixaStore.alert-text = ""; return accept; }
+                if CaixaStore.confirm-text != "" { CaixaStore.confirm-text = ""; return accept; }
+                if CaixaStore.tx-visible { CaixaStore.tx-visible = false; return accept; }
+                if CaixaStore.close-visible && !CaixaStore.close-submitting { CaixaStore.close-visible = false; return accept; }
+            }
+            reject
+        }
+
+        Flickable {
+            content-height: page.preferred-height;
+            page := VerticalLayout {
+                width: parent.width;
+                padding: 24px;
+                spacing: 16px;
+                alignment: start;
+
+                // Cabeçalho
+                Card {
+                    HorizontalLayout {
+                        padding: 20px;
+                        spacing: 14px;
+                        IconBox { icon: @image-url("icons/receipt.svg"); tint: Theme.available; size: 48px; }
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            HorizontalLayout {
+                                spacing: 10px;
+                                Text { text: "Frente de Caixa (PDV)"; color: Theme.text; font-size: 20px; font-weight: 900; vertical-alignment: center; }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Badge {
+                                        text: CaixaStore.is-open ? "Turno Aberto" : "Caixa Fechado";
+                                        tint: CaixaStore.is-open ? Theme.available : Theme.danger;
+                                    }
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            Text { text: "Controle de suprimento, sangria, recebimentos e repasse de comissões (10%)"; color: Theme.text-muted; font-size: 12px; overflow: elide; }
+                        }
+                        if CaixaStore.is-open: VerticalLayout {
+                            alignment: center;
+                            CxButton {
+                                icon: @image-url("icons/zap-fill.svg");
+                                text: "Venda Rápida (Balcão)";
+                                kbd: "F2";
+                                bg: Theme.primary;
+                                fg: Theme.primary-text;
+                                clicked => { CaixaStore.quick-open(); }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            CxButton { icon: @image-url("icons/file-text.svg"); text: "Comandas Finalizadas"; clicked => { CaixaStore.open-history(); } }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            CxButton {
+                                icon: @image-url("icons/refresh-cw.svg");
+                                width: 44px;
+                                font-size: 14px;
+                                clicked => { CaixaStore.refresh(); }
+                            }
+                        }
+                    }
+                }
+
+                // Caixa fechado: abertura do turno
+                if !CaixaStore.is-open: HorizontalLayout {
+                    alignment: center;
+                    Card {
+                        max-width: 520px;
+                        horizontal-stretch: 1;
+                        VerticalLayout {
+                            padding: 28px;
+                            spacing: 14px;
+                            HorizontalLayout { alignment: center; IconBox { icon: @image-url("icons/unlock.svg"); tint: Theme.primary; size: 64px; } }
+                            Text { text: "Abrir Turno de Caixa"; color: Theme.text; font-size: 20px; font-weight: 900; horizontal-alignment: center; }
+                            Text { text: "Inicie as operações informando o fundo de troco inicial disponível na gaveta."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+                            VerticalLayout {
+                                spacing: 4px;
+                                FieldLabel { text: "FUNDO DE TROCO INICIAL (R$) *"; }
+                                balance-input := CxInput {
+                                    property <int> tick: CaixaStore.focus-open-tick;
+                                    changed tick => { self.focus(); self.select-all(); }
+                                    text <=> CaixaStore.open-balance;
+                                    placeholder: "0.00";
+                                    mono: true;
+                                    weight: 800;
+                                    font-size: 18px;
+                                    min-height: 48px;
+                                    accepted => { CaixaStore.open-shift(); }
+                                }
+                            }
+                            VerticalLayout {
+                                spacing: 4px;
+                                FieldLabel { text: "OPERADOR / RESPONSÁVEL *"; }
+                                CxInput { text <=> CaixaStore.open-by; accepted => { CaixaStore.open-shift(); } }
+                            }
+                            VerticalLayout {
+                                spacing: 4px;
+                                FieldLabel { text: "OBSERVAÇÕES DO TURNO (OPCIONAL)"; }
+                                CxInput { text <=> CaixaStore.open-notes; placeholder: "Ex: Turno Noturno, Gaveta 01"; accepted => { CaixaStore.open-shift(); } }
+                            }
+                            CxButton {
+                                text: "CONFIRMAR ABERTURA DE CAIXA";
+                                kbd: "Ctrl+A";
+                                min-height: 50px;
+                                bg: Theme.available;
+                                fg: Theme.primary-text;
+                                font-size: 14px;
+                                weight: 900;
+                                clicked => { CaixaStore.open-shift(); }
+                            }
+                            Rectangle { height: 1px; background: Theme.border; }
+                            CxButton {
+                                icon: @image-url("icons/rotate-ccw.svg");
+                                text: "Fechou o caixa anterior com erro de digitação? Reabrir último turno";
+                                font-size: 12px;
+                                bg: transparent;
+                                hover-bg: Theme.primary.with-alpha(0.1);
+                                fg: Theme.primary;
+                                clicked => { CaixaStore.reopen-last(); }
+                            }
+                        }
+                    }
+                }
+
+                // Caixa aberto: resumo do turno
+                if CaixaStore.is-open: VerticalLayout {
+                    spacing: 16px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        StatCard { label: "FUNDO INICIAL (TROCO)"; value: CaixaStore.initial; }
+                        StatCard { label: "TOTAL DE VENDAS"; value: CaixaStore.total-sales; value-color: Theme.available; }
+                        StatCard {
+                            label: "SUPRIMENTOS / SANGRIAS";
+                            value: "";
+                            Text { text: "+ " + CaixaStore.supplies; color: Theme.occupied; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
+                            Text { text: "- " + CaixaStore.withdrawals; color: Theme.danger; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
+                        }
+                        StatCard { label: "DINHEIRO ESPERADO NA GAVETA"; value: CaixaStore.expected; value-color: Theme.primary; highlight: true; }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 16px;
+                        Card {
+                            horizontal-stretch: 2;
+                            VerticalLayout {
+                                padding: 20px;
+                                spacing: 12px;
+                                Text { text: "RECEBIMENTOS POR FORMA DE PAGAMENTO"; color: Theme.text; font-size: 13px; font-weight: 900; }
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    MethodTile { icon: @image-url("icons/qr-code.svg"); label: "PIX"; value: CaixaStore.pix; tint: Theme.available; }
+                                    MethodTile { icon: @image-url("icons/credit-card.svg"); label: "Cartão Crédito"; value: CaixaStore.credit; tint: Theme.occupied; }
+                                    MethodTile { icon: @image-url("icons/credit-card.svg"); label: "Cartão Débito"; value: CaixaStore.debit; tint: Theme.purple; }
+                                }
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    MethodTile { icon: @image-url("icons/banknote.svg"); label: "Dinheiro em Espécie"; value: CaixaStore.cash; tint: Theme.primary; }
+                                    MethodTile { icon: @image-url("icons/receipt.svg"); label: "Voucher / Outros"; value: CaixaStore.voucher; tint: Theme.purple; }
+                                    Rectangle { horizontal-stretch: 1; }
+                                }
+                            }
+                        }
+                        Card {
+                            horizontal-stretch: 1;
+                            VerticalLayout {
+                                padding: 20px;
+                                spacing: 8px;
+                                Text { text: "AÇÕES DE CAIXA"; color: Theme.text; font-size: 13px; font-weight: 900; }
+                                Text { text: "Operador: " + CaixaStore.opened-by; color: Theme.text-muted; font-size: 12px; }
+                                CxButton {
+                                    icon: @image-url("icons/zap-fill.svg");
+                                    text: "NOVA VENDA DE BALCÃO";
+                                    kbd: "F2";
+                                    min-height: 46px;
+                                    bg: Theme.available;
+                                    fg: Theme.primary-text;
+                                    weight: 900;
+                                    clicked => { CaixaStore.quick-open(); }
+                                }
+                                CxButton {
+                                    icon: @image-url("icons/arrow-down-right.svg");
+                                    text: "Efetuar Sangria (Retirada)";
+                                    kbd: "Ctrl+S";
+                                    bg: Theme.danger.with-alpha(0.1);
+                                    hover-bg: Theme.danger;
+                                    fg: Theme.danger;
+                                    outline: Theme.danger.with-alpha(0.25);
+                                    clicked => { CaixaStore.ask-tx(true); }
+                                }
+                                CxButton {
+                                    icon: @image-url("icons/arrow-up-right.svg");
+                                    text: "Efetuar Suprimento (Entrada)";
+                                    kbd: "Ctrl+Shift+S";
+                                    bg: Theme.occupied.with-alpha(0.1);
+                                    hover-bg: Theme.occupied;
+                                    fg: Theme.occupied;
+                                    outline: Theme.occupied.with-alpha(0.25);
+                                    clicked => { CaixaStore.ask-tx(false); }
+                                }
+                                Rectangle { vertical-stretch: 1; min-height: 4px; }
+                                CxButton {
+                                    icon: @image-url("icons/lock.svg");
+                                    text: "FECHAR TURNO DE CAIXA";
+                                    kbd: "Ctrl+F";
+                                    min-height: 46px;
+                                    bg: Theme.primary;
+                                    fg: Theme.primary-text;
+                                    weight: 900;
+                                    clicked => { CaixaStore.close-start(); }
+                                }
+                            }
+                        }
+                    }
+
+                    // Repasse de comissões dos garçons (10%)
+                    commissions := Card {
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 14px;
+                            HorizontalLayout {
+                                spacing: 12px;
+                                IconBox { icon: @image-url("icons/users.svg"); tint: Theme.primary; size: 40px; }
+                                VerticalLayout {
+                                    alignment: center;
+                                    horizontal-stretch: 1;
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        Text { text: "REPASSE DE COMISSÕES DOS GARÇONS (10%)"; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; }
+                                        VerticalLayout { alignment: center; Badge { text: "FIM DE EXPEDIENTE"; tint: Theme.primary; } }
+                                        Rectangle { horizontal-stretch: 1; }
+                                    }
+                                    Text { text: "Totalização das taxas de serviço arrecadadas no turno para repasse aos garçons"; color: Theme.text-muted; font-size: 12px; overflow: elide; }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        background: Theme.bg;
+                                        border-radius: 16px;
+                                        border-width: 1px;
+                                        border-color: Theme.border;
+                                        HorizontalLayout {
+                                            padding: 10px;
+                                            padding-left: 16px;
+                                            padding-right: 16px;
+                                            spacing: 10px;
+                                            Text { text: "TOTAL 10% DO TURNO:"; color: Theme.text-muted; font-size: 11px; font-weight: 800; vertical-alignment: center; }
+                                            Text { text: CaixaStore.fee-total; color: Theme.available; font-size: 18px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
+                                        }
+                                    }
+                                }
+                            }
+                            Rectangle { height: 1px; background: Theme.border; }
+                            if CaixaStore.waiters.length == 0: Rectangle {
+                                height: 64px;
+                                border-radius: 16px;
+                                border-width: 1px;
+                                border-color: Theme.border;
+                                background: Theme.bg.with-alpha(0.5);
+                                Text { text: "Nenhum valor de taxa de serviço (10%) acumulado neste turno ainda."; color: Theme.text-muted; font-size: 12px; }
+                            }
+                            if CaixaStore.waiters.length > 0: Rectangle {
+                                property <int> cols: 3;
+                                property <length> gap: 12px;
+                                property <length> card-w: (self.width - (cols - 1) * gap) / cols;
+                                height: ceil(CaixaStore.waiters.length / cols) * (120px + gap) - gap;
+                                for w[i] in CaixaStore.waiters: WaiterCard {
+                                    x: mod(i, parent.cols) * (parent.card-w + parent.gap);
+                                    y: floor(i / parent.cols) * (120px + parent.gap);
+                                    width: parent.card-w;
+                                    height: 120px;
+                                    data: w;
+                                }
+                            }
+                        }
+                    }
+
+                    // Movimentações & pagamentos do turno
+                    Card {
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
+                            Text { text: "MOVIMENTAÇÕES & PAGAMENTOS DO TURNO"; color: Theme.text; font-size: 13px; font-weight: 900; }
+                            if CaixaStore.payments.length == 0: Text {
+                                text: "Nenhum pagamento registrado ainda neste turno.";
+                                color: Theme.text-muted;
+                                font-size: 12px;
+                                horizontal-alignment: center;
+                                min-height: 48px;
+                                vertical-alignment: center;
+                            }
+                            if CaixaStore.payments.length > 0: Flickable {
+                                height: min(pay-list.preferred-height, 288px);
+                                content-height: pay-list.preferred-height;
+                                pay-list := VerticalLayout {
+                                    spacing: 8px;
+                                    for p in CaixaStore.payments: Rectangle {
+                                        height: 42px;
+                                        border-radius: 12px;
+                                        background: Theme.bg;
+                                        border-width: 1px;
+                                        border-color: Theme.border;
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 12px;
+                                            spacing: 8px;
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Rectangle {
+                                                    height: 22px;
+                                                    width: pg.preferred-width + 12px;
+                                                    border-radius: 7px;
+                                                    background: Theme.available.with-alpha(0.12);
+                                                    pg := Text { text: "PAGAMENTO"; color: Theme.available; font-size: 10px; font-weight: 800; }
+                                                }
+                                            }
+                                            Text { text: p.place + " • " + p.method; color: Theme.text; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                                            if p.notes != "": Text { text: "(" + p.notes + ")"; color: Theme.text-muted; font-size: 12px; font-italic: true; vertical-alignment: center; overflow: elide; }
+                                            Rectangle { horizontal-stretch: 1; }
+                                            Text { text: "+ " + p.amount; color: Theme.available; font-size: 12px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sangria / suprimento
+        if CaixaStore.tx-visible: Dialog {
+            panel-width: 440px;
+            Text {
+                text: CaixaStore.tx-withdrawal ? "Registrar Sangria (Retirada)" : "Registrar Suprimento (Entrada)";
+                color: Theme.text;
+                font-size: 18px;
+                font-weight: 900;
+            }
+            VerticalLayout {
+                spacing: 4px;
+                FieldLabel { text: "VALOR (R$) *"; }
+                tx-amount := CxInput {
+                    text <=> CaixaStore.tx-amount;
+                    placeholder: "0.00";
+                    mono: true;
+                    weight: 800;
+                    font-size: 16px;
+                    init => { self.focus(); }
+                    accepted => { CaixaStore.tx-confirm(); }
+                }
+            }
+            VerticalLayout {
+                spacing: 4px;
+                FieldLabel { text: "MOTIVO / JUSTIFICATIVA *"; }
+                CxInput {
+                    text <=> CaixaStore.tx-reason;
+                    placeholder: CaixaStore.tx-withdrawal ? "Ex: Pagamento fornecedor de gelo" : "Ex: Troco extra para notas";
+                    font-size: 13px;
+                    accepted => { CaixaStore.tx-confirm(); }
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                CxButton { text: "Cancelar"; horizontal-stretch: 1; clicked => { CaixaStore.tx-visible = false; } }
+                CxButton { text: "Confirmar"; horizontal-stretch: 1; bg: Theme.primary; fg: Theme.primary-text; clicked => { CaixaStore.tx-confirm(); } }
+            }
+        }
+
+        // Fechamento de turno (contagem cega, conferência e comprovante)
+        if CaixaStore.close-visible: Dialog {
+            panel-width: 520px;
+
+            if CaixaStore.close-step == 1: VerticalLayout {
+                spacing: 14px;
+                DialogHeader { icon: @image-url("icons/lock.svg"); title: "Fechamento de Turno"; subtitle: "Etapa 1 de 2: Informe a contagem física da gaveta"; }
+                Rectangle {
+                    background: Theme.bg;
+                    border-radius: 12px;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    VerticalLayout {
+                        padding: 12px;
+                        Text {
+                            text: "Conte o dinheiro em espécie na gaveta. Na próxima etapa você verá a conferência do sistema e poderá voltar para corrigir se houver qualquer erro de digitação.";
+                            color: Theme.text-muted;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    FieldLabel { text: "VALOR TOTAL EM DINHEIRO CONTADO NA GAVETA (R$) *"; }
+                    CxInput {
+                        text <=> CaixaStore.close-count;
+                        placeholder: "0.00";
+                        mono: true;
+                        weight: 900;
+                        font-size: 24px;
+                        min-height: 56px;
+                        init => { self.focus(); }
+                        accepted => { CaixaStore.close-verify(); }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 4px;
+                    FieldLabel { text: "CONFERIDO POR *"; }
+                    CxInput { text <=> CaixaStore.close-by; font-size: 13px; accepted => { CaixaStore.close-verify(); } }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    CxButton { text: "Cancelar"; horizontal-stretch: 1; min-height: 46px; clicked => { CaixaStore.close-visible = false; } }
+                    CxButton { text: "Avançar e Conferir"; icon: @image-url("icons/arrow-up-right.svg"); horizontal-stretch: 1; min-height: 46px; bg: Theme.primary; fg: Theme.primary-text; clicked => { CaixaStore.close-verify(); } }
+                }
+            }
+
+            if CaixaStore.close-step == 2: VerticalLayout {
+                spacing: 14px;
+                DialogHeader {
+                    icon: CaixaStore.check-sign == 0 ? @image-url("icons/check-circle.svg") : @image-url("icons/alert-triangle.svg");
+                    tint: CaixaStore.check-sign == 0 ? Theme.available : Theme.primary;
+                    title: "Conferência do Caixa";
+                    subtitle: "Etapa 2 de 2: Revise os valores antes de encerrar";
+                }
+                Rectangle {
+                    background: Theme.bg;
+                    border-radius: 16px;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 10px;
+                        LabeledRow { label: "Dinheiro Esperado pelo Sistema:"; value: CaixaStore.check-expected; }
+                        LabeledRow { label: "Valor Digitado (Contagem Física):"; value: CaixaStore.check-counted; }
+                        Rectangle { height: 1px; background: Theme.border; }
+                        LabeledRow {
+                            label: "Diferença Apurada:";
+                            bold: true;
+                            value: CaixaStore.check-diff;
+                            value-size: 16px;
+                            value-color: CaixaStore.check-sign == 0 ? Theme.available : CaixaStore.check-sign > 0 ? Theme.occupied : Theme.danger;
+                        }
+                    }
+                }
+                if CaixaStore.check-sign == 0: Rectangle {
+                    background: Theme.available.with-alpha(0.1);
+                    border-radius: 16px;
+                    border-width: 1px;
+                    border-color: Theme.available.with-alpha(0.3);
+                    HorizontalLayout {
+                        padding: 14px;
+                        spacing: 10px;
+                        VerticalLayout { alignment: center; Icon { source: @image-url("icons/check-circle.svg"); tint: Theme.available; width: 20px; height: 20px; } }
+                        VerticalLayout {
+                            Text { text: "Caixa 100% Exato!"; color: Theme.available; font-size: 13px; font-weight: 800; }
+                            Text { text: "O valor digitado bateu com o esperado pelo sistema."; color: Theme.available; font-size: 11px; }
+                        }
+                    }
+                }
+                if CaixaStore.check-sign != 0: Rectangle {
+                    background: Theme.primary.with-alpha(0.1);
+                    border-radius: 16px;
+                    border-width: 2px;
+                    border-color: Theme.primary.with-alpha(0.4);
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 6px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            VerticalLayout { alignment: center; Icon { source: @image-url("icons/alert-triangle.svg"); tint: Theme.primary; } }
+                            Text {
+                                text: CaixaStore.check-sign < 0 ? "Falta no Caixa Detectada" : "Sobra no Caixa Detectada";
+                                color: Theme.primary;
+                                font-size: 14px;
+                                font-weight: 900;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                        Text {
+                            text: "O valor digitado (" + CaixaStore.check-counted + ") é diferente do esperado (" + CaixaStore.check-expected + ").";
+                            color: Theme.text;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                        Rectangle {
+                            background: Theme.primary.with-alpha(0.2);
+                            border-radius: 12px;
+                            border-width: 1px;
+                            border-color: Theme.primary.with-alpha(0.3);
+                            VerticalLayout {
+                                padding: 8px;
+                                Text {
+                                    text: "Errou a digitação de alguma nota ou moeda? Clique em \"Voltar e Corrigir Valor\" abaixo para ajustar a contagem antes de fechar.";
+                                    color: Theme.text;
+                                    font-size: 12px;
+                                    font-weight: 800;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    CxButton {
+                        icon: @image-url("icons/arrow-left.svg");
+                        text: "VOLTAR E CORRIGIR VALOR";
+                        horizontal-stretch: 1;
+                        min-height: 48px;
+                        outline: Theme.border;
+                        clicked => { CaixaStore.close-step = 1; }
+                    }
+                    CxButton {
+                        icon: @image-url("icons/lock.svg");
+                        text: CaixaStore.close-submitting ? "FECHANDO..." : "CONFIRMAR FECHAMENTO";
+                        horizontal-stretch: 1;
+                        min-height: 48px;
+                        enabled: !CaixaStore.close-submitting;
+                        bg: CaixaStore.check-sign == 0 ? Theme.available : Theme.danger;
+                        fg: #ffffff;
+                        clicked => { CaixaStore.close-confirm(); }
+                    }
+                }
+            }
+
+            if CaixaStore.close-step == 3: VerticalLayout {
+                spacing: 14px;
+                DialogHeader { icon: @image-url("icons/check-circle.svg"); tint: Theme.available; title: "Caixa Encerrado com Sucesso"; subtitle: "Resumo oficial do turno arquivado no sistema"; }
+                Rectangle {
+                    background: Theme.bg;
+                    border-radius: 16px;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 8px;
+                        LabeledRow { label: "Dinheiro Esperado na Gaveta:"; value: CaixaStore.rep-expected; }
+                        LabeledRow { label: "Dinheiro Físico Contado:"; value: CaixaStore.rep-counted; }
+                        Rectangle { height: 1px; background: Theme.border; }
+                        LabeledRow {
+                            label: "Diferença Registrada:";
+                            bold: true;
+                            value: CaixaStore.rep-diff;
+                            value-color: CaixaStore.rep-negative ? Theme.danger : Theme.available;
+                        }
+                    }
+                }
+                Rectangle {
+                    background: Theme.primary.with-alpha(0.1);
+                    border-radius: 16px;
+                    border-width: 1px;
+                    border-color: Theme.primary.with-alpha(0.2);
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 8px;
+                        HorizontalLayout {
+                            HorizontalLayout {
+                                spacing: 6px;
+                                horizontal-stretch: 1;
+                                VerticalLayout { alignment: center; Icon { source: @image-url("icons/users.svg"); tint: Theme.primary; } }
+                                Text { text: "REPASSE DE 10% AOS GARÇONS"; color: Theme.primary; font-size: 12px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                            }
+                            Text { text: "Total: " + CaixaStore.rep-fee-total; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; }
+                        }
+                        if CaixaStore.rep-waiters.length == 0: Text {
+                            text: "Nenhuma comissão acumulada neste turno.";
+                            color: Theme.text-muted;
+                            font-size: 11px;
+                            font-italic: true;
+                        }
+                        if CaixaStore.rep-waiters.length > 0: Flickable {
+                            height: min(rep-list.preferred-height, 192px);
+                            content-height: rep-list.preferred-height;
+                            rep-list := VerticalLayout {
+                                spacing: 6px;
+                                for w in CaixaStore.rep-waiters: Rectangle {
+                                    height: 48px;
+                                    border-radius: 12px;
+                                    background: Theme.surface;
+                                    border-width: 1px;
+                                    border-color: Theme.primary.with-alpha(0.2);
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            horizontal-stretch: 1;
+                                            Text { text: w.name; color: Theme.text; font-size: 12px; font-weight: 800; }
+                                            Text { text: w.orders + " • " + w.sales + " em vendas"; color: Theme.text-muted; font-size: 10px; }
+                                        }
+                                        Text { text: w.fee; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                CxButton {
+                    text: "CONCLUIR E FECHAR JANELA";
+                    min-height: 50px;
+                    bg: Theme.available;
+                    fg: Theme.primary-text;
+                    weight: 900;
+                    clicked => { CaixaStore.close-finish(); }
+                }
+                CxButton {
+                    icon: @image-url("icons/rotate-ccw.svg");
+                    text: "Fechou errado mesmo assim? Reabrir caixa para correção";
+                    bg: transparent;
+                    hover-bg: Theme.primary.with-alpha(0.1);
+                    fg: Theme.primary;
+                    clicked => { CaixaStore.reopen-last(); }
+                }
+            }
+        }
+
+        // Venda rápida de balcão em tela cheia
+        if CaixaStore.quick-visible: QuickSale { width: 100%; height: 100%; }
+
+        // Confirmação (window.confirm do original)
+        if CaixaStore.confirm-text != "": Dialog {
+            panel-width: 440px;
+            DialogHeader { icon: @image-url("icons/help-circle.svg"); title: "Confirmar"; }
+            Text { text: CaixaStore.confirm-text; color: Theme.text; font-size: 13px; wrap: word-wrap; }
+            HorizontalLayout {
+                spacing: 8px;
+                CxButton { text: "Cancelar"; horizontal-stretch: 1; clicked => { CaixaStore.confirm-text = ""; } }
+                CxButton { text: "Confirmar"; horizontal-stretch: 1; bg: Theme.primary; fg: Theme.primary-text; clicked => { CaixaStore.confirm-yes(); } }
+            }
+        }
+
+        // Aviso (alert do original)
+        if CaixaStore.alert-text != "": Dialog {
+            panel-width: 420px;
+            DialogHeader { icon: @image-url("icons/alert-circle.svg"); tint: Theme.primary; title: "Aviso"; }
+            Text { text: CaixaStore.alert-text; color: Theme.text; font-size: 13px; wrap: word-wrap; }
+            CxButton {
+                text: "OK";
+                bg: Theme.primary;
+                fg: Theme.primary-text;
+                clicked => { CaixaStore.alert-text = ""; }
+            }
+        }
+    }
+}

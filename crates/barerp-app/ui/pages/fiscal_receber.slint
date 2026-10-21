@@ -1,0 +1,189 @@
+// 1º BIP: recebimento da NF do fornecedor e ciência da operação na SEFAZ (NfReceivingView).
+
+import { Theme } from "../theme.slint";
+import { FiscalStore, FxRecebida } from "fiscal_store.slint";
+import { FxCor, FxCores, FxCard, FxBadge, FxLabel, FxButton, FxBotao, FxInput, FxAviso, Icon } from "fiscal_ui.slint";
+import { FiscalIcons } from "fiscal_icons.slint";
+
+export component ReceberNota inherits Rectangle {
+    Flickable {
+        content-height: corpo.preferred-height;
+        corpo := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 80px;
+            spacing: 18px;
+            HorizontalLayout {
+                FxButton { text: "Voltar ao Módulo Fiscal"; icone: FiscalIcons.arrow-left; tipo: FxBotao.fantasma; clicked => { FiscalStore.abrir("hub"); } }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            VerticalLayout {
+                spacing: 6px;
+                Text { text: "1º BIP: Recebimento de NF & Ciência na SEFAZ"; color: Theme.text; font-size: 24px; font-weight: 900; wrap: word-wrap; }
+                Text { text: "Bipe a chave de 44 dígitos na entrega da mercadoria. O sistema registra a Ciência da Operação na SEFAZ e faz o download automático do XML."; color: Theme.text-muted; font-size: 14px; wrap: word-wrap; }
+            }
+            Rectangle {
+                border-radius: 18px;
+                background: Theme.occupied.with-alpha(0.08);
+                border-width: 1px;
+                border-color: Theme.occupied.with-alpha(0.3);
+                height: fluxo.preferred-height;
+                fluxo := VerticalLayout {
+                    padding: 18px;
+                    spacing: 6px;
+                    HorizontalLayout { spacing: 8px; VerticalLayout { alignment: center; Icon { source: FiscalIcons.scan; color: Theme.occupied; size: 16px; } } Text { text: "Fluxo de Entrada em 2 Etapas:"; color: Theme.occupied; font-size: 13px; font-weight: 900; horizontal-stretch: 1; } }
+                    Text { text: "1º Bip (Aqui): Confirma o recebimento fiscal na SEFAZ e baixa o XML. O estoque não é alterado ainda."; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                    Text { text: "2º Bip (Na Conferência): Feito ao descarregar as caixas e conferir os itens recebidos com a DANFE impressa. É neste momento que os produtos e custos entram no estoque."; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                }
+            }
+            FxCard {
+                height: bip.preferred-height;
+                bip := VerticalLayout {
+                    padding: 24px;
+                    spacing: 14px;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.scan; color: Theme.closing; size: 22px; } }
+                        Text { text: "1º Bip — Leitor de Chave de Acesso"; color: Theme.text; font-size: 17px; font-weight: 900; vertical-alignment: center; }
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        campo := FxInput {
+                            horizontal-stretch: 1;
+                            text <=> FiscalStore.rb-chave;
+                            placeholder: "Bipe o código ou cole a chave de 44 dígitos aqui...";
+                            mono: true;
+                            font-size: 16px;
+                            accepted => { FiscalStore.rb-bipar(); }
+                            init => { self.focus(); }
+                        }
+                        FxButton {
+                            text: FiscalStore.rb-bipando ? "Consultando SEFAZ..." : "Registrar NF";
+                            icone: FiscalIcons.scan;
+                            tipo: FxBotao.primario;
+                            enabled: !FiscalStore.rb-bipando;
+                            clicked => { FiscalStore.rb-bipar(); }
+                        }
+                    }
+                    Text { text: "Pressione Enter após bipar para registro imediato. O leitor USB já faz isso automaticamente."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                    HorizontalLayout {
+                        alignment: start;
+                        FxButton { text: "Fazer Upload de Arquivo XML (Manual)"; icone: FiscalIcons.file-text; clicked => { FiscalStore.importar(""); } }
+                    }
+                    if FiscalStore.rb-resultado.visivel: Rectangle {
+                        property <FxCor> cor: !FiscalStore.rb-resultado.ok ? FxCor.vermelho : !FiscalStore.rb-resultado.xml ? FxCor.ambar : FxCor.verde;
+                        border-radius: 16px;
+                        background: FxCores.de(self.cor).with-alpha(0.08);
+                        border-width: 1px;
+                        border-color: FxCores.de(self.cor).with-alpha(0.35);
+                        height: res.preferred-height;
+                        res := VerticalLayout {
+                            padding: 16px;
+                            spacing: 6px;
+                            if !FiscalStore.rb-resultado.ok: Text { text: "Erro no Bip"; color: Theme.danger; font-size: 14px; font-weight: 900; }
+                            if !FiscalStore.rb-resultado.ok: Text { text: FiscalStore.rb-resultado.erro; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                            if FiscalStore.rb-resultado.ok: HorizontalLayout {
+                                spacing: 12px;
+                                Text {
+                                    text: FiscalStore.rb-resultado.xml ? "1º Bip Concluído! Ciência e XML OK na SEFAZ" : "Ciência Registrada na SEFAZ! (XML em processamento)";
+                                    color: FiscalStore.rb-resultado.xml ? Theme.available : Theme.closing;
+                                    font-size: 14px;
+                                    font-weight: 900;
+                                    horizontal-stretch: 1;
+                                    wrap: word-wrap;
+                                }
+                                FxButton {
+                                    text: FiscalStore.rb-resultado.xml ? "Ir para 2º Bip / Conferência →" : "Tentar Conferir Agora";
+                                    tipo: FiscalStore.rb-resultado.xml ? FxBotao.sucesso : FxBotao.normal;
+                                    clicked => { FiscalStore.importar(FiscalStore.rb-resultado.chave); }
+                                }
+                            }
+                            if FiscalStore.rb-resultado.ok: Text {
+                                text: FiscalStore.rb-resultado.emitente + " — NF " + FiscalStore.rb-resultado.nf + (FiscalStore.rb-resultado.xml ? " — " + FiscalStore.rb-resultado.valor : "");
+                                color: Theme.text;
+                                font-size: 12px;
+                                font-weight: 700;
+                                wrap: word-wrap;
+                            }
+                            if FiscalStore.rb-resultado.ok && !FiscalStore.rb-resultado.xml: Text {
+                                text: "A SEFAZ recebeu o manifesto e está consolidando o XML oficial com a Focus NFe (~30s a 1 min). A nota já foi salva com segurança no seu histórico.";
+                                color: Theme.text-muted;
+                                font-size: 11px;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+            if FiscalStore.rb-aviso != "": FxAviso { text: FiscalStore.rb-aviso; cor: FiscalStore.rb-aviso-ok ? FxCor.verde : FxCor.ambar; }
+            FxCard {
+                height: hist.preferred-height;
+                hist := VerticalLayout {
+                    padding: 22px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Text { text: "Histórico de Recebimentos"; color: Theme.text; font-size: 16px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
+                        FxButton { text: "Atualizar"; clicked => { FiscalStore.rb-recarregar(); } }
+                    }
+                    if FiscalStore.rb-carregando: Text { text: "Carregando..."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
+                    if !FiscalStore.rb-carregando && FiscalStore.rb-notas.length == 0: VerticalLayout {
+                        padding: 30px;
+                        HorizontalLayout { alignment: center; Icon { source: FiscalIcons.scan; color: Theme.text-muted; size: 32px; } }
+                        Text { text: "Nenhuma nota recebida ainda. Bipe a primeira!"; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
+                    }
+                    if !FiscalStore.rb-carregando: VerticalLayout {
+                        spacing: 10px;
+                        for n in FiscalStore.rb-notas: Rectangle {
+                            border-radius: 16px;
+                            background: Theme.bg;
+                            border-width: 1px;
+                            border-color: Theme.border;
+                            height: linha.preferred-height;
+                            linha := HorizontalLayout {
+                                padding: 14px;
+                                spacing: 14px;
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    HorizontalLayout {
+                                        spacing: 10px;
+                                        alignment: start;
+                                        FxBadge { text: n.rotulo; cor: n.estado == 2 ? FxCor.verde : n.estado == 1 ? FxCor.azul : FxCor.ambar; }
+                                        Text { text: "NF " + n.nf; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                                    }
+                                    Text { text: n.emitente; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
+                                    Text { text: n.chave-curta; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    Text { text: n.valor; color: n.estado == 1 && n.valor == "Aguardando SEFAZ..." ? Theme.occupied : Theme.text; font-size: 14px; font-weight: 900; horizontal-alignment: right; }
+                                    Text { text: n.data; color: Theme.text-muted; font-size: 11px; horizontal-alignment: right; }
+                                }
+                                if n.estado == 1: VerticalLayout {
+                                    alignment: center;
+                                    FxButton {
+                                        text: FiscalStore.rb-sincronizando == n.chave ? "Consultando..." : "Buscar XML";
+                                        icone: FiscalIcons.refresh-cw;
+                                        enabled: FiscalStore.rb-sincronizando == "";
+                                        clicked => { FiscalStore.rb-buscar-xml(n.chave); }
+                                    }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    FxButton {
+                                        text: n.estado == 2 ? "Entrada Realizada" : n.estado == 1 ? "Conferir / Abrir" : "Fazer 2º Bip / Conferir";
+                                        icone: FiscalIcons.file-text;
+                                        tipo: n.estado == 0 ? FxBotao.primario : FxBotao.normal;
+                                        enabled: n.estado != 2;
+                                        clicked => { FiscalStore.importar(n.chave); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

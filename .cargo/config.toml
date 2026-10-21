@@ -1,0 +1,4 @@
+# Runtime do C (VCRUNTIME140) embutido no barerp.exe: sem isso o app não abre em PC sem o
+# "Visual C++ Redistributable" instalado
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

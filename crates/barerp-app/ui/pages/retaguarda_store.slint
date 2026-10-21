@@ -1,0 +1,223 @@
+// Estado e callbacks da Retaguarda (SettingsView, DashboardView, AuditView, PrinterSettingsView, SubscriptionView,
+// LicenseModal, BackupSettingsCard, DigitalMenuCard). Ligado em `src/pages/retaguarda.rs` com
+// `ui.global::<RetaguardaStore>()`. Prefixos: b- backup · m- cardápio digital · d- dashboard · a- auditoria
+// · p- impressoras · s- assinatura · g- tela de ativação (bloqueio) · i- aviso de mensalidade · u- atualização.
+
+// customers/suppliers: as telas de Clientes (Fiado) e Fornecedores da área Cardápio, abertas dentro da Retaguarda
+export enum RtView { hub, dashboard, printers, subscription, customers, suppliers }
+
+// kind: GARCOM_MOBILE | COZINHA_KDS | outro
+export struct RtDevice { kind: string, label: string, waiter: string, agent: string, ip: string }
+export struct RtMenuCategory { id: string, name: string, hidden: bool }
+// Uma linha de chips (o Rust quebra as categorias em linhas pela largura estimada, como o flex-wrap)
+export struct RtMenuRow { cats: [RtMenuCategory] }
+export struct RtTopProduct { rank: int, name: string, station: string, value: string, pct: float }
+export struct RtBar { label: string, value: string, pct: float }
+export struct RtWaiter { rank: int, name: string, sub: string, total: string }
+export struct RtLowMargin { name: string, margin: string }
+// tone: 0 neutro · 1 vermelho (cancelamento) · 2 âmbar (desconto)
+export struct RtAudit { when: string, action: string, description: string, tone: int }
+
+export global RetaguardaStore {
+    in-out property <string> status;
+    in-out property <RtView> view: RtView.hub;
+
+    // Aviso (alert do original) e confirmação (window.confirm)
+    in-out property <string> alert-text;
+    in-out property <string> confirm-text;
+    in-out property <string> confirm-action;
+    callback confirm-accepted(string);
+
+    // ---------- Hub (SettingsView) ----------
+    in property <string> font-label: "1x";
+    callback toggle-theme();
+    callback cycle-font();
+    in property <string> license-badge: "Ativa";
+    in property <bool> license-badge-warn;
+    in property <string> machine-short: "Carregando...";
+    callback open-subscription();
+    callback open-dashboard();
+    callback open-printers();
+    callback open-staff();
+    callback open-customers();
+    callback open-suppliers();
+    callback open-waiters();
+    callback open-connect();
+    in-out property <bool> auto-print-kitchen;
+    callback toggle-auto-print();
+    callback back();
+    // A aba Retaguarda foi aberta (recarrega o hub)
+    callback shown();
+
+    // Margem de lucro padrão
+    in-out property <string> margin-input: "50";
+    in property <bool> margin-saving;
+    callback save-margin();
+
+    // Backup automático
+    in property <bool> b-alert-on;
+    in property <string> b-alert;
+    in property <string> b-last-local: "nunca";
+    in property <string> b-local-count: "0 cópias guardadas";
+    in property <string> b-last-external: "desligado";
+    in property <string> b-external-sub: "Escolha uma pasta e ative abaixo";
+    in-out property <string> b-folder;
+    in-out property <bool> b-enabled;
+    in-out property <string> b-keep: "30";
+    in property <bool> b-saving;
+    in property <bool> b-running;
+    in property <string> b-message;
+    in property <bool> b-message-ok;
+    callback b-choose-folder();
+    callback b-save();
+    callback b-run-now();
+
+    // Cardápio digital
+    in property <string> m-badge: "Desligado";
+    in property <int> m-badge-tone; // 0 cinza · 1 verde · 2 vermelho
+    in property <string> m-error;
+    in property <bool> m-published;
+    in property <string> m-url;
+    in property <image> m-qr;
+    in property <bool> m-has-qr;
+    in property <string> m-last;
+    in-out property <bool> m-enabled;
+    in-out property <string> m-title;
+    in property <string> m-title-placeholder: "Nome do bar";
+    in-out property <string> m-message;
+    in property <[RtMenuRow]> m-category-rows;
+    in-out property <bool> m-ignore-stock;
+    in-out property <bool> m-hide-sold-out;
+    in-out property <bool> m-advanced;
+    in-out property <string> m-site;
+    in property <string> m-site-placeholder: "https://cardapio-barerp.netlify.app";
+    in property <bool> m-status-enabled;
+    in property <string> m-busy; // "" | save | publish | qr
+    in property <string> m-feedback;
+    in property <bool> m-feedback-ok;
+    callback m-toggle-category(string);
+    callback m-open-items();
+    callback m-open-menu();
+    callback m-copy-link();
+    callback m-qr-sheet();
+    callback m-save();
+    callback m-publish();
+    // Largura disponível para os chips de categoria (o Rust quebra as linhas por ela)
+    in-out property <length> m-chips-width: 800px;
+    callback m-chips-relayout();
+
+    // Sobre e atualização
+    in property <string> version;
+    in property <bool> has-update;
+    in property <string> update-text: "Sistema atualizado. O Bar ERP verifica e notifica sobre novas versões automaticamente.";
+    in property <bool> checking-update;
+    callback check-updates();
+    callback open-update();
+
+    // Dispositivos conectados
+    in property <[RtDevice]> devices;
+
+    // ---------- Dashboard ----------
+    in property <bool> d-loading;
+    in-out property <bool> d-audit-tab;
+    in property <string> d-date-label: "Hoje";
+    in property <string> d-date-text;
+    in property <bool> d-is-today: true;
+    in property <string> d-revenue: "R$ 0.00";
+    in property <string> d-orders: "0";
+    in property <string> d-ticket: "R$ 0.00";
+    in property <string> d-occupancy: "0%";
+    in property <string> d-occupancy-sub: "0 de 0 mesas ocupadas";
+    in property <[RtTopProduct]> d-top;
+    in property <[RtBar]> d-methods;
+    in property <[RtBar]> d-hours;
+    in property <[RtWaiter]> d-waiters;
+    in property <[RtLowMargin]> d-low;
+    callback d-refresh();
+    callback d-shift-day(int);
+    callback d-today();
+
+    // Auditoria
+    in property <bool> a-loading;
+    in property <[RtAudit]> a-logs;
+    callback a-refresh();
+
+    // ---------- Impressoras ----------
+    in property <bool> p-loading;
+    in property <[string]> p-detected;
+    in property <string> p-default-printer;
+    in-out property <string> p-cashier;
+    in-out property <string> p-kitchen;
+    in-out property <int> p-paper: 80;
+    in-out property <float> p-margin-left: 1;
+    in-out property <float> p-margin-right: 1;
+    in-out property <float> p-margin-top: 2;
+    in-out property <float> p-margin-bottom: 12;
+    in-out property <int> p-qr: 100;
+    in-out property <int> p-font: 100;
+    in-out property <bool> p-auto-cut: true;
+    in-out property <bool> p-silent: true;
+    in property <bool> p-saving;
+    in property <bool> p-saved;
+    in property <bool> p-testing;
+    in property <string> p-message;
+    in property <bool> p-message-ok;
+    callback p-reload();
+    callback p-save();
+    callback p-reset();
+    callback p-test();
+
+    // ---------- Assinatura ----------
+    in property <int> s-days;
+    in property <string> s-status-label: "Ativa & Em Operação";
+    in property <bool> s-soon;
+    in property <string> s-expiration: "Data em validação";
+    in property <string> s-client;
+    in property <string> s-machine;
+    in property <bool> s-copied-id;
+    in property <string> s-pix: "68.817.608/0001-47";
+    in property <bool> s-copied-pix;
+    in property <string> s-dev-name: "Pablo Franco - Software House";
+    in-out property <int> s-months: 1;
+    in property <string> s-projection;
+    in property <bool> s-syncing;
+    in property <string> s-sync-message;
+    in property <bool> s-sync-ok;
+    in-out property <bool> s-offline-open;
+    in-out property <string> s-offline-key;
+    in property <bool> s-offline-busy;
+    in property <string> s-offline-message;
+    in property <bool> s-offline-ok;
+    callback s-sync();
+    callback s-copy-id();
+    callback s-copy-pix();
+    callback s-set-months(int);
+    callback s-request-renewal();
+    callback s-activate-offline();
+    callback s-support();
+
+    // ---------- Tela de ativação (bloqueio total do App.tsx) ----------
+    in property <bool> g-visible;
+    in property <string> g-status; // EXPIRED | BLOCKED | outro
+    in property <string> g-error;
+    in property <string> g-success;
+    in property <bool> g-copied-id;
+    in property <bool> g-copied-pix;
+    in property <bool> g-syncing;
+    in-out property <bool> g-offline-open;
+    in-out property <string> g-offline-key;
+    in property <bool> g-offline-busy;
+    in-out property <bool> g-server-open;
+    in-out property <string> g-server-url: "https://bar-erp-licensas.onrender.com";
+    callback g-copy-id();
+    callback g-copy-pix();
+    callback g-whatsapp();
+    callback g-check-online();
+    callback g-activate-offline();
+
+    // ---------- Aviso de mensalidade (Navbar) ----------
+    in-out property <bool> i-visible;
+    in property <int> i-days;
+    callback i-whatsapp();
+    callback i-open-subscription();
+}

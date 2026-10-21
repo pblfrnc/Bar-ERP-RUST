@@ -1,0 +1,452 @@
+// Dashboard & Indicadores (DashboardView.tsx) com a aba Monitoramento Cego (AuditView.tsx).
+
+import { Theme } from "../theme.slint";
+import { RetaguardaStore, RtTopProduct, RtBar, RtWaiter, RtLowMargin, RtAudit } from "retaguarda_store.slint";
+import { RtIcons, RtColors, RIcon, Spinner, RButton, GhostButton, Card, IconBubble, ProgressBar, BackButton } from "retaguarda_widgets.slint";
+
+component MetricCard inherits Rectangle {
+    in property <image> icon;
+    in property <color> tone;
+    in property <string> label;
+    in property <string> value;
+    in property <color> value-color: Theme.text;
+    in property <string> sub;
+    border-radius: 18px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 4px;
+        HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout { alignment: center; RIcon { source: root.icon; tint: root.tone; } }
+            Text { text: root.label; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+        }
+        Text { text: root.value; color: root.value-color; font-size: 24px; font-weight: 900; }
+        Text { text: root.sub; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+    }
+}
+
+component Panel inherits Rectangle {
+    in property <string> title;
+    in property <image> icon;
+    in property <color> tone: Theme.primary;
+    border-radius: 24px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    VerticalLayout {
+        padding: 20px;
+        spacing: 16px;
+        alignment: start;
+        HorizontalLayout {
+            spacing: 8px;
+            if root.icon.width > 0: VerticalLayout { alignment: center; RIcon { source: root.icon; tint: root.tone; size: 20px; } }
+            Text { text: root.title; color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; }
+        }
+        @children
+    }
+}
+
+component EmptyText inherits Text {
+    color: Theme.text-muted;
+    font-size: 12px;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+    min-height: 72px;
+    wrap: word-wrap;
+}
+
+component TopRow inherits VerticalLayout {
+    in property <RtTopProduct> item;
+    spacing: 4px;
+    HorizontalLayout {
+        spacing: 8px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 22px;
+                height: 22px;
+                border-radius: 11px;
+                background: Theme.surface-2;
+                Text { text: "#" + root.item.rank; color: Theme.text; font-size: 10px; font-weight: 700; }
+            }
+        }
+        Text { text: root.item.name; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; overflow: elide; }
+        Text { text: "(" + root.item.station + ")"; color: Theme.text-muted; font-size: 10px; vertical-alignment: center; }
+        Rectangle { horizontal-stretch: 1; }
+        Text { text: root.item.value; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
+    }
+    ProgressBar { pct: root.item.pct; tone: Theme.primary; }
+}
+
+component MethodRow inherits VerticalLayout {
+    in property <RtBar> item;
+    spacing: 4px;
+    HorizontalLayout {
+        Text { text: root.item.label; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
+        Text { text: root.item.value; color: Theme.available; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+    }
+    ProgressBar { pct: root.item.pct; tone: #10b981; }
+}
+
+component HourChart inherits Rectangle {
+    in property <[RtBar]> bars;
+    height: 168px;
+    HorizontalLayout {
+        spacing: 8px;
+        padding-top: 16px;
+        for b in root.bars: VerticalLayout {
+            spacing: 6px;
+            horizontal-stretch: 1;
+            col := Rectangle {
+                vertical-stretch: 1;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                background: Theme.dark ? #020617 : #f1f5f9;
+                Rectangle {
+                    y: parent.height - self.height;
+                    width: parent.width;
+                    height: parent.height * clamp(b.pct, 0, 100) / 100;
+                    border-top-left-radius: 3px;
+                    border-top-right-radius: 3px;
+                    background: bar-touch.has-hover ? #818cf8 : #6366f1;
+                }
+                bar-touch := TouchArea { }
+                if bar-touch.has-hover: Rectangle {
+                    y: -4px;
+                    width: tip.preferred-width + 10px;
+                    height: 16px;
+                    border-radius: 4px;
+                    background: #1e293b;
+                    tip := Text { text: b.value; color: #ffffff; font-size: 9px; }
+                }
+            }
+            Text { text: b.label; color: Theme.text-muted; font-size: 10px; font-weight: 700; horizontal-alignment: center; }
+        }
+    }
+}
+
+component WaiterRow inherits Rectangle {
+    in property <RtWaiter> item;
+    property <color> medal: root.item.rank == 1 ? Theme.primary : root.item.rank == 2 ? Theme.text-muted : root.item.rank == 3 ? Theme.orange : Theme.text-muted;
+    height: 58px;
+    border-radius: 16px;
+    background: Theme.bg.with-alpha(0.6);
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                border-radius: 16px;
+                background: root.item.rank <= 3 ? root.medal.with-alpha(0.2) : Theme.surface-2;
+                Text { text: root.item.rank + "º"; color: root.item.rank <= 3 ? root.medal : Theme.text-muted; font-size: 13px; font-weight: 900; }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text { text: root.item.name; color: Theme.text; font-size: 13px; font-weight: 700; overflow: elide; }
+            Text { text: root.item.sub; color: Theme.text-muted; font-size: 10px; }
+        }
+        Text { text: root.item.total; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
+    }
+}
+
+// Ação da auditoria: vermelho (cancelamento), âmbar (desconto) ou neutro
+component ActionBadge inherits Rectangle {
+    in property <string> text;
+    in property <int> tone-kind;
+    property <color> tone: root.tone-kind == 1 ? Theme.danger : root.tone-kind == 2 ? Theme.primary : Theme.text-muted;
+    height: 20px;
+    width: min(170px, at.preferred-width + 12px);
+    border-radius: 4px;
+    background: root.tone.with-alpha(0.1);
+    border-width: 1px;
+    border-color: root.tone.with-alpha(0.25);
+    at := Text { text: root.text; color: root.tone-kind == 0 ? Theme.text : root.tone; font-size: 11px; font-weight: 700; overflow: elide; }
+}
+
+component AuditTable inherits Rectangle {
+    border-radius: 24px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    clip: true;
+    VerticalLayout {
+        if RetaguardaStore.a-loading: Text { text: "Carregando logs..."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; height: 96px; vertical-alignment: center; }
+        if !RetaguardaStore.a-loading && RetaguardaStore.a-logs.length == 0: VerticalLayout {
+            padding: 40px;
+            spacing: 12px;
+            alignment: center;
+            HorizontalLayout { alignment: center; RIcon { source: RtIcons.info; tint: Theme.text-muted.with-alpha(0.4); size: 32px; } }
+            Text { text: "Nenhuma atividade sensível registrada ainda."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
+        }
+        if !RetaguardaStore.a-loading && RetaguardaStore.a-logs.length > 0: VerticalLayout {
+            Rectangle {
+                height: 42px;
+                background: Theme.bg.with-alpha(0.5);
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    spacing: 16px;
+                    Text { width: 170px; text: "DATA/HORA"; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; }
+                    Text { width: 170px; text: "AÇÃO"; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; }
+                    Text { text: "DETALHES"; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; horizontal-stretch: 1; }
+                }
+            }
+            for log in RetaguardaStore.a-logs: Rectangle {
+                min-height: 44px;
+                background: row-touch.has-hover ? Theme.surface-2.with-alpha(0.6) : transparent;
+                Rectangle { y: 0; height: 1px; background: Theme.surface-2; }
+                row-touch := TouchArea { }
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    padding-top: 10px;
+                    padding-bottom: 10px;
+                    spacing: 16px;
+                    HorizontalLayout {
+                        width: 170px;
+                        spacing: 8px;
+                        VerticalLayout { alignment: center; RIcon { source: RtIcons.clock; tint: Theme.text-muted; } }
+                        Text { text: log.when; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
+                    }
+                    HorizontalLayout {
+                        width: 170px;
+                        alignment: start;
+                        VerticalLayout { alignment: center; ActionBadge { text: log.action; tone-kind: log.tone; } }
+                    }
+                    Text { text: log.description; color: Theme.text; font-size: 12px; font-family: "Menlo"; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
+                }
+            }
+        }
+    }
+}
+
+export component RetaguardaDashboard inherits Rectangle {
+    property <length> content-w: root.width - 40px;
+    property <string> lower: RetaguardaStore.d-is-today ? "hoje" : RetaguardaStore.d-date-label;
+
+    Flickable {
+        content-height: col.preferred-height + 40px;
+        col := VerticalLayout {
+            x: 20px;
+            y: 20px;
+            width: root.content-w;
+            spacing: 16px;
+
+            // Cabeçalho
+            Card {
+                HorizontalLayout {
+                    padding: 20px;
+                    spacing: 14px;
+                    VerticalLayout { alignment: center; BackButton { clicked => { RetaguardaStore.back(); } } }
+                    VerticalLayout { alignment: center; IconBubble { icon: RtIcons.chart; tone: Theme.purple; square: true; outlined: true; } }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+                        horizontal-stretch: 1;
+                        Text { text: "Dashboard & Indicadores"; color: Theme.text; font-size: 20px; font-weight: 900; }
+                        Text { text: "Desempenho operacional, faturamento e produtos líderes de vendas"; color: Theme.text-muted; font-size: 12px; }
+                    }
+                    // Filtro por data (dia local)
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 0;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            GhostButton { icon: RtIcons.chevron-left; pad: 10px; width: 40px; clicked => { RetaguardaStore.d-shift-day(-1); } }
+                            Rectangle {
+                                min-height: 38px;
+                                width: 170px;
+                                border-radius: 12px;
+                                background: Theme.surface-2;
+                                border-width: 1px;
+                                border-color: Theme.border;
+                                HorizontalLayout {
+                                    padding-left: 14px;
+                                    padding-right: 12px;
+                                    spacing: 8px;
+                                    Text { text: RetaguardaStore.d-date-text; color: Theme.text; font-size: 13px; font-weight: 600; vertical-alignment: center; horizontal-stretch: 1; }
+                                    VerticalLayout { alignment: center; RIcon { source: RtIcons.calendar; tint: Theme.text-muted; } }
+                                }
+                            }
+                            GhostButton { icon: RtIcons.chevron-right; pad: 10px; width: 40px; enabled: !RetaguardaStore.d-is-today; clicked => { RetaguardaStore.d-shift-day(1); } }
+                            if !RetaguardaStore.d-is-today: GhostButton { text: "Hoje"; clicked => { RetaguardaStore.d-today(); } }
+                            GhostButton {
+                                icon: RtIcons.refresh;
+                                spin: RetaguardaStore.d-loading;
+                                pad: 10px;
+                                width: 40px;
+                                clicked => { RetaguardaStore.d-audit-tab ? RetaguardaStore.a-refresh() : RetaguardaStore.d-refresh(); }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Abas
+            HorizontalLayout {
+                alignment: start;
+                Rectangle {
+                    border-radius: 16px;
+                    background: Theme.dark ? Theme.surface : #f1f5f9;
+                    border-width: 1px;
+                    border-color: Theme.surface-2;
+                    HorizontalLayout {
+                        padding: 6px;
+                        spacing: 8px;
+                        RButton {
+                            text: "Visão Geral";
+                            bg: !RetaguardaStore.d-audit-tab ? (Theme.dark ? #1e293b : #ffffff) : transparent;
+                            hover-bg: !RetaguardaStore.d-audit-tab ? self.bg : Theme.surface-2;
+                            fg: !RetaguardaStore.d-audit-tab ? Theme.text : Theme.text-muted;
+                            weight: 700;
+                            clicked => { RetaguardaStore.d-audit-tab = false; }
+                        }
+                        RButton {
+                            icon: RtIcons.shield-alert;
+                            text: "Monitoramento Cego";
+                            bg: RetaguardaStore.d-audit-tab ? RtColors.rose.with-alpha(0.15) : transparent;
+                            hover-bg: RetaguardaStore.d-audit-tab ? self.bg : Theme.surface-2;
+                            fg: RetaguardaStore.d-audit-tab ? RtColors.rose : Theme.text-muted;
+                            outline: RetaguardaStore.d-audit-tab && !Theme.dark ? RtColors.rose.with-alpha(0.3) : transparent;
+                            weight: 700;
+                            clicked => { RetaguardaStore.d-audit-tab = true; RetaguardaStore.a-refresh(); }
+                        }
+                    }
+                }
+            }
+
+            if RetaguardaStore.d-audit-tab: VerticalLayout {
+                spacing: 16px;
+                Card {
+                    HorizontalLayout {
+                        padding: 20px;
+                        spacing: 14px;
+                        VerticalLayout { alignment: center; IconBubble { icon: RtIcons.shield-alert; tone: RtColors.rose; square: true; outlined: true; } }
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            horizontal-stretch: 1;
+                            Text { text: "Auditoria Cega"; color: Theme.text; font-size: 20px; font-weight: 900; }
+                            Text { text: "Histórico seguro de remoção de itens, descontos e ações do sistema"; color: Theme.text-muted; font-size: 12px; }
+                        }
+                        VerticalLayout { alignment: center; GhostButton { text: "Atualizar"; weight: 700; clicked => { RetaguardaStore.a-refresh(); } } }
+                    }
+                }
+                AuditTable { }
+            }
+
+            if !RetaguardaStore.d-audit-tab: VerticalLayout {
+                spacing: 16px;
+                HorizontalLayout {
+                    spacing: 14px;
+                    MetricCard { horizontal-stretch: 1; icon: RtIcons.dollar; tone: Theme.available; label: "FATURAMENTO " + RetaguardaStore.d-date-label; value: RetaguardaStore.d-revenue; value-color: Theme.available; sub: "Pagamentos liquidados"; }
+                    MetricCard { horizontal-stretch: 1; icon: RtIcons.receipt; tone: Theme.occupied; label: "COMANDAS PAGAS " + RetaguardaStore.d-date-label; value: RetaguardaStore.d-orders; sub: "Mesas finalizadas " + RetaguardaStore.d-date-label; }
+                    MetricCard { horizontal-stretch: 1; icon: RtIcons.trending-up; tone: Theme.primary; label: "TICKET MÉDIO"; value: RetaguardaStore.d-ticket; value-color: Theme.dark ? #fbbf24 : #d97706; sub: "Gasto médio por mesa"; }
+                    MetricCard { horizontal-stretch: 1; icon: RtIcons.users; tone: Theme.purple; label: "TAXA DE OCUPAÇÃO"; value: RetaguardaStore.d-occupancy; sub: RetaguardaStore.d-occupancy-sub; }
+                }
+                HorizontalLayout {
+                    spacing: 16px;
+                    Panel {
+                        horizontal-stretch: 1;
+                        icon: RtIcons.award;
+                        title: "Top 5 Produtos Mais Pedidos " + RetaguardaStore.d-date-label;
+                        if RetaguardaStore.d-top.length == 0: EmptyText { text: "Nenhum pedido computado " + root.lower + " ainda."; }
+                        for p in RetaguardaStore.d-top: TopRow { item: p; }
+                    }
+                    Panel {
+                        horizontal-stretch: 1;
+                        title: "Distribuição dos Pagamentos " + RetaguardaStore.d-date-label;
+                        if RetaguardaStore.d-methods.length == 0: EmptyText { text: "Nenhum pagamento liquidado " + root.lower + "."; }
+                        for m in RetaguardaStore.d-methods: MethodRow { item: m; }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 16px;
+                    Panel {
+                        horizontal-stretch: 1;
+                        title: "Vendas por Hora " + RetaguardaStore.d-date-label + " (Pico)";
+                        if RetaguardaStore.d-hours.length == 0: EmptyText { text: "Nenhuma venda registrada " + root.lower + "."; min-height: 160px; }
+                        if RetaguardaStore.d-hours.length > 0: HourChart { bars: RetaguardaStore.d-hours; }
+                    }
+                    Panel {
+                        horizontal-stretch: 1;
+                        title: "Performance dos Garçons " + RetaguardaStore.d-date-label;
+                        if RetaguardaStore.d-waiters.length == 0: EmptyText { text: "Nenhum garçom registrou vendas " + root.lower + "."; }
+                        for w in RetaguardaStore.d-waiters: WaiterRow { item: w; }
+                    }
+                    // Alerta de lucratividade
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 24px;
+                        background: RtColors.rose.with-alpha(0.05);
+                        border-width: 1px;
+                        border-color: RtColors.rose.with-alpha(0.25);
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
+                            Text { text: "Alerta de Lucratividade"; color: RtColors.rose; font-size: 15px; font-weight: 900; }
+                            Text {
+                                text: "Produtos com margem de lucro inferior a 30%. Recomendado revisar preços ou trocar fornecedor.";
+                                color: Theme.text-muted;
+                                font-size: 11px;
+                                wrap: word-wrap;
+                            }
+                            if RetaguardaStore.d-low.length == 0: Text {
+                                text: "Nenhum produto com margem perigosa!";
+                                color: Theme.available;
+                                font-size: 12px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                min-height: 48px;
+                                vertical-alignment: center;
+                            }
+                            if RetaguardaStore.d-low.length > 0: Flickable {
+                                height: min(192px, low-col.preferred-height);
+                                content-height: low-col.preferred-height;
+                                low-col := VerticalLayout {
+                                    width: parent.width;
+                                    spacing: 8px;
+                                    for p in RetaguardaStore.d-low: Rectangle {
+                                        height: 40px;
+                                        border-radius: 12px;
+                                        background: Theme.surface;
+                                        border-width: 1px;
+                                        border-color: RtColors.rose.with-alpha(0.25);
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 8px;
+                                            spacing: 8px;
+                                            Text { text: p.name; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Rectangle {
+                                                    height: 22px;
+                                                    width: mt.preferred-width + 14px;
+                                                    border-radius: 5px;
+                                                    background: RtColors.rose.with-alpha(0.1);
+                                                    mt := Text { text: p.margin; color: RtColors.rose; font-size: 10px; font-weight: 700; font-family: "Menlo"; }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Rectangle { vertical-stretch: 1; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

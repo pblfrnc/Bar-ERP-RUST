@@ -1,0 +1,11 @@
+# Compilação (passa de 10 GB)
+/target/
+
+# Bancos locais de teste: podem ter dados de cliente e campos cifrados
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# macOS
+.DS_Store

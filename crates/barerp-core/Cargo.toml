@@ -1,0 +1,20 @@
+[package]
+name = "barerp-core"
+description = "Regras de negócio puras do BarERP (preço, documentos fiscais, criptografia)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+aes-gcm = "0.10.3"
+chrono = "0.4.39"
+hex = "0.4.3"
+pbkdf2 = { version = "0.12.2", features = ["simple"] }
+rand = "0.8.5"
+scrypt = { version = "0.11.0", default-features = false }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+sha2 = "0.10.8"
+subtle = "2.6.1"
+thiserror = "2.0.11"

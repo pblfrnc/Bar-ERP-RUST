@@ -1,0 +1,23 @@
+[package]
+name = "barerp-catalog"
+description = "Busca de produto por código de barras (notas recebidas, catálogo global) e inferência de NCM/CEST/CFOP"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+barerp-db = { path = "../barerp-db" }
+image = { version = "0.25.5", default-features = false, features = ["jpeg", "png", "webp"] }
+regex = "1.11.1"
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+sqlx = { version = "0.8.3", default-features = false, features = ["runtime-tokio", "sqlite"] }
+tokio = { version = "1.43.0", features = ["time"] }
+tracing = "0.1.41"
+
+[dev-dependencies]
+barerp-core = { path = "../barerp-core" }
+tokio = { version = "1.43.0", features = ["full"] }
+wiremock = "0.6.2"

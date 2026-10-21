@@ -1,0 +1,15 @@
+pub mod cash;
+pub mod customers;
+pub mod health;
+pub mod import_xml;
+pub mod kds;
+pub mod orders;
+pub mod products;
+pub mod products_admin;
+pub mod reports;
+pub mod settings;
+pub mod staff;
+pub mod suppliers;
+pub mod system;
+pub mod tables;
+pub mod waiters;

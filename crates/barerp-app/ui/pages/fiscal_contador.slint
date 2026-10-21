@@ -1,0 +1,270 @@
+// Painel do Contador (AccountantPanelView): resumo do mês, posição de estoque, fechamento em .ZIP e
+// backups oficiais da Focus NFe na nuvem.
+
+import { Theme } from "../theme.slint";
+import { FiscalStore, FxCategoria, FxBackup } from "fiscal_store.slint";
+import { FxCor, FxCores, FxCard, FxBadge, FxLabel, FxButton, FxBotao, FxInput, FxAviso, Icon } from "fiscal_ui.slint";
+import { FiscalIcons } from "fiscal_icons.slint";
+
+component Resumo inherits Rectangle {
+    in property <string> rotulo;
+    in property <image> icone;
+    in property <FxCor> cor;
+    in property <string> qtd;
+    in property <string> total;
+    border-radius: 18px;
+    background: Theme.bg;
+    border-width: 1px;
+    border-color: Theme.border;
+    height: r.preferred-height;
+    r := VerticalLayout {
+        padding: 18px;
+        spacing: 8px;
+        HorizontalLayout {
+            HorizontalLayout {
+                spacing: 6px;
+                horizontal-stretch: 1;
+                VerticalLayout { alignment: center; Icon { source: root.icone; color: FxCores.de(root.cor); size: 14px; } }
+                Text { text: root.rotulo; color: FxCores.de(root.cor); font-size: 12px; font-weight: 900; horizontal-stretch: 1; }
+            }
+            Text { text: FiscalStore.ct-carregando ? "..." : root.qtd + " nota(s)"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+        }
+        Text { text: FiscalStore.ct-carregando ? "..." : root.total; color: Theme.text; font-size: 22px; font-weight: 900; }
+    }
+}
+
+component Valor inherits Rectangle {
+    in property <string> rotulo;
+    in property <string> valor;
+    in property <FxCor> cor: FxCor.neutro;
+    border-radius: 14px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.border;
+    height: v.preferred-height;
+    v := VerticalLayout {
+        padding: 14px;
+        spacing: 4px;
+        FxLabel { text: root.rotulo; }
+        Text { text: root.valor; color: root.cor == FxCor.neutro ? Theme.text : FxCores.de(root.cor); font-size: 17px; font-weight: 900; }
+    }
+}
+
+export component PainelContador inherits Rectangle {
+    Flickable {
+        content-height: corpo.preferred-height;
+        corpo := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 80px;
+            spacing: 18px;
+            HorizontalLayout {
+                FxButton { text: "Voltar ao Painel Fiscal"; icone: FiscalIcons.arrow-left; tipo: FxBotao.fantasma; clicked => { FiscalStore.abrir("hub"); } }
+                Rectangle { horizontal-stretch: 1; }
+            }
+            if FiscalStore.ct-mensagem != "": FxAviso { text: FiscalStore.ct-mensagem; cor: FiscalStore.ct-mensagem-ok ? FxCor.verde : FxCor.vermelho; }
+            FxCard {
+                height: card.preferred-height;
+                card := VerticalLayout {
+                    padding: 26px;
+                    spacing: 18px;
+                    HorizontalLayout {
+                        spacing: 14px;
+                        Rectangle {
+                            width: 50px; height: 50px; border-radius: 16px;
+                            background: Theme.occupied.with-alpha(0.12);
+                            border-width: 1px; border-color: Theme.occupied.with-alpha(0.3);
+                            Icon { source: FiscalIcons.briefcase; color: Theme.occupied; size: 24px; }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 4px;
+                            Text { text: "Painel do Contador"; color: Theme.text; font-size: 22px; font-weight: 900; }
+                            Text { text: "Gere o pacote mensal completo (.ZIP) com os XMLs de notas fiscais e relatório de fechamento para a contabilidade."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
+                        }
+                    }
+                    Rectangle {
+                        border-radius: 18px;
+                        background: Theme.bg;
+                        border-width: 1px;
+                        border-color: Theme.border;
+                        height: mes.preferred-height;
+                        mes := HorizontalLayout {
+                            padding: 16px;
+                            spacing: 12px;
+                            VerticalLayout { alignment: center; Icon { source: FiscalIcons.calendar; color: Theme.occupied; size: 22px; } }
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                alignment: center;
+                                Text { text: "Mês de Competência"; color: Theme.text; font-size: 14px; font-weight: 900; }
+                                Text { text: "Selecione o mês do fechamento contábil"; color: Theme.text-muted; font-size: 12px; }
+                            }
+                            FxButton { text: "‹"; font-size: 18px; clicked => { FiscalStore.ct-mes-passo(-1); } }
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 2px;
+                                FxInput {
+                                    width: 130px;
+                                    text <=> FiscalStore.ct-mes;
+                                    placeholder: "AAAA-MM";
+                                    mono: true;
+                                    align: center;
+                                    accepted => { FiscalStore.ct-mes-mudou(self.text); }
+                                    edited(t) => { if t.character-count == 7 { FiscalStore.ct-mes-mudou(t); } }
+                                }
+                                Text { text: FiscalStore.ct-mes-rotulo; color: Theme.text-muted; font-size: 11px; horizontal-alignment: center; }
+                            }
+                            FxButton { text: "›"; font-size: 18px; clicked => { FiscalStore.ct-mes-passo(1); } }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 14px;
+                        Resumo { rotulo: "NFC-e (Mod. 65)"; icone: FiscalIcons.arrow-up-right; cor: FxCor.verde; qtd: FiscalStore.ct-nfce-qtd; total: FiscalStore.ct-nfce-total; }
+                        Resumo { rotulo: "NF-e (Mod. 55)"; icone: FiscalIcons.arrow-up-right; cor: FxCor.azul; qtd: FiscalStore.ct-nfe-qtd; total: FiscalStore.ct-nfe-total; }
+                        Resumo { rotulo: "Entradas (Compras)"; icone: FiscalIcons.arrow-down-left; cor: FxCor.ambar; qtd: FiscalStore.ct-ent-qtd; total: FiscalStore.ct-ent-total; }
+                    }
+                    if FiscalStore.ct-tem-estoque: Rectangle {
+                        border-radius: 18px;
+                        background: Theme.bg;
+                        border-width: 1px;
+                        border-color: Theme.border;
+                        height: est.preferred-height;
+                        est := VerticalLayout {
+                            padding: 18px;
+                            spacing: 14px;
+                            HorizontalLayout {
+                                HorizontalLayout { spacing: 8px; horizontal-stretch: 1; VerticalLayout { alignment: center; Icon { source: FiscalIcons.boxes; color: Theme.occupied; size: 16px; } } Text { text: "Posição de Estoque & Lucro Previsto (SPED)"; color: Theme.text; font-size: 14px; font-weight: 900; horizontal-stretch: 1; } }
+                                FxBadge {
+                                    text: FiscalStore.ct-incluir-estoque ? "SERÁ INCLUÍDO NO SPED" : "OCULTO NO SPED";
+                                    cor: FiscalStore.ct-incluir-estoque ? FxCor.verde : FxCor.neutro;
+                                }
+                            }
+                            Rectangle {
+                                border-radius: 16px;
+                                background: FiscalStore.ct-incluir-estoque ? Theme.occupied.with-alpha(0.08) : Theme.surface;
+                                border-width: 1px;
+                                border-color: FiscalStore.ct-incluir-estoque ? Theme.occupied.with-alpha(0.35) : Theme.border;
+                                height: chk.preferred-height;
+                                chk := HorizontalLayout {
+                                    padding: 14px;
+                                    spacing: 12px;
+                                    Rectangle {
+                                        width: 22px; height: 22px; border-radius: 6px;
+                                        background: FiscalStore.ct-incluir-estoque ? Theme.occupied : transparent;
+                                        border-width: 2px;
+                                        border-color: FiscalStore.ct-incluir-estoque ? Theme.occupied : Theme.border;
+                                        if FiscalStore.ct-incluir-estoque: Icon { source: FiscalIcons.check; color: #ffffff; size: 14px; }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        Text { text: "Enviar posição do estoque no SPED / Fechamento"; color: Theme.text; font-size: 13px; font-weight: 800; }
+                                        Text { text: "Marque esta opção somente se o inventário físico estiver conferido e corrigido. Se desmarcado, o SPED/fechamento será gerado exclusivamente com as notas fiscais emitidas e recebidas."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                                    }
+                                }
+                                TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.ct-incluir-estoque = !FiscalStore.ct-incluir-estoque; } }
+                            }
+                            HorizontalLayout {
+                                spacing: 12px;
+                                Valor { rotulo: "ESTOQUE A CUSTO"; valor: FiscalStore.ct-estoque-custo; }
+                                Valor { rotulo: "ESTOQUE A VENDA"; valor: FiscalStore.ct-estoque-venda; }
+                                Valor { rotulo: "LUCRO PREVISTO TOTAL"; valor: FiscalStore.ct-estoque-lucro; cor: FxCor.verde; }
+                            }
+                            if FiscalStore.ct-categorias.length > 0: VerticalLayout {
+                                spacing: 8px;
+                                HorizontalLayout {
+                                    HorizontalLayout { spacing: 6px; horizontal-stretch: 1; VerticalLayout { alignment: center; Icon { source: FiscalIcons.tag; color: Theme.text-muted; size: 14px; } } Text { text: "Lucro Previsto por Categoria"; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-stretch: 1; } }
+                                    Text { text: FiscalStore.ct-incluir-estoque ? "Incluído no fechamento CSV" : "Oculto no fechamento CSV"; color: Theme.text-muted; font-size: 11px; }
+                                }
+                                for cat in FiscalStore.ct-categorias: Rectangle {
+                                    border-radius: 12px;
+                                    background: Theme.surface;
+                                    border-width: 1px;
+                                    border-color: Theme.border;
+                                    height: linha.preferred-height;
+                                    linha := HorizontalLayout {
+                                        padding: 12px;
+                                        spacing: 12px;
+                                        Text { text: cat.nome + " (" + cat.itens + " itens)"; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
+                                        Text { text: "Custo: " + cat.custo; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                                        Text { text: "Lucro: " + cat.lucro + " (" + cat.margem + "%)"; color: Theme.available; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if FiscalStore.ct-tem-resumo && !FiscalStore.ct-tem-notas && !FiscalStore.ct-carregando: FxAviso {
+                        cor: FxCor.ambar;
+                        icone: FiscalIcons.circle-alert;
+                        text: "Nenhuma nota fiscal encontrada neste mês\nNão foram emitidas NFC-e nem importadas notas de fornecedor em " + FiscalStore.ct-mes + ". Ao clicar em baixar, o sistema gerará o arquivo ZIP com o relatório fiscal de fechamento oficial demonstrando a movimentação zerada.";
+                    }
+                    if FiscalStore.ct-tem-resumo && FiscalStore.ct-tem-notas && !FiscalStore.ct-carregando: FxAviso {
+                        cor: FxCor.verde;
+                        icone: FiscalIcons.circle-check;
+                        text: FiscalStore.ct-total-notas + " nota(s) prontas para empacotamento em ZIP com XMLs separados e relatório em CSV.";
+                    }
+                    FxButton {
+                        text: FiscalStore.ct-exportando ? "Compactando XMLs e Relatório..." : "Baixar Fechamento Contábil Local (.ZIP)";
+                        icone: FiscalIcons.download;
+                        tipo: FxBotao.primario;
+                        font-size: 16px;
+                        min-height: 54px;
+                        enabled: !FiscalStore.ct-exportando;
+                        clicked => { FiscalStore.ct-exportar(); }
+                    }
+                    Text { text: "O arquivo .ZIP local inclui XMLs de Saídas/Entradas e planilha formatada para o contador (.CSV)."; color: Theme.text-muted; font-size: 11px; horizontal-alignment: center; wrap: word-wrap; }
+                }
+            }
+
+            // Backups oficiais em nuvem
+            FxCard {
+                height: bk.preferred-height;
+                bk := VerticalLayout {
+                    padding: 24px;
+                    spacing: 14px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.download; color: Theme.occupied; size: 22px; } }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            Text { text: "Backups Oficiais em Nuvem (Focus NFe)"; color: Theme.text; font-size: 16px; font-weight: 900; }
+                            Text { text: "Pacotes mensais e semanais compilados automaticamente pelos servidores da Focus"; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        }
+                        FxButton { text: "Atualizar Nuvem"; busy: FiscalStore.ct-bk-carregando; clicked => { FiscalStore.ct-bk-atualizar(); } }
+                    }
+                    if FiscalStore.ct-bk-carregando: Text { text: "Consultando arquivos compactados na Focus NFe..."; color: Theme.text-muted; font-size: 13px; }
+                    if FiscalStore.ct-bk-erro != "" && !FiscalStore.ct-bk-carregando: FxAviso {
+                        cor: FxCor.ambar;
+                        text: FiscalStore.ct-bk-erro + "\nOs backups mensais da Focus NFe são gerados automaticamente a cada virada de mês (ou aos sábados). Enquanto não houver lote fechado, utilize o botão de fechamento contábil acima.";
+                    }
+                    if !FiscalStore.ct-bk-carregando: VerticalLayout {
+                        spacing: 10px;
+                        for b in FiscalStore.ct-backups: Rectangle {
+                            border-radius: 16px;
+                            background: Theme.bg;
+                            border-width: 1px;
+                            border-color: Theme.border;
+                            height: bl.preferred-height;
+                            bl := HorizontalLayout {
+                                padding: 14px;
+                                spacing: 14px;
+                                Rectangle {
+                                    width: 44px; height: 44px; border-radius: 12px;
+                                    background: Theme.occupied.with-alpha(0.12);
+                                    Text { text: b.mes; color: Theme.occupied; font-size: 14px; font-weight: 900; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    alignment: center;
+                                    Text { text: "Competência " + b.rotulo; color: Theme.text; font-size: 14px; font-weight: 800; }
+                                    Text { text: "Pacote oficial homologado com DANFEs e XMLs"; color: Theme.text-muted; font-size: 11px; }
+                                }
+                                if b.xmls != "": VerticalLayout { alignment: center; FxButton { text: "Baixar XMLs"; icone: FiscalIcons.download; clicked => { FiscalStore.ct-abrir-url(b.xmls); } } }
+                                if b.danfes != "": VerticalLayout { alignment: center; FxButton { text: "Baixar DANFEs"; icone: FiscalIcons.download; clicked => { FiscalStore.ct-abrir-url(b.danfes); } } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,420 @@
+// Estado e callbacks da área fiscal, ligados em `src/pages/fiscal.rs`. Fica separado das telas para que cada
+// tela (`fiscal_*.slint`) importe o mesmo global sem import circular.
+
+// Selo da SEFAZ no topo do Módulo Fiscal (SefazStatusBadge)
+export struct FxSefaz {
+    carregando: bool,
+    online: bool,
+    desconectado: bool,
+    rotulo: string,
+    autorizador: string,
+    motivo: string,
+    codigo: string,
+    latencia: string,
+    detalhe: string,
+    dica: string,
+}
+
+// Nota emitida nas listas de reimpressão e cancelamento
+export struct FxNota {
+    referencia: string,
+    numero: string,
+    serie: string,
+    status: string,
+    cancelada: bool,
+    data: string,
+    valor: string,
+    chave: string,
+    // cancelamento: "Restam ~12 min" / "5h 30min restantes"; urgência 0 verde, 1 âmbar, 2 vermelho
+    prazo: string,
+    urgencia: int,
+}
+
+// Nota localizada pela busca da reimpressão
+export struct FxNotaAchada {
+    visivel: bool,
+    referencia: string,
+    numero: string,
+    serie: string,
+    status: string,
+    chave: string,
+    valor: string,
+}
+
+// Resultado do "Testar Conexão" (validate-api)
+export struct FxValidacao {
+    visivel: bool,
+    ok: bool,
+    ambiente: string,
+    total: string,
+    status-cnpj: string,
+    nao-localizado: bool,
+    erro: string,
+    erro-token: bool,
+}
+
+// Painel do Contador: lucro previsto por categoria e backups da Focus
+export struct FxCategoria { nome: string, itens: int, custo: string, lucro: string, margem: string }
+export struct FxBackup { rotulo: string, mes: string, xmls: string, danfes: string }
+
+// 1º bip: resultado do último bip e histórico de recebimentos
+export struct FxBip { visivel: bool, ok: bool, xml: bool, erro: string, emitente: string, nf: string, valor: string, chave: string }
+export struct FxRecebida {
+    chave: string,
+    chave-curta: string,
+    emitente: string,
+    nf: string,
+    // 0 aguardando 2º bip (âmbar), 1 ciência/processando XML (azul), 2 no estoque (verde)
+    estado: int,
+    rotulo: string,
+    valor: string,
+    data: string,
+}
+
+// Notas Pendentes (DF-e)
+export struct FxPendente {
+    chave: string,
+    chave-fmt: string,
+    emitente: string,
+    cnpj: string,
+    nf: string,
+    data: string,
+    valor: string,
+    // 0 pendente, 1 recebida, 2 finalizada
+    estado: int,
+    xml: bool,
+}
+// Confirmação simples (substitui o confirm() do navegador)
+export struct FxConfirma { visivel: bool, titulo: string, texto: string, acao: string, chave: string }
+
+// Emissor de NFC-e
+export struct FxProdutoBusca { nome: string, codigo: string, marca: string, ncm: string, cfop: string, preco: string }
+export struct FxItemNfce { nome: string, codigo: string, ncm-ok: bool, ncm: string, cfop: string, qtd: int, unitario: string, subtotal: string }
+export struct FxVendaOk { visivel: bool, total: string, forma: string, chave: string, impresso: bool }
+export struct FxNcmPedido { nome: string, valor: string, valido: bool }
+
+// Emissão de NF-e: nota emitida (a chave chega depois quando a SEFAZ processa)
+export struct FxNfeOk { visivel: bool, referencia: string, total: string, forma: string, chave: string, impresso: bool }
+
+// 2º bip: item da nota na conferência
+export struct FxItemImport {
+    titulo: string,
+    nome: string,
+    qtd: string,
+    custo: string,
+    total: string,
+    // 0 vincular existente, 1 criar novo, 2 ignorar
+    acao: int,
+    conv-ativo: bool,
+    // 0 caixa/embalagem, 1 porções
+    conv-modo: int,
+    fator: string,
+    custo-real: string,
+    entrada: string,
+    custo-nf: string,
+    produto-idx: int,
+    categoria-idx: int,
+    margem: string,
+    preco: string,
+    // 0 nada, 1 preço abaixa, 2 reajuste, 3 mantido
+    tendencia: int,
+    tendencia-texto: string,
+    venda-atual: string,
+    tem-caixa: bool,
+    caixa-qtd: string,
+    atualizar-caixa: bool,
+    preco-caixa: string,
+    caixa-atual: string,
+}
+export struct FxQueda { nome: string, de: string, para: string }
+
+export global FiscalStore {
+    in-out property <string> status;
+
+    // Tela atual: hub | receber | importar | pendentes | nfe | nfce | contador | reimprimir-nfce |
+    // reimprimir-nfe | cancelar-nfce | cancelar-nfe | config
+    in-out property <string> tela: "hub";
+    callback abrir(string);
+    // Tabela NCM & Alíquotas (modal da área Cardápio)
+    callback abrir-ncm();
+
+    // ---------- Selo da SEFAZ ----------
+    in property <FxSefaz> sefaz: { carregando: true, rotulo: "SEFAZ..." };
+    in-out property <bool> sefaz-detalhes;
+    callback sefaz-atualizar();
+
+    // ---------- Inutilização de numeração (modal; "" fechado, "nfce" ou "nfe") ----------
+    in-out property <string> inut-modelo;
+    in-out property <string> inut-serie;
+    in-out property <string> inut-inicial;
+    in-out property <string> inut-final;
+    in-out property <string> inut-justificativa;
+    in property <bool> inut-enviando;
+    in property <string> inut-resultado;
+    in property <bool> inut-resultado-ok;
+    callback inut-abrir(string);
+    callback inut-enviar();
+
+    // ---------- Reimpressão (NFC-e e NF-e; a tela atual diz qual) ----------
+    in-out property <string> rp-busca;
+    in-out property <string> rp-serie;
+    in property <bool> rp-carregando;
+    in property <bool> rp-buscando;
+    in property <[FxNota]> rp-notas;
+    in property <FxNotaAchada> rp-achada;
+    in property <string> rp-erro;
+    callback rp-recarregar();
+    callback rp-buscar();
+    callback rp-reimprimir(int);
+    // NFC-e: cupom na térmica; NF-e: PDF A4 no visualizador do sistema
+    callback rp-imprimir();
+    callback rp-ver();
+
+    // ---------- Cancelamento (NFC-e e NF-e) ----------
+    in property <[FxNota]> cn-notas;
+    in property <bool> cn-carregando;
+    in property <string> cn-resultado;
+    in property <bool> cn-resultado-ok;
+    in-out property <bool> cn-confirmando;
+    in property <FxNota> cn-nota;
+    in-out property <string> cn-justificativa;
+    in property <bool> cn-cancelando;
+    in-out property <string> cn-busca;
+    in-out property <string> cn-serie;
+    in property <bool> cn-buscando;
+    in property <string> cn-erro;
+    callback cn-recarregar();
+    callback cn-selecionar(int);
+    callback cn-localizar();
+    callback cn-confirmar();
+
+    // ---------- Configurações Fiscais ----------
+    in-out property <string> cfg-token;
+    in-out property <string> cfg-razao;
+    in-out property <string> cfg-fantasia;
+    in-out property <string> cfg-cnpj;
+    in-out property <string> cfg-ie;
+    in-out property <string> cfg-crt;
+    in-out property <string> cfg-csc-id;
+    in-out property <string> cfg-csc;
+    in-out property <string> cfg-ambiente: "homologacao";
+    in-out property <string> cfg-serie-nfe;
+    in-out property <string> cfg-proximo-nfe;
+    in-out property <string> cfg-serie-nfce;
+    in-out property <string> cfg-proximo-nfce;
+    in-out property <string> cfg-cep;
+    in-out property <string> cfg-logradouro;
+    in-out property <string> cfg-numero;
+    in-out property <string> cfg-bairro;
+    in-out property <string> cfg-municipio;
+    in-out property <string> cfg-uf;
+    in property <bool> cfg-carregando;
+    // -1 incompleto, 0 inválido, 1 válido
+    in property <int> cfg-cnpj-valido: -1;
+    in property <bool> cfg-buscando-cnpj;
+    in property <bool> cfg-salvando;
+    in property <string> cfg-mensagem;
+    in property <bool> cfg-mensagem-ok;
+    in property <bool> cfg-validando;
+    in property <FxValidacao> cfg-validacao;
+    in property <bool> cfg-diagnosticando;
+    in property <string> cfg-diagnostico;
+    in property <string> cfg-cert-arquivo;
+    in-out property <string> cfg-cert-senha;
+    in property <bool> cfg-enviando-cert;
+    in property <string> cfg-cert-resultado;
+    in property <bool> cfg-cert-ok;
+    callback cfg-cnpj-editado(string);
+    callback cfg-salvar();
+    callback cfg-testar();
+    callback cfg-diagnosticar();
+    callback cfg-escolher-cert();
+    callback cfg-enviar-cert();
+    callback cfg-abrir-focus();
+
+    // ---------- Painel do Contador ----------
+    in-out property <string> ct-mes;
+    in property <string> ct-mes-rotulo;
+    in property <bool> ct-carregando;
+    in property <bool> ct-tem-resumo;
+    in property <string> ct-nfce-qtd;
+    in property <string> ct-nfce-total;
+    in property <string> ct-nfe-qtd;
+    in property <string> ct-nfe-total;
+    in property <string> ct-ent-qtd;
+    in property <string> ct-ent-total;
+    in property <bool> ct-tem-notas;
+    in property <int> ct-total-notas;
+    in property <bool> ct-tem-estoque;
+    in property <string> ct-estoque-custo;
+    in property <string> ct-estoque-venda;
+    in property <string> ct-estoque-lucro;
+    in property <[FxCategoria]> ct-categorias;
+    in-out property <bool> ct-incluir-estoque;
+    in property <bool> ct-exportando;
+    in property <string> ct-mensagem;
+    in property <bool> ct-mensagem-ok;
+    in property <[FxBackup]> ct-backups;
+    in property <bool> ct-bk-carregando;
+    in property <string> ct-bk-erro;
+    callback ct-mes-mudou(string);
+    callback ct-mes-passo(int);
+    callback ct-exportar();
+    callback ct-bk-atualizar();
+    callback ct-abrir-url(string);
+
+    // ---------- 1º BIP: Recebimento ----------
+    in-out property <string> rb-chave;
+    in property <bool> rb-bipando;
+    in property <FxBip> rb-resultado;
+    in property <[FxRecebida]> rb-notas;
+    in property <bool> rb-carregando;
+    in property <string> rb-sincronizando;
+    in property <string> rb-aviso;
+    in property <bool> rb-aviso-ok;
+    callback rb-bipar();
+    callback rb-recarregar();
+    callback rb-buscar-xml(string);
+    // abre a importação (2º bip); chave vazia = upload manual do XML
+    callback importar(string);
+
+    // ---------- Notas Pendentes (DF-e) ----------
+    in property <[FxPendente]> pd-notas;
+    in property <int> pd-total;
+    in property <int> pd-pendentes;
+    in property <int> pd-recebidas;
+    in property <int> pd-finalizadas;
+    in property <int> pd-com-xml;
+    in property <int> pd-sem-xml;
+    in-out property <string> pd-status: "todos";
+    in-out property <string> pd-xml: "todos";
+    in-out property <string> pd-busca;
+    in-out property <string> pd-inicio;
+    in-out property <string> pd-fim;
+    in property <bool> pd-carregando;
+    in property <bool> pd-sincronizando;
+    in property <string> pd-aviso;
+    in property <bool> pd-aviso-ok;
+    in property <string> pd-acao-chave;
+    in property <string> pd-copiada;
+    in property <FxConfirma> pd-confirma;
+    callback pd-filtrar();
+    callback pd-periodo(string);
+    callback pd-limpar();
+    callback pd-sincronizar();
+    callback pd-fechar-aviso();
+    // receber | finalizar | reabrir (pedem confirmação)
+    callback pd-acao(string, string);
+    callback pd-confirmar(bool);
+    callback pd-buscar-xml(string);
+    callback pd-baixar-xml(string);
+    callback pd-ver-danfe(string);
+    callback pd-copiar(string);
+
+    // ---------- Emissor de NFC-e (tela cheia) ----------
+    in-out property <string> nf-busca;
+    in property <[FxProdutoBusca]> nf-resultados;
+    in property <int> nf-qtd-encontrados;
+    in-out property <bool> nf-lista-aberta;
+    in property <[FxItemNfce]> nf-itens;
+    in property <int> nf-unidades;
+    in-out property <string> nf-doc;
+    in property <string> nf-doc-erro;
+    in property <string> nf-doc-ok;
+    in property <bool> nf-doc-obrigatorio;
+    in-out property <string> nf-nome;
+    in-out property <string> nf-pagamento: "PIX";
+    in property <string> nf-total: "R$ 0,00";
+    in property <bool> nf-emitindo;
+    in property <string> nf-aviso;
+    in property <FxVendaOk> nf-venda;
+    in property <bool> nf-copiada;
+    in-out property <string> nf-email;
+    in property <bool> nf-enviando-email;
+    in property <bool> nf-email-ok;
+    in property <string> nf-email-erro;
+    in property <[FxNcmPedido]> nf-ncm;
+    in property <bool> nf-ncm-salvando;
+    in property <bool> nf-ncm-pronto;
+    callback nf-busca-editada(string);
+    callback nf-busca-enter();
+    callback nf-adicionar(int);
+    callback nf-quantidade(int, int);
+    callback nf-remover(int);
+    callback nf-limpar();
+    callback nf-doc-editado(string);
+    callback nf-emitir();
+    callback nf-fechar-aviso();
+    callback nf-imprimir();
+    callback nf-ver-danfe();
+    callback nf-copiar-chave();
+    callback nf-enviar-email();
+    callback nf-nova-venda();
+    callback nf-ncm-editado(int, string);
+    callback nf-ncm-salvar();
+    callback nf-ncm-cancelar();
+
+    // ---------- Emissão de NF-e (Modelo 55) — usa a busca, os itens e o pagamento do emissor ----------
+    in-out property <string> ne-doc;
+    // -1 vazio, 0 inválido, 1 válido, 2 digitando
+    in property <int> ne-doc-estado: -1;
+    in property <string> ne-doc-msg;
+    in property <string> ne-doc-detalhe;
+    in property <bool> ne-buscando-doc;
+    in-out property <string> ne-nome;
+    in-out property <string> ne-cep;
+    in-out property <string> ne-logradouro;
+    in-out property <string> ne-numero;
+    in-out property <string> ne-complemento;
+    in-out property <string> ne-bairro;
+    in-out property <string> ne-municipio;
+    in-out property <string> ne-uf;
+    in property <bool> ne-buscando-cep;
+    in property <FxNfeOk> ne-nota;
+    callback ne-doc-editado(string);
+    callback ne-buscar-cnpj();
+    callback ne-cep-editado(string);
+    callback ne-emitir();
+    callback ne-imprimir();
+    callback ne-nova();
+
+    // ---------- 2º BIP: Importação de NF-e e entrada no estoque ----------
+    // inicio | carregando | conferencia
+    in property <string> im-fase: "inicio";
+    in-out property <string> im-bip;
+    in property <int> im-bip-digitos;
+    in property <string> im-erro;
+    in property <string> im-arquivo;
+    in property <bool> im-lendo;
+    in-out property <bool> im-contingencia;
+    in property <string> im-fornecedor;
+    in property <string> im-cnpj-nf;
+    in-out property <string> im-confirmacao;
+    // 0 aguardando, 1 confere, 2 divergente
+    in property <int> im-confirma-estado;
+    in property <[FxItemImport]> im-itens;
+    in property <[string]> im-produtos;
+    in property <[string]> im-categorias;
+    in property <bool> im-aplicando;
+    in property <string> im-aviso;
+    in property <bool> im-aviso-ok;
+    in property <[FxQueda]> im-quedas;
+    callback im-bip-editado(string);
+    callback im-carregar();
+    callback im-escolher-xml();
+    callback im-carregar-xml();
+    callback im-voltar-inicio();
+    callback im-confirmacao-editada(string);
+    callback im-acao(int, int);
+    callback im-conv-ativo(int, bool);
+    callback im-conv-preset(int, int, int);
+    callback im-fator(int, string);
+    callback im-produto(int, int);
+    callback im-categoria(int, int);
+    callback im-margem(int, string);
+    callback im-preco(int, string);
+    callback im-atualizar-caixa(int, bool);
+    callback im-preco-caixa(int, string);
+    callback im-aplicar();
+    callback im-confirmar-quedas(bool);
+}

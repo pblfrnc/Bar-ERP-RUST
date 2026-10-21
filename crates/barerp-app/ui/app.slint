@@ -1,0 +1,413 @@
+// Janela principal do BarERP Pro (caixa / gerência): barra superior do Navbar.tsx, login e as seis áreas do
+// menu original (ui/pages/<área>.slint). Cada área guarda o próprio estado num global exportado para o Rust
+// (`ui.global::<...Store>()`); aqui ficam só a navegação, o login, a troca de senha e o bloqueio por licença.
+
+import { Theme } from "theme.slint";
+import { Icons, Icon } from "icons.slint";
+import { Palette } from "std-widgets.slint";
+export { Theme }
+import { LoginPage, StaffItem } from "login.slint";
+import { ChangePasswordDialog } from "password.slint";
+// Páginas por área (ui/pages/*.slint): os globais são exportados para o Rust usar ui.global::<...>()
+import { CaixaStore, CaixaAreaPage } from "pages/caixa.slint";
+import { CardapioStore, CardapioAreaPage } from "pages/cardapio.slint";
+import { FiscalStore, FiscalAreaPage } from "pages/fiscal.slint";
+import { KdsStore, KdsAreaPage } from "pages/kds.slint";
+import { MesasStore, MesasAreaPage } from "pages/mesas.slint";
+import { MesasModalStore } from "pages/mesas_modals.slint";
+import { RetaguardaStore, RetaguardaAreaPage, LicenseGate, LicenseInfoModal } from "pages/retaguarda.slint";
+import { UpdateStore, UpdateBanner, UpdateModal } from "pages/update.slint";
+import { ImportLegacyStore, ImportLegacyModal } from "pages/import_legacy.slint";
+export { MesasModalStore }
+export { CaixaStore, CardapioStore, FiscalStore, KdsStore, MesasStore, RetaguardaStore, UpdateStore, ImportLegacyStore }
+export { StaffItem }
+
+export enum Page { login, tables, kds, cash, products, fiscal, settings }
+
+component NavTab inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <bool> active;
+    in property <string> badge;
+    in property <color> badge-tone: Theme.primary;
+    // Janela estreita: só o ícone (a aba ativa continua com o nome)
+    in property <bool> icon-only;
+    callback clicked;
+    height: 40px;
+    width: row.preferred-width + 12px;
+    border-radius: 12px;
+    background: root.active ? Theme.primary : (touch.has-hover ? Theme.surface-2 : transparent);
+    row := HorizontalLayout {
+        alignment: center;
+        spacing: 5px;
+        Icon { source: root.icon; color: root.active ? Theme.primary-text : Theme.text-muted; size: 16px; y: (parent.height - self.height) / 2; }
+        if !root.icon-only: Text { text: root.label; color: root.active ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: root.active ? 800 : 500; vertical-alignment: center; }
+        if root.badge != "": VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 18px;
+                width: b.preferred-width + 12px;
+                border-radius: 9px;
+                background: root.active ? Theme.primary-text : root.badge-tone.with-alpha(0.2);
+                b := Text { text: root.badge; color: root.active ? Theme.primary : root.badge-tone; font-size: 10px; font-weight: 800; }
+            }
+        }
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component NavPill inherits Rectangle {
+    in property <string> text;
+    in property <color> tone;
+    in property <bool> solid;
+    callback clicked;
+    height: 32px;
+    width: t.preferred-width + 20px;
+    border-radius: 11px;
+    background: root.solid ? root.tone : root.tone.with-alpha(0.2);
+    border-width: 1px;
+    border-color: root.tone.with-alpha(0.4);
+    opacity: mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.7;
+    t := Text { text: root.text; color: root.solid ? Theme.primary-text : root.tone; font-size: 12px; font-weight: 800; }
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+component NavIconButton inherits Rectangle {
+    in property <image> icon;
+    in property <bool> has-icon;
+    in property <string> text;
+    in property <color> tone: Theme.text-muted;
+    callback clicked;
+    width: max(32px, t.preferred-width + 16px);
+    height: 40px;
+    border-radius: 11px;
+    background: touch.has-hover ? Theme.surface-2 : transparent;
+    if root.has-icon: Icon { source: root.icon; color: root.tone; size: 17px; }
+    t := Text { text: root.has-icon ? "" : root.text; color: root.tone; font-size: 13px; font-weight: 800; }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+export struct NavPerms { tables: bool, kds: bool, cash: bool, products: bool, fiscal: bool, settings: bool }
+
+export component AppWindow inherits Window {
+    title: "BarERP Pro";
+    icon: @image-url("../assets/icon.png");
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    min-width: 960px;
+    min-height: 640px;
+    background: Theme.bg;
+    default-font-size: Theme.font-body;
+
+    in-out property <Page> page: Page.login;
+    // Barra superior em janelas menores (1280/1366 px): sem o texto da marca e com selos curtos. Quem decide é o
+    // Rust pelo tamanho real da janela (calcular aqui pela largura fazia um laço com a largura mínima da barra)
+    in property <bool> compact;
+    // Ainda menor (< 1180 px): abas inativas só com o ícone
+    in property <bool> tiny;
+    in property <string> version;
+    in property <string> status-message;
+    in property <bool> status-error;
+    // Campos de texto, combos e chaves do std-widgets acompanham o tema do app
+    init => { Palette.color-scheme = Theme.dark ? ColorScheme.dark : ColorScheme.light; }
+    changed dark-theme => { Palette.color-scheme = self.dark-theme ? ColorScheme.dark : ColorScheme.light; }
+    property <bool> dark-theme: Theme.dark;
+
+    // Barra superior: abas permitidas, conexão dos celulares, mensalidade e atualização
+    in property <NavPerms> nav: { tables: true, kds: true, cash: true, products: true, fiscal: true, settings: true };
+    in property <bool> server-online: true;
+    in property <int> license-days: -1;
+    // KDS: itens na fila de todas as praças (número da aba)
+    in property <int> kds-total;
+    // Tema e escala de fonte
+    in property <string> font-scale-label: "A";
+    callback toggle-theme();
+    callback cycle-font-scale();
+
+    // Login, troca de senha e sair
+    in property <[StaffItem]> staff;
+    in property <string> login-error;
+    in property <bool> login-busy;
+    in property <string> user-name;
+    in property <string> user-role;
+    callback login(string, string);
+    callback logout();
+    in-out property <bool> password-dialog-open;
+    in property <string> password-hint;
+    in property <string> password-error;
+    in property <bool> password-busy;
+    callback change-password(string, string, string);
+    callback password-dialog-closed();
+
+    forward-focus: keys;
+    keys := FocusScope {
+        key-pressed(event) => {
+            // Tela cheia (F11), como no Electron
+            if (event.text == Key.F11) {
+                root.full-screen = !root.full-screen;
+                return accept;
+            }
+            // Atalhos globais do PC
+            if (root.page != Page.login && !RetaguardaStore.g-visible) {
+                if (event.text == Key.F2) {
+                    root.page = Page.cash;
+                    CaixaStore.shortcut("quickSale");
+                    return accept;
+                }
+                if (event.text == Key.F3) {
+                    root.page = Page.kds;
+                    return accept;
+                }
+                if ((event.modifiers.control || event.modifiers.meta) && (event.text == "a" || event.text == "A")) {
+                    root.page = Page.cash;
+                    CaixaStore.shortcut("openShift");
+                    return accept;
+                }
+                if ((event.modifiers.control || event.modifiers.meta) && event.modifiers.shift && (event.text == "s" || event.text == "S")) {
+                    root.page = Page.cash;
+                    CaixaStore.shortcut("supply");
+                    return accept;
+                }
+                if ((event.modifiers.control || event.modifiers.meta) && (event.text == "s" || event.text == "S")) {
+                    root.page = Page.cash;
+                    CaixaStore.shortcut("withdrawal");
+                    return accept;
+                }
+                if ((event.modifiers.control || event.modifiers.meta) && (event.text == "f" || event.text == "F")) {
+                    root.page = Page.cash;
+                    CaixaStore.shortcut("closeShift");
+                    return accept;
+                }
+            }
+            reject
+        }
+
+        login-page := LoginPage {
+            visible: root.page == Page.login;
+            width: 100%;
+            height: 100%;
+            staff: root.staff;
+            error: root.login-error;
+            busy: root.login-busy;
+            submit(user, pin) => { root.login(user, pin); }
+        }
+
+        VerticalLayout {
+            visible: root.page != Page.login;
+            width: 100%;
+            height: 100%;
+
+            // Barra Superior de Navegação (Navbar.tsx)
+            Rectangle {
+                height: 64px;
+                background: Theme.surface;
+                Rectangle { y: parent.height - 1px; height: 1px; background: Theme.surface-2; }
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 12px;
+                    // Abas e botões com altura própria ficam centralizados na barra de 64 px
+                    padding-top: 12px;
+                    padding-bottom: 12px;
+                    spacing: 2px;
+                    // Marca
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Rectangle {
+                            width: 38px;
+                            height: 38px;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: 12px;
+                            background: Theme.primary;
+                            Icon { source: Icons.beer; color: Theme.primary-text; size: 20px; }
+                        }
+                        if !root.compact: VerticalLayout {
+                            alignment: center;
+                            HorizontalLayout {
+                                spacing: 4px;
+                                HorizontalLayout {
+                                    spacing: 0px;
+                                    Text { text: "Bar"; color: Theme.text; font-size: 18px; font-weight: 900; }
+                                    Text { text: "ERP"; color: Theme.primary; font-size: 18px; font-weight: 900; }
+                                }
+                                Rectangle {
+                                    width: 32px;
+                                    height: 17px;
+                                    y: 4px;
+                                    border-radius: 4px;
+                                    background: Theme.primary.with-alpha(0.2);
+                                    Text { text: "PRO"; color: Theme.closing; font-size: 10px; font-weight: 800; }
+                                }
+                            }
+                            Text { text: "Controle de Mesas & KDS"; color: Theme.text-muted; font-size: 11px; }
+                        }
+                    }
+                    Rectangle { width: 10px; }
+
+                    // Abas (visíveis conforme as permissões do usuário)
+                    if root.nav.tables: NavTab { icon-only: root.tiny && !self.active; icon: Icons.layout-grid; label: "Mesas & Salão"; active: root.page == Page.tables; clicked => { root.page = Page.tables; } }
+                    if root.nav.kds: NavTab { icon-only: root.tiny && !self.active;
+                        icon: Icons.chef-hat;
+                        label: "KDS (Cozinha)";
+                        badge: root.kds-total > 0 ? root.kds-total : "";
+                        badge-tone: Theme.primary;
+                        active: root.page == Page.kds;
+                        clicked => { root.page = Page.kds; }
+                    }
+                    if root.nav.cash: NavTab { icon-only: root.tiny && !self.active;
+                        icon: Icons.receipt-text;
+                        label: "Caixa & PDV";
+                        badge: CaixaStore.is-open ? "Aberto" : "Fechado";
+                        badge-tone: CaixaStore.is-open ? Theme.available : Theme.danger;
+                        active: root.page == Page.cash;
+                        clicked => { root.page = Page.cash; CaixaStore.refresh(); }
+                    }
+                    if root.nav.products: NavTab { icon-only: root.tiny && !self.active; icon: Icons.utensils-crossed; label: "Cardápio & Estoque"; active: root.page == Page.products; clicked => { root.page = Page.products; } }
+                    if root.nav.fiscal: NavTab { icon-only: root.tiny && !self.active; icon: Icons.file-text; label: "Módulo Fiscal"; active: root.page == Page.fiscal; clicked => { root.page = Page.fiscal; } }
+                    if root.nav.settings: NavTab { icon-only: root.tiny && !self.active; icon: Icons.settings; label: "Retaguarda"; active: root.page == Page.settings; clicked => { root.page = Page.settings; RetaguardaStore.shown(); } }
+
+                    Rectangle { horizontal-stretch: 1; }
+
+                    // Conexão dos celulares (servidor na porta 3001)
+                    VerticalLayout { alignment: center; Rectangle {
+                        height: 26px;
+                        width: root.compact ? 34px : (root.server-online ? 84px : 88px);
+                        border-radius: 13px;
+                        background: root.server-online ? Theme.available.with-alpha(0.1) : Theme.danger.with-alpha(0.1);
+                        border-width: 1px;
+                        border-color: root.server-online ? Theme.available.with-alpha(0.3) : Theme.danger.with-alpha(0.3);
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 5px;
+                            Icon { source: root.server-online ? Icons.wifi : Icons.wifi-off; color: root.server-online ? Theme.available : Theme.danger; size: 13px; y: (parent.height - self.height) / 2; }
+                            if !root.compact: Text { text: root.server-online ? "Online" : "Offline"; color: root.server-online ? Theme.available : Theme.danger; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                        }
+                    } }
+                    // Mensalidade vencendo (últimos 5 dias)
+                    if root.license-days >= 0 && root.license-days <= 5: VerticalLayout { alignment: center; NavPill {
+                        text: root.compact ? "⚠ " + root.license-days + "d" : "⚠ Mensalidade: " + root.license-days + "d";
+                        tone: Theme.closing;
+                        clicked => { RetaguardaStore.i-visible = true; }
+                    } }
+                    // Nova versão (atualizador: ui/pages/update.slint)
+                    if UpdateStore.has-update: VerticalLayout { alignment: center; NavPill {
+                        text: root.compact ? "NOVA" : "NOVA VERSÃO";
+                        tone: Theme.primary;
+                        solid: true;
+                        clicked => { UpdateStore.modal-open = true; }
+                    } }
+                    // Escala de fonte e tema
+                    NavIconButton { text: root.font-scale-label; clicked => { root.cycle-font-scale(); } }
+                    NavIconButton { icon: Theme.dark ? Icons.sun : Icons.moon; has-icon: true; clicked => { root.toggle-theme(); } }
+                    // Tela cheia
+                    NavIconButton { icon: Icons.maximize; has-icon: true; clicked => { root.full-screen = !root.full-screen; } }
+                    // Operador (nome e perfil em duas linhas, como no Navbar original); clique troca a senha
+                    Rectangle {
+                        height: 40px;
+                        width: op.preferred-width + 20px;
+                        border-radius: 12px;
+                        background: op-touch.has-hover ? Theme.surface-2 : transparent;
+                        op := HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; Icon { source: Icons.user; color: Theme.text-muted; size: 15px; } }
+                            VerticalLayout {
+                                alignment: center;
+                                Text { text: root.user-name; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-alignment: right; overflow: elide; max-width: root.compact ? 90px : 120px; }
+                                Text { text: root.user-role; color: Theme.text-muted; font-size: 10px; horizontal-alignment: right; }
+                            }
+                        }
+                        op-touch := TouchArea { clicked => { root.password-dialog-open = true; } }
+                    }
+                    NavIconButton { icon: Icons.log-out; has-icon: true; tone: Theme.danger; clicked => { root.logout(); } }
+                }
+            }
+
+            // Área das Páginas
+            Rectangle {
+                vertical-stretch: 1;
+
+                // Mesas & Salão (ui/pages/mesas.slint)
+                if root.page == Page.tables: MesasAreaPage {
+                    width: 100%;
+                    height: 100%;
+                }
+                // KDS (ui/pages/kds.slint)
+                if root.page == Page.kds: KdsAreaPage {
+                    width: 100%;
+                    height: 100%;
+                }
+                // Caixa & PDV (ui/pages/caixa.slint)
+                if root.page == Page.cash: CaixaAreaPage {
+                    width: 100%;
+                    height: 100%;
+                }
+                // Cardápio & Estoque (ui/pages/cardapio.slint)
+                if root.page == Page.products: CardapioAreaPage {
+                    width: 100%;
+                    height: 100%;
+                }
+                // Módulo Fiscal (ui/pages/fiscal.slint)
+                if root.page == Page.fiscal: FiscalAreaPage {
+                    width: 100%;
+                    height: 100%;
+                }
+                // Retaguarda (ui/pages/retaguarda.slint)
+                if root.page == Page.settings: RetaguardaAreaPage {
+                    width: 100%;
+                    height: 100%;
+                }
+            }
+
+            // Rodapé
+            Rectangle {
+                height: 26px;
+                background: Theme.surface;
+                HorizontalLayout {
+                    padding-left: 20px;
+                    padding-right: 20px;
+                    Text { text: root.status-message; color: root.status-error ? Theme.danger : Theme.text-muted; font-size: 12px; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                    Text { text: "v" + root.version + " · nativo"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                }
+            }
+        }
+
+        if root.page != Page.login && root.password-dialog-open: ChangePasswordDialog {
+            width: root.width;
+            height: root.height;
+            hint: root.password-hint;
+            error: root.password-error;
+            busy: root.password-busy;
+            save(current, new, confirm) => { root.change-password(current, new, confirm); }
+            cancel => { root.password-dialog-open = false; root.password-dialog-closed(); }
+        }
+
+        // Importar do Sistema Antigo (botões "Importar XML" de Produtos e Fornecedores)
+        if root.page != Page.login && ImportLegacyStore.visible: ImportLegacyModal {
+            width: root.width;
+            height: root.height;
+        }
+
+        // Nova versão: aviso no canto e a janela de atualização
+        if root.page != Page.login && UpdateStore.has-update && !UpdateStore.modal-open && !UpdateStore.banner-dismissed: UpdateBanner {
+            width: min(448px, root.width - 32px);
+            x: root.width - self.width - 16px;
+            y: root.height - self.height - 42px;
+        }
+        if root.page != Page.login && UpdateStore.has-update && UpdateStore.modal-open: UpdateModal {
+            width: root.width;
+            height: root.height;
+        }
+
+        // Aviso de mensalidade vencendo (selo da barra superior)
+        if root.page != Page.login && RetaguardaStore.i-visible: LicenseInfoModal {
+            width: root.width;
+            height: root.height;
+        }
+
+        // Licença expirada, bloqueada ou não ativada: trava tudo, inclusive o login (App.tsx)
+        if RetaguardaStore.g-visible: LicenseGate {
+            width: root.width;
+            height: root.height;
+        }
+    }
+}

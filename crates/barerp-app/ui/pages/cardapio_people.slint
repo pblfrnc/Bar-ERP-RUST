@@ -1,0 +1,357 @@
+// Fornecedores (SuppliersView.tsx + o modal "Gestão de Fornecedores" do ProductsView) e Clientes / fiado
+// (CustomersView.tsx), como sub-telas da área Cardápio & Estoque.
+
+import { LineEdit, ListView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons, Icon } from "../icons.slint";
+import { CardapioIcons } from "cardapio_icons.slint";
+import { CardapioStore, CdSupplier, CdCustomer } from "cardapio_store.slint";
+import { Pill, Btn } from "cardapio_widgets.slint";
+
+component StatCard inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <image> icon;
+    in property <color> tone;
+    horizontal-stretch: 1;
+    height: 84px;
+    background: Theme.surface;
+    border-radius: 18px;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    HorizontalLayout {
+        padding: 16px;
+        spacing: 12px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            Text { text: root.label; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.4px; }
+            Text { text: root.value; color: root.tone; font-size: 24px; font-weight: 900; }
+        }
+        Rectangle {
+            width: 40px;
+            height: 40px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 14px;
+            background: root.tone.with-alpha(0.12);
+            Icon { source: root.icon; color: root.tone; size: 20px; }
+        }
+    }
+}
+
+component PageHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <image> icon;
+    in property <color> tone;
+    in property <string> action;
+    in property <color> action-fill: Theme.primary;
+    // Botão secundário em vermelho (ex.: "Importar XML", uso exclusivo do desenvolvedor)
+    in property <string> extra;
+    // Seta de voltar à esquerda (quando a tela é aberta dentro da Retaguarda)
+    in property <bool> show-back;
+    callback act();
+    callback extra-act();
+    callback back();
+    height: row.preferred-height;
+    background: Theme.surface;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    row := HorizontalLayout {
+        padding: 18px;
+        spacing: 12px;
+        if root.show-back: Rectangle {
+            width: 44px;
+            height: 44px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 14px;
+            border-width: 1px;
+            border-color: Theme.border;
+            background: back-touch.has-hover ? Theme.border : Theme.surface-2;
+            Icon { source: Icons.arrow-left; color: Theme.text; size: 20px; }
+            back-touch := TouchArea { mouse-cursor: pointer; clicked => { root.back(); } }
+        }
+        Rectangle {
+            width: 46px;
+            height: 46px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 16px;
+            background: root.tone.with-alpha(0.12);
+            border-width: 1px;
+            border-color: root.tone.with-alpha(0.25);
+            Icon { source: root.icon; color: root.tone; size: 22px; }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            Text { text: root.title; color: Theme.text; font-size: 20px; font-weight: 900; }
+            Text { text: root.subtitle; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+        }
+        if root.extra != "": VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            Btn {
+                text: root.extra;
+                fill: Theme.danger.with-alpha(0.12);
+                tone: Theme.danger;
+                weight: 800;
+                clicked => { root.extra-act(); }
+            }
+            Text { text: "Uso exclusivo do desenvolvedor"; color: Theme.danger; font-size: 10px; horizontal-alignment: right; }
+        }
+        Btn {
+            y: (parent.height - self.height) / 2;
+            text: root.action;
+            icon: Icons.plus;
+            has-icon: true;
+            fill: root.action-fill;
+            tone: Theme.primary-text;
+            weight: 900;
+            clicked => { root.act(); }
+        }
+    }
+}
+
+component SupplierCard inherits Rectangle {
+    in property <CdSupplier> data;
+    height: col.preferred-height;
+    background: Theme.surface;
+    border-radius: 18px;
+    border-width: 1px;
+    border-color: hover.has-hover ? Theme.border : Theme.surface-2;
+    hover := TouchArea { }
+    col := HorizontalLayout {
+        padding: 14px;
+        spacing: 12px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 5px;
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                Text { text: root.data.title; color: Theme.text; font-size: 14px; font-weight: 900; vertical-alignment: center; }
+                if root.data.razao != "": Text { text: root.data.razao; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                if root.data.document != "": Pill { y: (parent.height - self.height) / 2; text: root.data.document; tone: Theme.available; mono: true; }
+                if root.data.products != "": Pill { y: (parent.height - self.height) / 2; text: root.data.products; }
+            }
+            HorizontalLayout {
+                spacing: 14px;
+                alignment: start;
+                if root.data.phone != "": HorizontalLayout {
+                    spacing: 4px;
+                    Icon { source: CardapioIcons.phone; color: Theme.available; size: 12px; y: (parent.height - self.height) / 2; }
+                    Text {
+                        text: root.data.phone;
+                        color: wa.has-hover ? Theme.available : Theme.text;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        wa := TouchArea { clicked => { CardapioStore.sup-whatsapp(root.data.id); } }
+                    }
+                }
+                if root.data.email != "": HorizontalLayout {
+                    spacing: 4px;
+                    Icon { source: CardapioIcons.mail; color: Theme.occupied; size: 12px; y: (parent.height - self.height) / 2; }
+                    Text { text: root.data.email; color: Theme.text; font-size: 12px; vertical-alignment: center; }
+                }
+                if root.data.contact != "": Text { text: "Contato: " + root.data.contact; color: Theme.text-muted; font-size: 12px; }
+                if root.data.city != "": Text { text: root.data.city; color: Theme.text-muted; font-size: 12px; }
+            }
+            if root.data.notes != "": Text { text: "\"" + root.data.notes + "\""; color: Theme.text-muted; font-size: 11px; font-italic: true; wrap: word-wrap; }
+        }
+        Btn {
+            y: (parent.height - self.height) / 2;
+            text: "Editar";
+            icon: Icons.pencil;
+            has-icon: true;
+            clicked => { CardapioStore.sup-edit(root.data.id); }
+        }
+        Btn {
+            y: (parent.height - self.height) / 2;
+            text: "";
+            icon: Icons.trash-2;
+            has-icon: true;
+            tone: Theme.danger;
+            clicked => { CardapioStore.sup-delete(root.data.id); }
+        }
+    }
+}
+
+export component SuppliersScreen inherits Rectangle {
+    in property <bool> show-back;
+    callback back();
+    background: Theme.bg;
+    VerticalLayout {
+        padding: 16px;
+        padding-top: 4px;
+        spacing: 12px;
+        PageHeader {
+            show-back: root.show-back;
+            back => { root.back(); }
+            title: "Gestão de Fornecedores";
+            subtitle: "Cadastre distribuidores, cervejarias e parceiros para vincular aos produtos e cruzar com NF-e";
+            icon: CardapioIcons.truck;
+            tone: Theme.available;
+            action: "Novo Fornecedor";
+            action-fill: Theme.available;
+            extra: CardapioStore.is-admin ? "Importar XML" : "";
+            act => { CardapioStore.sup-new(); }
+            extra-act => { CardapioStore.import-xml(); }
+        }
+        HorizontalLayout {
+            spacing: 12px;
+            StatCard { label: "FORNECEDORES"; value: CardapioStore.sup-total; icon: CardapioIcons.building-2; tone: Theme.text; }
+            StatCard { label: "COM CNPJ/CPF"; value: CardapioStore.sup-with-doc; icon: CardapioIcons.user-check; tone: Theme.available; }
+            StatCard { label: "PRODUTOS VINCULADOS"; value: CardapioStore.sup-linked; icon: Icons.package; tone: Theme.primary; }
+        }
+        Rectangle {
+            height: 52px;
+            background: Theme.surface;
+            border-radius: 16px;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            HorizontalLayout {
+                padding: 7px;
+                padding-left: 14px;
+                spacing: 8px;
+                Icon { source: Icons.search; color: Theme.text-muted; size: 16px; y: (parent.height - self.height) / 2; }
+                LineEdit {
+                    horizontal-stretch: 1;
+                    placeholder-text: "Pesquisar por Razão Social, Nome Fantasia, CNPJ/CPF, cidade ou telefone...";
+                    text <=> CardapioStore.sup-search;
+                    edited => { CardapioStore.sup-search-changed(); }
+                }
+            }
+        }
+        if CardapioStore.suppliers.length > 0: ListView {
+            vertical-stretch: 1;
+            for s in CardapioStore.suppliers: VerticalLayout {
+                padding-bottom: 8px;
+                SupplierCard { data: s; }
+            }
+        }
+        if CardapioStore.suppliers.length == 0: Rectangle {
+            vertical-stretch: 1;
+            background: Theme.surface;
+            border-radius: 22px;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            VerticalLayout {
+                alignment: center;
+                spacing: 8px;
+                padding: 24px;
+                HorizontalLayout { alignment: center; Icon { source: CardapioIcons.truck; color: Theme.text-muted.with-alpha(0.5); size: 44px; } }
+                Text {
+                    text: CardapioStore.sup-all == 0 ? "Nenhum fornecedor cadastrado ainda" : "Nenhum fornecedor encontrado para esta busca";
+                    color: Theme.text;
+                    font-size: 14px;
+                    font-weight: 800;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: "Fornecedores são cadastrados manualmente pelo botão acima ou importados automaticamente ao bipar XMLs de compra da SEFAZ.";
+                    color: Theme.text-muted;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+                if CardapioStore.sup-all == 0: HorizontalLayout {
+                    alignment: center;
+                    Btn { text: "+ Cadastrar Primeiro Fornecedor"; fill: Theme.available; tone: Theme.primary-text; weight: 800; clicked => { CardapioStore.sup-new(); } }
+                }
+            }
+        }
+    }
+}
+
+component CustomerRow inherits Rectangle {
+    in property <CdCustomer> data;
+    height: 62px;
+    background: hover.has-hover ? Theme.surface-2.with-alpha(0.5) : transparent;
+    hover := TouchArea { }
+    Rectangle { y: parent.height - 1px; height: 1px; background: Theme.surface-2; }
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        spacing: 12px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            alignment: center;
+            spacing: 3px;
+            Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 800; }
+            HorizontalLayout {
+                spacing: 12px;
+                alignment: start;
+                if root.data.phone != "": Text { text: root.data.phone; color: Theme.text-muted; font-size: 10px; }
+                if root.data.document != "": Text { text: "Doc: " + root.data.document; color: Theme.text-muted; font-size: 10px; }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            Text { text: "SALDO DEVEDOR"; color: root.data.owes ? Theme.danger : Theme.available; font-size: 10px; font-weight: 800; horizontal-alignment: right; }
+            Text { text: root.data.debt; color: root.data.owes ? Theme.danger : Theme.available; font-size: 14px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; }
+        }
+        if root.data.owes: Btn {
+            y: (parent.height - self.height) / 2;
+            text: "Receber";
+            icon: Icons.hand-coins;
+            has-icon: true;
+            fill: Theme.available.with-alpha(0.15);
+            tone: Theme.available;
+            clicked => { CardapioStore.cu-pay(root.data.id); }
+        }
+    }
+}
+
+export component CustomersScreen inherits Rectangle {
+    in property <bool> show-back;
+    callback back();
+    background: Theme.bg;
+    VerticalLayout {
+        padding: 16px;
+        padding-top: 4px;
+        spacing: 12px;
+        PageHeader {
+            show-back: root.show-back;
+            back => { root.back(); }
+            title: "Clientes (Fiado)";
+            subtitle: "Banco de dados de clientes e saldos devedores";
+            icon: Icons.users;
+            tone: Theme.primary;
+            action: "Novo Cliente";
+            act => { CardapioStore.cu-new(); }
+        }
+        Rectangle {
+            height: 52px;
+            background: Theme.surface;
+            border-radius: 16px;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            HorizontalLayout {
+                padding: 7px;
+                padding-left: 14px;
+                spacing: 8px;
+                Icon { source: Icons.search; color: Theme.text-muted; size: 16px; y: (parent.height - self.height) / 2; }
+                LineEdit {
+                    horizontal-stretch: 1;
+                    placeholder-text: "Buscar cliente por nome...";
+                    text <=> CardapioStore.cu-search;
+                    edited => { CardapioStore.cu-search-changed(); }
+                }
+            }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            background: Theme.surface;
+            border-radius: 22px;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            clip: true;
+            if CardapioStore.cu-loading: Text { text: "Carregando clientes..."; color: Theme.text-muted; font-size: 13px; }
+            if !CardapioStore.cu-loading && CardapioStore.customers.length == 0: Text { text: "Nenhum cliente encontrado."; color: Theme.text-muted; font-size: 13px; }
+            if CardapioStore.customers.length > 0: ListView {
+                for c in CardapioStore.customers: CustomerRow { data: c; }
+            }
+        }
+    }
+}

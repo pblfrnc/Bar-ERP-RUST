@@ -1,0 +1,420 @@
+// Reimpressão e cancelamento de notas emitidas: NfceReprintView, NfeReprintView, NfceCancelView e
+// NfeCancelView. A tela atual (`FiscalStore.tela`) diz se é NFC-e ou NF-e.
+
+import { Theme } from "../theme.slint";
+import { FiscalStore, FxNota } from "fiscal_store.slint";
+import { FxCor, FxCores, FxCard, FxBadge, FxLabel, FxButton, FxBotao, FxInput, FxTextArea, FxField, FxAviso, FxSheet, Icon } from "fiscal_ui.slint";
+import { FiscalIcons } from "fiscal_icons.slint";
+
+// Barra do topo das telas de notas: voltar + ação de recarregar
+component BarraTopo inherits HorizontalLayout {
+    in property <string> recarregar;
+    callback recarregou;
+    spacing: 12px;
+    FxButton { text: "Voltar ao Painel Fiscal"; icone: FiscalIcons.arrow-left; tipo: FxBotao.fantasma; clicked => { FiscalStore.abrir("hub"); } }
+    Rectangle { horizontal-stretch: 1; }
+    FxButton { text: root.recarregar; icone: FiscalIcons.refresh-cw; clicked => { root.recarregou(); } }
+}
+
+component Cabecalho inherits FxCard {
+    in property <image> icone;
+    in property <FxCor> cor;
+    in property <string> titulo;
+    in property <string> texto;
+    height: cab.preferred-height;
+    clip: true;
+    Rectangle {
+        x: parent.width - 140px;
+        y: -60px;
+        width: 200px;
+        height: 200px;
+        border-radius: 100px;
+        background: FxCores.de(root.cor).with-alpha(0.07);
+    }
+    cab := VerticalLayout {
+        padding: 26px;
+        spacing: 14px;
+        HorizontalLayout {
+            spacing: 14px;
+            Rectangle {
+                width: 50px;
+                height: 50px;
+                border-radius: 16px;
+                background: FxCores.de(root.cor).with-alpha(0.12);
+                border-width: 1px;
+                border-color: FxCores.de(root.cor).with-alpha(0.3);
+                Icon { source: root.icone; color: FxCores.de(root.cor); size: 24px; }
+            }
+            VerticalLayout {
+                alignment: center;
+                spacing: 4px;
+                Text { text: root.titulo; color: Theme.text; font-size: 22px; font-weight: 900; }
+                Text { text: root.texto; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
+            }
+        }
+        @children
+    }
+}
+
+component StatusNota inherits FxBadge {
+    in property <bool> cancelada;
+    cor: root.cancelada ? FxCor.vermelho : FxCor.verde;
+}
+
+// Linha de nota da lista
+component LinhaNota inherits Rectangle {
+    in property <FxNota> nota;
+    in property <string> modelo;
+    in property <string> acao;
+    in property <image> icone-acao;
+    in property <bool> perigo;
+    in property <bool> cancelamento;
+    callback acionar;
+    border-radius: 18px;
+    background: t.has-hover ? Theme.surface-2 : Theme.bg;
+    border-width: 1px;
+    border-color: Theme.border;
+    height: linha.preferred-height;
+    t := TouchArea { }
+    linha := HorizontalLayout {
+        padding: 16px;
+        spacing: 16px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 6px;
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: start;
+                Text { text: root.modelo + " Nº " + (root.nota.numero == "" ? "S/N" : root.nota.numero); color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; }
+                Text { text: "Série " + (root.nota.serie == "" ? "1" : root.nota.serie); color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                if !root.cancelamento: VerticalLayout { alignment: center; StatusNota { text: root.nota.status; cancelada: root.nota.cancelada; } }
+                if root.cancelamento: VerticalLayout {
+                    alignment: center;
+                    FxBadge {
+                        text: root.nota.prazo;
+                        cor: root.nota.urgencia == 2 ? FxCor.vermelho : root.nota.urgencia == 1 ? FxCor.ambar : FxCor.verde;
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 14px;
+                alignment: start;
+                Text { text: (root.cancelamento ? "Emitida em: " : "") + root.nota.data; color: Theme.text-muted; font-size: 12px; }
+                Text { text: root.nota.valor; color: Theme.text; font-size: 12px; font-weight: 800; }
+            }
+            if root.cancelamento && root.nota.chave != "" && root.modelo == "NF-e": Text {
+                text: "Chave: " + root.nota.chave;
+                color: Theme.text-muted;
+                font-size: 11px;
+                font-family: "Menlo";
+                overflow: elide;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            FxButton {
+                text: root.acao;
+                icone: root.icone-acao;
+                tipo: root.perigo ? FxBotao.perigo : FxBotao.normal;
+                clicked => { root.acionar(); }
+            }
+        }
+    }
+}
+
+component ListaVazia inherits VerticalLayout {
+    in property <image> icone;
+    in property <string> titulo;
+    in property <string> texto;
+    padding: 34px;
+    spacing: 6px;
+    alignment: center;
+    HorizontalLayout { alignment: center; Icon { source: root.icone; color: Theme.text-muted; size: 34px; } }
+    Text { text: root.titulo; color: Theme.text; font-size: 14px; font-weight: 800; horizontal-alignment: center; wrap: word-wrap; }
+    if root.texto != "": Text { text: root.texto; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+}
+
+// ============================================================
+// Reimpressão
+// ============================================================
+
+export component ReimprimirNota inherits Rectangle {
+    property <bool> nfe: FiscalStore.tela == "reimprimir-nfe";
+    property <string> modelo: root.nfe ? "NF-e" : "NFC-e";
+    Flickable {
+        content-height: corpo.preferred-height;
+        corpo := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 60px;
+            spacing: 18px;
+            BarraTopo { recarregar: "Atualizar Notas"; recarregou => { FiscalStore.rp-recarregar(); } }
+            Cabecalho {
+                icone: FiscalIcons.printer;
+                cor: root.nfe ? FxCor.roxo : FxCor.azul;
+                titulo: "Reimprimir " + root.modelo;
+                texto: root.nfe
+                    ? "Busca direta por Número e Série, Referência ou Chave SEFAZ."
+                    : "Busca direta pelo Número da Nota Fiscal (independente de comanda ou mesa).";
+                HorizontalLayout {
+                    spacing: 12px;
+                    FxField {
+                        horizontal-stretch: 3;
+                        label: root.nfe ? "NÚMERO, REFERÊNCIA OU CHAVE DA NF‑E" : "NÚMERO DA NFC-E";
+                        FxInput {
+                            text <=> FiscalStore.rp-busca;
+                            placeholder: root.nfe ? "Ex: 1 ou nfe_... ou chave de 44 dígitos" : "Ex: 1543 ou 12";
+                            mono: true;
+                            accepted => { FiscalStore.rp-buscar(); }
+                        }
+                    }
+                    if root.nfe: FxField {
+                        horizontal-stretch: 1;
+                        label: "SÉRIE (OPCIONAL)";
+                        FxInput { text <=> FiscalStore.rp-serie; placeholder: "Ex: 2"; mono: true; accepted => { FiscalStore.rp-buscar(); } }
+                    }
+                    VerticalLayout {
+                        alignment: end;
+                        FxButton {
+                            text: root.nfe ? "Buscar NF-e" : "Buscar Nota";
+                            icone: FiscalIcons.search;
+                            tipo: FxBotao.primario;
+                            busy: FiscalStore.rp-buscando;
+                            enabled: FiscalStore.rp-busca != "";
+                            clicked => { FiscalStore.rp-buscar(); }
+                        }
+                    }
+                }
+                if FiscalStore.rp-erro != "": FxAviso { text: FiscalStore.rp-erro; cor: FxCor.vermelho; }
+                if FiscalStore.rp-achada.visivel: Rectangle {
+                    border-radius: 18px;
+                    background: Theme.available.with-alpha(0.08);
+                    border-width: 1px;
+                    border-color: Theme.available.with-alpha(0.35);
+                    height: achada.preferred-height;
+                    achada := HorizontalLayout {
+                        padding: 18px;
+                        spacing: 16px;
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.file-text; color: Theme.available; size: 28px; } }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 4px;
+                            alignment: center;
+                            Text { text: root.modelo + " Nº " + FiscalStore.rp-achada.numero + " Encontrada!"; color: Theme.text; font-size: 16px; font-weight: 900; }
+                            Text {
+                                text: "Série: " + FiscalStore.rp-achada.serie + " • Status: " + FiscalStore.rp-achada.status
+                                    + (root.nfe && FiscalStore.rp-achada.valor != "" ? " • Valor: " + FiscalStore.rp-achada.valor : "");
+                                color: Theme.text-muted;
+                                font-size: 12px;
+                            }
+                            if FiscalStore.rp-achada.chave != "": Text { text: "Chave: " + FiscalStore.rp-achada.chave; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; wrap: word-wrap; }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            FxButton {
+                                text: root.nfe ? "Imprimir DANFE A4 (Janela do Sistema)" : "Imprimir Direto (Silencioso)";
+                                icone: FiscalIcons.printer;
+                                tipo: FxBotao.sucesso;
+                                clicked => { FiscalStore.rp-imprimir(); }
+                            }
+                            FxButton { text: root.nfe ? "Ver PDF" : "Ver Cupom (DANFE)"; icone: FiscalIcons.external-link; clicked => { FiscalStore.rp-ver(); } }
+                        }
+                    }
+                }
+            }
+            FxCard {
+                height: lista.preferred-height;
+                lista := VerticalLayout {
+                    padding: 22px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        FxLabel { text: "NOTAS EMITIDAS RECENTEMENTE (" + FiscalStore.rp-notas.length + ")"; horizontal-stretch: 1; }
+                        Text { text: "Clique em qualquer nota para reimprimir"; color: Theme.text-muted; font-size: 11px; }
+                    }
+                    if FiscalStore.rp-carregando: ListaVazia { icone: FiscalIcons.loader-circle; titulo: "Carregando histórico recente..."; }
+                    if !FiscalStore.rp-carregando && FiscalStore.rp-notas.length == 0: ListaVazia { icone: FiscalIcons.package; titulo: "Nenhuma nota emitida gravada no sistema ainda."; }
+                    if !FiscalStore.rp-carregando: VerticalLayout {
+                        spacing: 10px;
+                        for nota[i] in FiscalStore.rp-notas: LinhaNota {
+                            nota: nota;
+                            modelo: root.modelo;
+                            acao: "Reimprimir";
+                            icone-acao: FiscalIcons.printer;
+                            acionar => { FiscalStore.rp-reimprimir(i); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ============================================================
+// Cancelamento
+// ============================================================
+
+component LinhaDado inherits HorizontalLayout {
+    in property <string> rotulo;
+    in property <string> valor;
+    Text { text: root.rotulo; color: Theme.text-muted; font-size: 13px; horizontal-stretch: 1; }
+    Text { text: root.valor; color: Theme.text; font-size: 13px; font-weight: 800; }
+}
+
+// Dupla confirmação (ação irreversível na SEFAZ)
+component ConfirmarCancelamento inherits FxSheet {
+    in property <bool> nfe;
+    property <int> letras: FiscalStore.cn-justificativa.character-count;
+    titulo: root.nfe ? "Confirmar Cancelamento de NF-e" : "Dupla Confirmação de Cancelamento";
+    subtitulo: "Ação Irreversível perante a SEFAZ";
+    icone: FiscalIcons.shield-alert;
+    cor: FxCor.vermelho;
+    largura: 520px;
+    fechar => { if !FiscalStore.cn-cancelando { FiscalStore.cn-confirmando = false; } }
+    Rectangle {
+        border-radius: 16px;
+        background: Theme.bg;
+        border-width: 1px;
+        border-color: Theme.border;
+        height: dados.preferred-height;
+        dados := VerticalLayout {
+            padding: 16px;
+            spacing: 8px;
+            LinhaDado { rotulo: "Número da Nota:"; valor: "#" + FiscalStore.cn-nota.numero + " (Série " + FiscalStore.cn-nota.serie + ")"; }
+            LinhaDado { rotulo: "Valor Total:"; valor: FiscalStore.cn-nota.valor; }
+            LinhaDado { rotulo: "Prazo Restante:"; valor: FiscalStore.cn-nota.prazo; }
+            if root.nfe: LinhaDado { rotulo: "Emitida em:"; valor: FiscalStore.cn-nota.data; }
+        }
+    }
+    FxField {
+        label: root.nfe ? "MOTIVO DO CANCELAMENTO (MÍNIMO 15 CARACTERES — OBRIGATÓRIO SEFAZ)" : "MOTIVO DO CANCELAMENTO (MÍNIMO 15 CARACTERES)";
+        FxTextArea {
+            text <=> FiscalStore.cn-justificativa;
+            placeholder: root.nfe
+                ? "Ex: Erro nos dados do destinatário ou desistência do cliente"
+                : "Exemplo: Erro de preenchimento ou desistência da compra pelo cliente";
+        }
+        HorizontalLayout {
+            Text {
+                text: root.letras + (root.nfe ? "/15 caracteres mínimos" : "/15 caracteres");
+                color: root.letras >= 15 ? Theme.available : Theme.danger;
+                font-size: 11px;
+                font-weight: 800;
+                horizontal-stretch: 1;
+            }
+            if root.letras < 15: Text { text: "A SEFAZ exige ao menos 15 letras."; color: Theme.text-muted; font-size: 11px; }
+        }
+    }
+    HorizontalLayout {
+        spacing: 12px;
+        FxButton {
+            horizontal-stretch: 1;
+            text: "Voltar / Não Cancelar";
+            enabled: !FiscalStore.cn-cancelando;
+            clicked => { FiscalStore.cn-confirmando = false; }
+        }
+        FxButton {
+            horizontal-stretch: 1;
+            text: FiscalStore.cn-cancelando ? "Cancelando na SEFAZ..." : "Confirmar Cancelamento";
+            icone: FiscalIcons.circle-x;
+            tipo: FxBotao.perigo;
+            enabled: !FiscalStore.cn-cancelando && root.letras >= 15;
+            clicked => { FiscalStore.cn-confirmar(); }
+        }
+    }
+}
+
+export component CancelarNota inherits Rectangle {
+    property <bool> nfe: FiscalStore.tela == "cancelar-nfe";
+    property <string> modelo: root.nfe ? "NF-e" : "NFC-e";
+    Flickable {
+        content-height: corpo.preferred-height;
+        corpo := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 60px;
+            spacing: 18px;
+            BarraTopo { recarregar: "Atualizar Lista"; recarregou => { FiscalStore.cn-recarregar(); } }
+            if FiscalStore.cn-resultado != "": FxAviso {
+                text: FiscalStore.cn-resultado;
+                icone: FiscalStore.cn-resultado-ok ? FiscalIcons.circle-check : FiscalIcons.circle-x;
+                cor: FiscalStore.cn-resultado-ok ? FxCor.verde : FxCor.vermelho;
+            }
+            Cabecalho {
+                icone: root.nfe ? FiscalIcons.file-text : FiscalIcons.file-x;
+                cor: FxCor.vermelho;
+                titulo: "Cancelamento de " + root.modelo;
+                texto: root.nfe
+                    ? "Conforme regras da SEFAZ, o cancelamento de NF-e é permitido em até 24 horas após a autorização."
+                    : "Conforme regras da SEFAZ, o cancelamento é permitido exclusivamente em até 30 minutos após a emissão.";
+                if !root.nfe: FxAviso {
+                    cor: FxCor.ambar;
+                    icone: FiscalIcons.clock;
+                    text: "Todas as notas abaixo foram emitidas recentemente e estão dentro do prazo legal. Se a nota que você procura não aparece aqui, o prazo de 30 minutos expirou e ela não pode mais ser cancelada na SEFAZ.";
+                }
+                if root.nfe: FxAviso { cor: FxCor.vermelho; icone: FiscalIcons.triangle-alert; text: "NF-e (esta tela): Prazo de 24 horas para cancelamento após autorização da SEFAZ."; }
+                if root.nfe: FxAviso { cor: FxCor.ambar; icone: FiscalIcons.clock; text: "NFC-e (outra tela): Prazo de apenas 30 minutos. Use \"Cancelar NFC-e\" para cupons fiscais."; }
+            }
+            if root.nfe: FxCard {
+                height: busca.preferred-height;
+                busca := VerticalLayout {
+                    padding: 22px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.search; color: Theme.danger; size: 16px; } }
+                        Text { text: "Localizar NF-e por Número ou Chave para Cancelar"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; }
+                    }
+                    Text { text: "Caso a nota não apareça na listagem automática abaixo, informe o número e série para buscá-la e abrir o cancelamento:"; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        FxInput { horizontal-stretch: 3; text <=> FiscalStore.cn-busca; placeholder: "Número da nota (ex: 1), referência ou chave de 44 dígitos"; mono: true; accepted => { FiscalStore.cn-localizar(); } }
+                        FxInput { horizontal-stretch: 1; text <=> FiscalStore.cn-serie; placeholder: "Série (ex: 2)"; mono: true; accepted => { FiscalStore.cn-localizar(); } }
+                    }
+                    if FiscalStore.cn-erro != "": FxAviso { text: FiscalStore.cn-erro; cor: FxCor.vermelho; }
+                    HorizontalLayout {
+                        alignment: start;
+                        FxButton {
+                            text: "Localizar e Abrir Cancelamento";
+                            icone: FiscalIcons.search;
+                            tipo: FxBotao.perigo;
+                            busy: FiscalStore.cn-buscando;
+                            enabled: FiscalStore.cn-busca != "";
+                            clicked => { FiscalStore.cn-localizar(); }
+                        }
+                    }
+                }
+            }
+            FxCard {
+                height: lista.preferred-height;
+                lista := VerticalLayout {
+                    padding: 22px;
+                    spacing: 12px;
+                    FxLabel { text: (root.nfe ? "NF-ES" : "NOTAS") + " DISPONÍVEIS PARA CANCELAMENTO (" + FiscalStore.cn-notas.length + ")"; }
+                    if FiscalStore.cn-carregando: ListaVazia {
+                        icone: FiscalIcons.loader-circle;
+                        titulo: root.nfe ? "Verificando NF-es dentro do prazo..." : "Verificando notas com prazo ativo...";
+                    }
+                    if !FiscalStore.cn-carregando && FiscalStore.cn-notas.length == 0: ListaVazia {
+                        icone: FiscalIcons.clock;
+                        titulo: root.nfe ? "Nenhuma NF-e emitida nas últimas 24 horas." : "Nenhuma nota emitida nos últimos 30 minutos.";
+                        texto: root.nfe
+                            ? "Notas emitidas há mais de 24h não podem mais ser canceladas na SEFAZ."
+                            : "Todas as notas anteriores já tiveram seu prazo legal de cancelamento expirado.";
+                    }
+                    if !FiscalStore.cn-carregando: VerticalLayout {
+                        spacing: 10px;
+                        for nota[i] in FiscalStore.cn-notas: LinhaNota {
+                            nota: nota;
+                            modelo: root.modelo;
+                            cancelamento: true;
+                            perigo: true;
+                            acao: "Cancelar Esta Nota";
+                            icone-acao: FiscalIcons.circle-x;
+                            acionar => { FiscalStore.cn-selecionar(i); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if FiscalStore.cn-confirmando: ConfirmarCancelamento { nfe: root.nfe; }
+}

@@ -1,0 +1,230 @@
+// "Importar do Sistema Antigo" (ImportXmlModal.tsx, uso exclusivo do desenvolvedor): escolhe o XML de exportação
+// de tabelas e mostra o resumo. Ligado em `src/pages/import_legacy.rs` com `ui.global::<ImportLegacyStore>()`.
+
+import { Theme } from "../theme.slint";
+import { RtIcons, RIcon, RButton, GhostButton } from "retaguarda_widgets.slint";
+
+export global ImportLegacyStore {
+    in-out property <bool> visible;
+    in property <string> file-name;
+    in property <string> file-size;
+    in property <bool> importing;
+    // "" sem resultado · ok · error
+    in property <string> result;
+    in property <string> error;
+    in property <int> categories;
+    in property <int> suppliers;
+    in property <int> suppliers-existing;
+    in property <int> products;
+    in property <int> products-updated;
+    in property <int> bar;
+    in property <int> kitchen;
+    in property <[string]> errors;
+    callback choose-file();
+    callback import();
+    callback close();
+}
+
+component Stat inherits Rectangle {
+    in property <string> label;
+    in property <int> value;
+    in property <string> sub;
+    border-radius: 12px;
+    background: Theme.surface-2.with-alpha(0.6);
+    VerticalLayout {
+        padding: 10px;
+        Text { text: root.label; color: Theme.text-muted; font-size: 12px; }
+        Text { text: root.value; color: Theme.text; font-size: 18px; font-weight: 900; }
+        if root.sub != "": Text { text: root.sub; color: Theme.text-muted; font-size: 10px; }
+    }
+}
+
+export component ImportLegacyModal inherits Rectangle {
+    property <color> sky: Theme.dark ? #38bdf8 : #0284c7;
+    background: #0f172a99;
+    TouchArea { }
+    Rectangle {
+        width: min(512px, root.width - 32px);
+        height: col.preferred-height;
+        border-radius: 24px;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.border;
+        clip: true;
+        drop-shadow-blur: 40px;
+        drop-shadow-color: #00000080;
+        col := VerticalLayout {
+            Rectangle {
+                background: Theme.bg.with-alpha(0.6);
+                HorizontalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 12px;
+                            background: root.sky.with-alpha(0.1);
+                            RIcon { source: RtIcons.upload; tint: root.sky; size: 20px; }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Text { text: "Importar do Sistema Antigo"; color: Theme.text; font-size: 16px; font-weight: 700; }
+                        Text { text: "XML de exportação de tabelas"; color: Theme.text-muted; font-size: 12px; }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 30px;
+                            height: 30px;
+                            border-radius: 10px;
+                            background: x-touch.has-hover ? Theme.surface-2 : transparent;
+                            RIcon { source: RtIcons.x; tint: Theme.text-muted; size: 18px; }
+                            x-touch := TouchArea { mouse-cursor: pointer; clicked => { ImportLegacyStore.close(); } }
+                        }
+                    }
+                }
+            }
+            Rectangle { height: 1px; background: Theme.surface-2; }
+            VerticalLayout {
+                padding: 24px;
+                spacing: 16px;
+                // Aviso do desenvolvedor
+                Rectangle {
+                    border-radius: 12px;
+                    background: Theme.danger.with-alpha(0.1);
+                    border-width: 1px;
+                    border-color: Theme.danger.with-alpha(0.3);
+                    HorizontalLayout {
+                        padding: 12px;
+                        spacing: 10px;
+                        VerticalLayout { alignment: start; RIcon { source: RtIcons.alert; tint: Theme.danger; } }
+                        Text {
+                            text: "USO EXCLUSIVO DO DESENVOLVEDOR. Esta função importa dados em massa do sistema antigo. Usar sem orientação pode duplicar ou sobrescrever produtos e fornecedores.";
+                            color: Theme.danger;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                }
+                Rectangle {
+                    border-radius: 12px;
+                    background: Theme.surface-2.with-alpha(0.5);
+                    HorizontalLayout {
+                        padding: 12px;
+                        Text {
+                            text: "O arquivo deve ser o XML exportado pelo sistema antigo contendo Fornecedores, Categorias e Produtos. Os dados já existentes não serão duplicados.";
+                            color: Theme.text-muted;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+                // Escolha do arquivo
+                Rectangle {
+                    height: 132px;
+                    border-radius: 16px;
+                    border-width: 2px;
+                    border-color: ImportLegacyStore.file-name != "" ? root.sky.with-alpha(0.5) : (pick-touch.has-hover ? Theme.text-muted : Theme.border);
+                    background: ImportLegacyStore.file-name != "" ? root.sky.with-alpha(0.05) : Theme.bg.with-alpha(0.5);
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 6px;
+                        HorizontalLayout {
+                            alignment: center;
+                            RIcon {
+                                source: ImportLegacyStore.file-name != "" ? RtIcons.file-text : RtIcons.upload;
+                                tint: ImportLegacyStore.file-name != "" ? root.sky : Theme.text-muted;
+                                size: 32px;
+                            }
+                        }
+                        if ImportLegacyStore.file-name != "": Text { text: ImportLegacyStore.file-name; color: Theme.text; font-size: 14px; font-weight: 700; horizontal-alignment: center; }
+                        if ImportLegacyStore.file-name != "": Text { text: ImportLegacyStore.file-size + " — clique para trocar"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+                        if ImportLegacyStore.file-name == "": Text { text: "Clique para selecionar o arquivo XML"; color: root.sky; font-size: 14px; horizontal-alignment: center; }
+                    }
+                    pick-touch := TouchArea { mouse-cursor: pointer; clicked => { ImportLegacyStore.choose-file(); } }
+                }
+                if ImportLegacyStore.result == "ok": Rectangle {
+                    border-radius: 16px;
+                    background: Theme.available.with-alpha(0.1);
+                    border-width: 1px;
+                    border-color: Theme.available.with-alpha(0.3);
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 12px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            VerticalLayout { alignment: center; RIcon { source: RtIcons.circle-check; tint: Theme.available; } }
+                            Text { text: "Importação concluída!"; color: Theme.available; font-size: 14px; font-weight: 700; }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Stat { horizontal-stretch: 1; label: "Categorias importadas"; value: ImportLegacyStore.categories; }
+                            Stat {
+                                horizontal-stretch: 1;
+                                label: "Fornecedores importados";
+                                value: ImportLegacyStore.suppliers;
+                                sub: ImportLegacyStore.suppliers-existing > 0 ? ImportLegacyStore.suppliers-existing + " já existiam" : "";
+                            }
+                        }
+                        if ImportLegacyStore.products + ImportLegacyStore.products-updated > 0: HorizontalLayout {
+                            spacing: 8px;
+                            Stat { horizontal-stretch: 1; label: "Produtos importados"; value: ImportLegacyStore.products; }
+                            Stat { horizontal-stretch: 1; label: "Produtos atualizados"; value: ImportLegacyStore.products-updated; }
+                        }
+                        if ImportLegacyStore.products + ImportLegacyStore.products-updated > 0: Rectangle {
+                            border-radius: 12px;
+                            background: Theme.primary.with-alpha(0.1);
+                            HorizontalLayout {
+                                padding: 10px;
+                                Text { text: "🍺 Bar (ml / bebidas): " + ImportLegacyStore.bar; color: Theme.text; font-size: 12px; horizontal-stretch: 1; }
+                                Text { text: "🍳 Cozinha: " + ImportLegacyStore.kitchen; color: Theme.text; font-size: 12px; }
+                            }
+                        }
+                        if ImportLegacyStore.errors.length > 0: VerticalLayout {
+                            spacing: 2px;
+                            Text { text: "⚠️ " + ImportLegacyStore.errors.length + " erros ignorados:"; color: Theme.primary; font-size: 12px; font-weight: 700; }
+                            for e in ImportLegacyStore.errors: Text { text: "• " + e; color: Theme.text-muted; font-size: 10px; wrap: word-wrap; }
+                        }
+                    }
+                }
+                if ImportLegacyStore.result == "error": Rectangle {
+                    border-radius: 16px;
+                    background: Theme.danger.with-alpha(0.1);
+                    border-width: 1px;
+                    border-color: Theme.danger.with-alpha(0.3);
+                    HorizontalLayout {
+                        padding: 16px;
+                        spacing: 8px;
+                        VerticalLayout { alignment: start; RIcon { source: RtIcons.alert; tint: Theme.danger; } }
+                        Text { text: ImportLegacyStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; horizontal-stretch: 1; }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 12px;
+                    RButton {
+                        horizontal-stretch: 1;
+                        icon: RtIcons.upload;
+                        spin: ImportLegacyStore.importing;
+                        text: ImportLegacyStore.importing ? "Importando..." : "Importar Dados";
+                        bg: #0284c7;
+                        hover-bg: #0ea5e9;
+                        fg: #ffffff;
+                        min-height: 46px;
+                        enabled: ImportLegacyStore.file-name != "" && !ImportLegacyStore.importing;
+                        clicked => { ImportLegacyStore.import(); }
+                    }
+                    GhostButton {
+                        text: ImportLegacyStore.result == "ok" ? "Fechar" : "Cancelar";
+                        min-height: 46px;
+                        clicked => { ImportLegacyStore.close(); }
+                    }
+                }
+            }
+        }
+    }
+}

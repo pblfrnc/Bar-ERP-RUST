@@ -1,0 +1,635 @@
+// Configurações de Impressoras Térmicas (PrinterSettingsView.tsx). No app nativo a impressão é ESC/POS direto
+// na impressora (USB/compartilhada pelo spooler do Windows ou rede 9100), sem a janela de impressão do navegador.
+
+import { Slider } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { RetaguardaStore } from "retaguarda_store.slint";
+import {
+    RtIcons, RtColors, RIcon, RButton, PrimaryButton, GhostButton, RInput, Card, Badge, IconBubble, SectionTitle,
+    CheckBox, Feedback
+} from "retaguarda_widgets.slint";
+
+component PrinterChoice inherits Rectangle {
+    in property <string> name;
+    in property <bool> selected;
+    in property <bool> is-default;
+    callback picked;
+    height: 32px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: root.selected ? Theme.primary : Theme.border;
+    background: root.selected ? Theme.primary.with-alpha(0.15) : (touch.has-hover ? Theme.surface-2 : Theme.bg);
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+        Text {
+            text: root.name;
+            color: root.selected ? (Theme.dark ? #fbbf24 : #b45309) : Theme.text;
+            font-size: 12px;
+            font-weight: 700;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+        if root.is-default: VerticalLayout { alignment: center; Badge { text: "PADRÃO"; tone: Theme.primary; } }
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.picked(); } }
+}
+
+component PrinterField inherits VerticalLayout {
+    in property <string> label;
+    in-out property <string> value;
+    in property <string> placeholder;
+    in property <string> empty-label;
+    property <length> gap: 6px;
+    property <int> cols: max(1, floor((root.width + root.gap) / (200px + root.gap)));
+    property <length> chip-w: (root.width - (root.cols - 1) * root.gap) / root.cols;
+    property <int> count: RetaguardaStore.p-detected.length + 1;
+    spacing: 6px;
+    Text { text: root.label; color: Theme.text; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+    RInput { text <=> root.value; placeholder: root.placeholder; mono: true; }
+    if RetaguardaStore.p-detected.length > 0: Rectangle {
+        height: ceil(root.count / root.cols) * (32px + root.gap) - root.gap;
+        PrinterChoice {
+            x: 0;
+            y: 0;
+            width: root.chip-w;
+            name: root.empty-label;
+            selected: root.value == "";
+            picked => { root.value = ""; }
+        }
+        for p[i] in RetaguardaStore.p-detected: PrinterChoice {
+            x: mod(i + 1, root.cols) * (root.chip-w + root.gap);
+            y: floor((i + 1) / root.cols) * (32px + root.gap);
+            width: root.chip-w;
+            name: p;
+            selected: root.value == p;
+            is-default: p == RetaguardaStore.p-default-printer;
+            picked => { root.value = p; }
+        }
+    }
+}
+
+component PaperOption inherits Rectangle {
+    in property <string> title;
+    in property <string> sub;
+    in property <bool> selected;
+    callback picked;
+    min-height: 84px;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: root.selected ? Theme.primary : (touch.has-hover ? Theme.text-muted : Theme.surface-2);
+    background: root.selected ? Theme.primary.with-alpha(0.12) : Theme.bg;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 4px;
+        Text { text: root.title; color: root.selected ? (Theme.dark ? #fbbf24 : #d97706) : Theme.text; font-size: 16px; font-weight: 900; }
+        Text { text: root.sub; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+    }
+    if root.selected: RIcon { x: parent.width - 26px; y: 10px; source: RtIcons.circle-check; tint: Theme.primary; }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.picked(); } }
+}
+
+// Régua com valor, slider e dica
+component RangeRow inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value-text;
+    in property <string> hint;
+    in property <float> minimum;
+    in property <float> maximum;
+    in property <float> step: 1;
+    in-out property <float> value;
+    spacing: 4px;
+    HorizontalLayout {
+        Text { text: root.label; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
+        Text { text: root.value-text; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+    }
+    Slider {
+        minimum: root.minimum;
+        maximum: root.maximum;
+        value: root.value;
+        changed(v) => { root.value = round(v / root.step) * root.step; }
+    }
+    if root.hint != "": Text { text: root.hint; color: Theme.text-muted; font-size: 10px; wrap: word-wrap; }
+}
+
+component PresetButton inherits Rectangle {
+    in property <string> title;
+    in property <string> sub;
+    in property <string> note;
+    in property <bool> selected;
+    callback picked;
+    min-height: 40px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: root.selected ? Theme.primary : (touch.has-hover ? Theme.text-muted : Theme.surface-2);
+    background: root.selected ? Theme.primary.with-alpha(0.2) : Theme.bg;
+    VerticalLayout {
+        padding: 8px;
+        padding-left: 4px;
+        padding-right: 4px;
+        spacing: 1px;
+        alignment: center;
+        Text { text: root.title; color: root.selected ? (Theme.dark ? #fbbf24 : #d97706) : Theme.text-muted; font-size: 12px; font-weight: root.selected ? 900 : 700; horizontal-alignment: center; }
+        if root.sub != "": Text { text: root.sub; color: Theme.text-muted; font-size: 10px; horizontal-alignment: center; }
+        if root.note != "": Text { text: root.note; color: Theme.primary.with-alpha(0.8); font-size: 9px; horizontal-alignment: center; }
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.picked(); } }
+}
+
+component OptionRow inherits HorizontalLayout {
+    in property <image> icon;
+    in property <string> title;
+    in property <string> sub;
+    in property <bool> checked;
+    callback toggled;
+    spacing: 12px;
+    VerticalLayout { alignment: center; RIcon { source: root.icon; tint: Theme.primary; size: 20px; } }
+    VerticalLayout {
+        alignment: center;
+        horizontal-stretch: 1;
+        Text { text: root.title; color: Theme.text; font-size: 12px; font-weight: 900; }
+        Text { text: root.sub; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+    }
+    VerticalLayout { alignment: center; CheckBox { checked: root.checked; toggled => { root.toggled(); } } }
+}
+
+// Texto do cupom simulado; a escala do texto acompanha o ajuste "Escala do Texto da Impressão"
+component SimText inherits Text {
+    in property <length> base: 10px;
+    in property <bool> strong;
+    color: #000000;
+    font-size: root.base * RetaguardaStore.p-font / 100;
+    font-family: "Menlo";
+    font-weight: root.strong ? 900 : 400;
+}
+
+// Linha do cupom simulado (texto à esquerda e à direita)
+component SimRow inherits HorizontalLayout {
+    in property <string> left;
+    in property <string> right;
+    in property <bool> strong;
+    in property <length> size: 10px;
+    SimText { text: root.left; base: root.size; strong: root.strong; horizontal-stretch: 1; overflow: elide; }
+    SimText { text: root.right; base: root.size; font-weight: 700; }
+}
+
+component Dashed inherits Rectangle {
+    in property <color> tone: #94a3b8;
+    height: 1px;
+    clip: true;
+    HorizontalLayout {
+        spacing: 3px;
+        alignment: start;
+        for i in [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59]: Rectangle { width: 4px; height: 1px; background: root.tone; }
+    }
+}
+
+// Bobina virtual: largura e margens acompanham os ajustes (4 px por mm de papel, 3 px por mm de margem)
+component ReceiptSimulator inherits Rectangle {
+    property <length> paper-w: min(360px, RetaguardaStore.p-paper * 4px);
+    property <length> qr: min(220px, RetaguardaStore.p-qr * 1px);
+    border-radius: 24px;
+    background: Theme.dark ? #020617cc : #e2e8f0;
+    border-width: 1px;
+    border-color: Theme.dark ? #1e293b : #cbd5e1;
+    clip: true;
+    height: paper.height + 32px;
+    paper := Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: 16px;
+        width: min(root.paper-w, parent.width - 24px);
+        height: sim.preferred-height;
+        background: #ffffff;
+        border-radius: 2px;
+        drop-shadow-blur: 12px;
+        drop-shadow-color: #00000040;
+        clip: true;
+        sim := VerticalLayout {
+            padding-left: RetaguardaStore.p-margin-left * 3px;
+            padding-right: RetaguardaStore.p-margin-right * 3px;
+            padding-top: RetaguardaStore.p-margin-top * 3px + 4px;
+            padding-bottom: RetaguardaStore.p-margin-bottom * 3px;
+            spacing: 6px;
+            VerticalLayout {
+                spacing: 1px;
+                SimText { text: "J. M. A. DE SOUZA COMERCIO"; base: 12px; strong: true; horizontal-alignment: center; }
+                SimText { text: "CNPJ: 36.275.163/0001-24"; base: 9px; color: #334155; horizontal-alignment: center; }
+                SimText { text: "TAILÂNDIA - PA"; base: 9px; color: #334155; horizontal-alignment: center; }
+                SimText { text: "NFC-e Nº 000002 • SÉRIE 2"; base: 11px; strong: true; horizontal-alignment: center; }
+            }
+            Dashed { }
+            VerticalLayout {
+                spacing: 2px;
+                SimRow { left: "ITEM / DESCRIÇÃO"; right: "TOTAL"; strong: true; size: 9px; }
+                SimRow { left: "1x CERV HEINEKEN 600ML"; right: "R$ 15,00"; }
+                SimRow { left: "1x PORÇÃO DE FRITAS"; right: "R$ 25,00"; }
+            }
+            Dashed { }
+            VerticalLayout {
+                spacing: 2px;
+                SimRow { left: "VALOR TOTAL:"; right: "R$ 40,00"; strong: true; size: 12px; }
+                SimRow { left: "Forma: DINHEIRO"; right: "R$ 40,00"; }
+            }
+            Dashed { }
+            VerticalLayout {
+                spacing: 4px;
+                SimText { text: "CONSULTE PELA SEFAZ:"; base: 9px; font-weight: 700; horizontal-alignment: center; }
+                HorizontalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: root.qr;
+                        height: root.qr;
+                        background: #f1f5f9;
+                        border-width: 1px;
+                        border-color: #94a3b8;
+                        RIcon { source: RtIcons.qr-code; tint: #1e293b; size: root.qr - 16px; }
+                    }
+                }
+                SimText {
+                    text: "Dimensão: " + RetaguardaStore.p-qr + "px (~" + round(RetaguardaStore.p-qr / 96 * 25.4) + "mm)";
+                    base: 8px;
+                    color: #64748b;
+                    horizontal-alignment: center;
+                }
+                SimText { text: "Chave: 1526 0936 2751 6300 0124..."; base: 8px; color: #475569; horizontal-alignment: center; }
+            }
+            Dashed { tone: #f87171; }
+            SimText {
+                text: "✂ Linha de corte da guilhotina (+" + RetaguardaStore.p-margin-bottom + "mm)";
+                base: 8px;
+                color: #dc2626;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+        }
+    }
+}
+
+// Colunas da tela (lado a lado ou uma embaixo da outra, conforme a largura)
+component PrinterSettingsColumn inherits VerticalLayout {
+    spacing: 24px;
+    alignment: start;
+
+    // 1. Impressora física
+    Card {
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+            HorizontalLayout {
+                SectionTitle { icon: RtIcons.settings-2; text: "1. IMPRESSORA FÍSICA CONECTADA"; horizontal-stretch: 1; }
+                GhostButton { icon: RtIcons.refresh; spin: RetaguardaStore.p-loading; pad: 8px; min-height: 30px; clicked => { RetaguardaStore.p-reload(); } }
+            }
+            PrinterField {
+                label: "IMPRESSORA DO CAIXA / BALCÃO (NFC-E & COMANDAS)";
+                value <=> RetaguardaStore.p-cashier;
+                placeholder: "Vazio = impressora padrão do sistema · ou o nome dela (POS-80) · ou o IP de rede (192.168.0.50)";
+                empty-label: "(Padrão do Sistema Operacional)";
+            }
+            Text {
+                text: (RetaguardaStore.p-detected.length > 0
+                        ? RetaguardaStore.p-detected.length + " impressoras detectadas no computador. "
+                        : "Nenhuma impressora instalada foi detectada. ")
+                    + (RetaguardaStore.p-default-printer != ""
+                        ? "Deixe vazio para usar a padrão do sistema (" + RetaguardaStore.p-default-printer + ")."
+                        : "O sistema não tem impressora padrão: escolha uma acima ou informe o IP da impressora de rede (porta 9100).");
+                color: Theme.text-muted;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+            PrinterField {
+                label: "IMPRESSORA DA COZINHA / PRODUÇÃO (TICKETS KDS)";
+                value <=> RetaguardaStore.p-kitchen;
+                placeholder: "Nome da impressora da cozinha (opcional)";
+                empty-label: "(Mesma do Caixa / Balcão)";
+            }
+            Rectangle {
+                border-radius: 12px;
+                background: Theme.occupied.with-alpha(0.08);
+                border-width: 1px;
+                border-color: Theme.occupied.with-alpha(0.25);
+                HorizontalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+                    Text { text: "📄"; font-size: 15px; }
+                    VerticalLayout {
+                        spacing: 2px;
+                        horizontal-stretch: 1;
+                        Text { text: "IMPRESSÃO DE NF-E (MODELO 55 - FOLHA A4) DIFERENCIADA"; color: Theme.occupied; font-size: 11px; font-weight: 900; wrap: word-wrap; }
+                        Text {
+                            text: "A NF-e para fornecedores/empresas não é enviada para a impressora térmica do caixa. Ao imprimir a NF-e, o Bar ERP abre o PDF da nota (DANFE) para você imprimir na sua impressora A4 comum (Laser / Jato de Tinta) ou salvar.";
+                            color: Theme.text;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Bobina
+    Card {
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+            SectionTitle { icon: RtIcons.maximize; text: "2. TAMANHO DA BOBINA DE PAPEL"; }
+            HorizontalLayout {
+                spacing: 12px;
+                PaperOption {
+                    horizontal-stretch: 1;
+                    title: "Bobina 80mm";
+                    sub: "Padrão 3 Polegadas • Mais comum em bares, restaurantes e caixas.";
+                    selected: RetaguardaStore.p-paper == 80;
+                    picked => {
+                        RetaguardaStore.p-paper = 80; RetaguardaStore.p-qr = 100;
+                        RetaguardaStore.p-margin-left = 1; RetaguardaStore.p-margin-right = 1;
+                    }
+                }
+                PaperOption {
+                    horizontal-stretch: 1;
+                    title: "Bobina 58mm";
+                    sub: "Padrão 2 Polegadas • Mini impressoras portáteis ou compactas.";
+                    selected: RetaguardaStore.p-paper == 58;
+                    picked => {
+                        RetaguardaStore.p-paper = 58; RetaguardaStore.p-qr = 85;
+                        RetaguardaStore.p-margin-left = 1; RetaguardaStore.p-margin-right = 1;
+                    }
+                }
+            }
+            Rectangle {
+                border-radius: 12px;
+                background: Theme.bg;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                HorizontalLayout {
+                    padding: 12px;
+                    spacing: 12px;
+                    Text { text: "Largura Personalizada (mm):"; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                    RInput {
+                        width: 96px;
+                        text: RetaguardaStore.p-paper;
+                        mono: true;
+                        weight: 700;
+                        align: center;
+                        edited(t) => {
+                            if t.to-float() >= 40 && t.to-float() <= 120 { RetaguardaStore.p-paper = round(t.to-float()); }
+                        }
+                    }
+                    Text { text: "milímetros de largura física"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                }
+            }
+        }
+    }
+
+    // 3. Margens
+    Card {
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+            HorizontalLayout {
+                SectionTitle { icon: RtIcons.sliders; text: "3. MARGENS & ALINHAMENTO MILIMÉTRICO"; horizontal-stretch: 1; }
+                Text { text: "Ajuste fino de bordas"; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+            }
+            RangeRow {
+                label: "Margem Esquerda"; value-text: RetaguardaStore.p-margin-left + " mm"; minimum: 0; maximum: 15; step: 0.5;
+                value <=> RetaguardaStore.p-margin-left;
+                hint: "Aumente se o texto encostar muito na esquerda ou se a impressora comer letras no início.";
+            }
+            RangeRow {
+                label: "Margem Direita"; value-text: RetaguardaStore.p-margin-right + " mm"; minimum: 0; maximum: 15; step: 0.5;
+                value <=> RetaguardaStore.p-margin-right;
+                hint: "Aumente se a margem direita estiver cortando o final dos preços.";
+            }
+            RangeRow {
+                label: "Margem Superior (Topo)"; value-text: RetaguardaStore.p-margin-top + " mm"; minimum: 0; maximum: 10; step: 0.5;
+                value <=> RetaguardaStore.p-margin-top;
+            }
+            RangeRow {
+                label: "Margem Inferior (Segurança da Guilhotina/Picote)"; value-text: RetaguardaStore.p-margin-bottom + " mm"; minimum: 2; maximum: 30; step: 1;
+                value <=> RetaguardaStore.p-margin-bottom;
+                hint: "Espaço extra no rodapé para a lâmina da guilhotina não cortar o QR Code ou protocolo da SEFAZ.";
+            }
+        }
+    }
+
+    // 4. QR e escala
+    Card {
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+            SectionTitle { icon: RtIcons.qr-code; text: "4. QR CODE DA SEFAZ & ESCALA DE TEXTO"; }
+            HorizontalLayout {
+                Text { text: "TAMANHO DO QR CODE DA NFC-E:"; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
+                Text { text: RetaguardaStore.p-qr + "px"; color: Theme.primary; font-size: 12px; font-weight: 900; font-family: "Menlo"; }
+                Text { text: " (" + round(RetaguardaStore.p-qr / 96 * 25.4) + "mm aprox.)"; color: Theme.text-muted; font-size: 10px; vertical-alignment: center; }
+            }
+            Slider {
+                minimum: 60;
+                maximum: 160;
+                value: RetaguardaStore.p-qr;
+                changed(v) => { RetaguardaStore.p-qr = round(v / 5) * 5; }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                PresetButton { horizontal-stretch: 1; title: "Micro"; sub: "75px"; note: "20mm (Mín. SEFAZ)"; selected: RetaguardaStore.p-qr == 75; picked => { RetaguardaStore.p-qr = 75; } }
+                PresetButton { horizontal-stretch: 1; title: "Pequeno"; sub: "85px"; note: "22mm"; selected: RetaguardaStore.p-qr == 85; picked => { RetaguardaStore.p-qr = 85; } }
+                PresetButton { horizontal-stretch: 1; title: "Padrão"; sub: "100px"; note: "26mm (Ideal)"; selected: RetaguardaStore.p-qr == 100; picked => { RetaguardaStore.p-qr = 100; } }
+                PresetButton { horizontal-stretch: 1; title: "Médio"; sub: "115px"; note: "30mm"; selected: RetaguardaStore.p-qr == 115; picked => { RetaguardaStore.p-qr = 115; } }
+                PresetButton { horizontal-stretch: 1; title: "Grande"; sub: "130px"; note: "35mm"; selected: RetaguardaStore.p-qr == 130; picked => { RetaguardaStore.p-qr = 130; } }
+            }
+            Text {
+                text: "💡 A SEFAZ recomenda QR Code entre 20mm e 28mm (~75px a 105px). Tamanhos menores economizam papel e mantêm a leitura instantânea pela câmera do celular.";
+                color: Theme.text-muted;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+            Rectangle { height: 1px; background: Theme.surface-2; }
+            HorizontalLayout {
+                Text { text: "ESCALA DO TEXTO DA IMPRESSÃO:"; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
+                Text { text: RetaguardaStore.p-font + "%"; color: Theme.primary; font-size: 12px; font-weight: 900; font-family: "Menlo"; }
+            }
+            Slider {
+                minimum: 70;
+                maximum: 115;
+                value: RetaguardaStore.p-font;
+                changed(v) => { RetaguardaStore.p-font = round(v / 5) * 5; }
+            }
+            HorizontalLayout {
+                spacing: 6px;
+                for s in [75, 80, 85, 90, 100, 110]: PresetButton {
+                    horizontal-stretch: 1;
+                    title: s + "%";
+                    selected: RetaguardaStore.p-font == s;
+                    picked => { RetaguardaStore.p-font = s; }
+                }
+            }
+            Text {
+                text: "💡 A escala em 85% ou 90% é excelente para impressoras de 80mm com margens estreitas, evitando quebras de linhas de produtos.";
+                color: Theme.text-muted;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    // 5. Guilhotina e comportamento
+    Card {
+        VerticalLayout {
+            padding: 24px;
+            spacing: 12px;
+            OptionRow {
+                icon: RtIcons.scissors;
+                title: "ACIONAMENTO DE GUILHOTINA (AUTO-CUT)";
+                sub: "Comando de corte de papel automático ao terminar o cupom.";
+                checked: RetaguardaStore.p-auto-cut;
+                toggled => { RetaguardaStore.p-auto-cut = !RetaguardaStore.p-auto-cut; }
+            }
+            Rectangle { height: 1px; background: Theme.surface-2; }
+            OptionRow {
+                icon: RtIcons.sparkles;
+                title: "IMPRESSÃO SILENCIOSA DIRETA (1 CLIQUE)";
+                sub: "Imprime direto na impressora sem abrir diálogo do Windows.";
+                checked: RetaguardaStore.p-silent;
+                toggled => { RetaguardaStore.p-silent = !RetaguardaStore.p-silent; }
+            }
+        }
+    }
+}
+
+component SimulatorColumn inherits VerticalLayout {
+    spacing: 8px;
+    alignment: start;
+    HorizontalLayout {
+        spacing: 6px;
+        VerticalLayout { alignment: center; RIcon { source: RtIcons.info; tint: Theme.primary; size: 14px; } }
+        Text { text: "SIMULADOR DA BOBINA EM TEMPO REAL"; color: Theme.text; font-size: 11px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+        Text {
+            text: RetaguardaStore.p-paper + "mm • Margens: E:" + RetaguardaStore.p-margin-left + " D:" + RetaguardaStore.p-margin-right;
+            color: Theme.text-muted;
+            font-size: 11px;
+            font-family: "Menlo";
+            vertical-alignment: center;
+        }
+    }
+    ReceiptSimulator { }
+    Rectangle {
+        border-radius: 16px;
+        background: Theme.primary.with-alpha(0.08);
+        border-width: 1px;
+        border-color: Theme.primary.with-alpha(0.3);
+        HorizontalLayout {
+            padding: 16px;
+            spacing: 10px;
+            VerticalLayout { alignment: start; RIcon { source: RtIcons.circle-alert; tint: Theme.dark ? #fbbf24 : #d97706; } }
+            Text {
+                text: "Dica de Calibração: Se a impressão na sua impressora física estiver cortando à direita, aumente a Margem Direita para 2 ou 3 mm e certifique-se de que a bobina selecionada corresponde ao papel real (80mm ou 58mm).";
+                color: Theme.dark ? #fcd34d : #92400e;
+                font-size: 12px;
+                wrap: word-wrap;
+                horizontal-stretch: 1;
+            }
+        }
+    }
+}
+
+export component RetaguardaPrinters inherits Rectangle {
+    property <length> content-w: min(1024px, root.width - 40px);
+    // Abaixo disso o simulador vai para baixo das configurações (tela estreita ou fonte aumentada)
+    property <bool> stacked: root.content-w < 900px;
+
+    Flickable {
+        content-height: col.preferred-height + 72px;
+        col := VerticalLayout {
+            x: (root.width - root.content-w) / 2;
+            y: 16px;
+            width: root.content-w;
+            spacing: 20px;
+
+            // Barra de navegação
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    HorizontalLayout {
+                        spacing: 8px;
+                        VerticalLayout { alignment: center; RIcon { source: RtIcons.arrow-left; tint: back-touch.has-hover ? Theme.text : Theme.text-muted; } }
+                        Text { text: "Voltar para Retaguarda"; color: back-touch.has-hover ? Theme.text : Theme.text-muted; font-size: 14px; font-weight: 700; vertical-alignment: center; }
+                    }
+                    back-touch := TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.back(); } }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                GhostButton { icon: RtIcons.rotate-ccw; text: "Restaurar Padrões"; weight: 700; clicked => { RetaguardaStore.p-reset(); } }
+                RButton {
+                    icon: RtIcons.check;
+                    spin: RetaguardaStore.p-saving;
+                    text: RetaguardaStore.p-saved ? "SALVO COM SUCESSO!" : "SALVAR CONFIGURAÇÕES";
+                    bg: RetaguardaStore.p-saved ? #10b981 : Theme.primary;
+                    hover-bg: RetaguardaStore.p-saved ? #10b981 : #fbbf24;
+                    fg: #020617;
+                    weight: 900;
+                    enabled: !RetaguardaStore.p-saving;
+                    clicked => { RetaguardaStore.p-save(); }
+                }
+            }
+
+            // Cabeçalho
+            Card {
+                HorizontalLayout {
+                    padding: 28px;
+                    spacing: 16px;
+                    VerticalLayout { alignment: center; IconBubble { icon: RtIcons.printer; tone: Theme.primary; size: 56px; square: true; outlined: true; } }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        horizontal-stretch: 1;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            Text { text: "Configurações de Impressoras Térmicas"; color: Theme.text; font-size: 22px; font-weight: 900; vertical-alignment: center; wrap: word-wrap; }
+                            VerticalLayout {
+                                alignment: center;
+                                Badge { text: "IMPRESSÃO DIRETA (ESC/POS)"; tone: Theme.available; }
+                            }
+                        }
+                        Text {
+                            text: "Calibre a largura da bobina (80mm / 58mm), margens milimétricas e o tamanho do QR Code da NFC-e para qualquer impressora térmica (Epson, Bematech, Elgin, POS-80).";
+                            color: Theme.text-muted;
+                            font-size: 13px;
+                            wrap: word-wrap;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        RButton {
+                            icon: RtIcons.printer;
+                            spin: RetaguardaStore.p-testing;
+                            text: RetaguardaStore.p-testing ? "IMPRIMINDO TESTE..." : "IMPRIMIR PÁGINA DE TESTE";
+                            bg: #10b981;
+                            hover-bg: #34d399;
+                            fg: #020617;
+                            weight: 900;
+                            min-height: 46px;
+                            enabled: !RetaguardaStore.p-testing;
+                            clicked => { RetaguardaStore.p-test(); }
+                        }
+                    }
+                }
+            }
+
+            if RetaguardaStore.p-message != "": Feedback { text: RetaguardaStore.p-message; ok: RetaguardaStore.p-message-ok; }
+
+            if !root.stacked: HorizontalLayout {
+                spacing: 24px;
+                alignment: start;
+                PrinterSettingsColumn { width: (root.content-w - 24px) * 7 / 12; }
+                SimulatorColumn { width: (root.content-w - 24px) * 5 / 12; }
+            }
+            if root.stacked: VerticalLayout {
+                spacing: 24px;
+                PrinterSettingsColumn { }
+                SimulatorColumn { }
+            }
+        }
+    }
+}

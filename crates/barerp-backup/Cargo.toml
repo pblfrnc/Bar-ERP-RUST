@@ -1,0 +1,20 @@
+[package]
+name = "barerp-backup"
+description = "Backup automático do banco do BarERP (VACUUM INTO, cópia externa, retenção) e restauração"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono = "0.4.39"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+sqlx = { version = "0.8.3", default-features = false, features = ["runtime-tokio", "sqlite"] }
+thiserror = "2.0.11"
+tokio = { version = "1.43.0", features = ["fs", "macros", "rt", "sync", "time"] }
+tracing = "0.1.41"
+
+[dev-dependencies]
+tempfile = "3.14.0"
+tokio = { version = "1.43.0", features = ["full"] }

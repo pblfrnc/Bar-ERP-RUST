@@ -1,0 +1,37 @@
+[package]
+name = "barerp-server"
+description = "Servidor embutido do BarERP: a mesma API REST e o mesmo Socket.IO do Node, para os APKs de Garçom e Cozinha"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+barerp-backup = { path = "../barerp-backup" }
+barerp-catalog = { path = "../barerp-catalog" }
+barerp-core = { path = "../barerp-core" }
+barerp-db = { path = "../barerp-db" }
+barerp-fiscal = { path = "../barerp-fiscal" }
+barerp-license = { path = "../barerp-license" }
+barerp-menu-publish = { path = "../barerp-menu-publish" }
+axum = { version = "0.7.9", features = ["multipart"] }
+base64 = "0.22.1"
+chrono = "0.4.39"
+if-addrs = "0.13.3"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+socketioxide = "0.15.2"
+sqlx = { version = "0.8.3", default-features = false, features = ["runtime-tokio", "sqlite"] }
+thiserror = "2.0.11"
+tokio = { version = "1.43.0", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["compression-gzip", "cors", "set-header"] }
+tracing = "0.1.41"
+zip = { version = "2.2.2", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+http-body-util = "0.1.2"
+tower = { version = "0.5.2", features = ["util"] }
+wiremock = "0.6.2"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+

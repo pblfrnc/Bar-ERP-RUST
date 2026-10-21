@@ -1,0 +1,302 @@
+// Notas Fiscais Pendentes (DF-e) — PendingInvoicesView: notas emitidas contra o CNPJ, ciclo Pendente →
+// Recebida → Finalizada, filtros, sincronização com a SEFAZ e ações por nota.
+
+import { Theme } from "../theme.slint";
+import { FiscalStore, FxPendente } from "fiscal_store.slint";
+import { FxCor, FxCores, FxCard, FxBadge, FxLabel, FxButton, FxBotao, FxInput, FxAviso, FxOpcao, FxSheet, Icon } from "fiscal_ui.slint";
+import { FiscalIcons } from "fiscal_icons.slint";
+
+component Metrica inherits Rectangle {
+    in property <string> rotulo;
+    in property <image> icone;
+    in property <int> valor;
+    in property <string> legenda;
+    in property <FxCor> cor;
+    in property <bool> ativo;
+    in property <bool> clicavel: true;
+    callback clicked;
+    border-radius: 24px;
+    background: Theme.surface;
+    border-width: root.ativo ? 2px : 1px;
+    border-color: root.ativo || (t.has-hover && root.clicavel) ? FxCores.de(root.cor) : Theme.border;
+    height: m.preferred-height;
+    m := VerticalLayout {
+        padding: 18px;
+        spacing: 4px;
+        HorizontalLayout {
+            Text { text: root.rotulo; color: Theme.text-muted; font-size: 11px; font-weight: 900; horizontal-stretch: 1; }
+            Icon { source: root.icone; color: FxCores.de(root.cor); size: 16px; }
+        }
+        Text { text: root.valor; color: root.cor == FxCor.neutro ? Theme.text : FxCores.de(root.cor); font-size: 28px; font-weight: 900; }
+        Text { text: root.legenda; color: Theme.text-muted; font-size: 11px; }
+    }
+    t := TouchArea { mouse-cursor: root.clicavel ? pointer : default; clicked => { root.clicked(); } }
+}
+
+component Bolinha inherits Rectangle {
+    in property <bool> verde;
+    width: 9px;
+    height: 9px;
+    border-radius: 5px;
+    background: root.verde ? Theme.available : Theme.closing;
+}
+
+component AcaoPequena inherits Rectangle {
+    in property <image> icone;
+    callback clicked;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: t.has-hover ? Theme.border : Theme.surface-2;
+    border-width: 1px;
+    border-color: Theme.border;
+    Icon { source: root.icone; color: Theme.text; size: 16px; }
+    t := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+component LinhaPendente inherits Rectangle {
+    in property <FxPendente> n;
+    property <bool> ocupado: FiscalStore.pd-acao-chave == root.n.chave;
+    border-radius: 22px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: root.n.estado == 0 ? Theme.closing.with-alpha(0.4) : root.n.estado == 1 ? Theme.occupied.with-alpha(0.4) : Theme.border;
+    height: l.preferred-height;
+    l := HorizontalLayout {
+        padding: 18px;
+        spacing: 18px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: start;
+                Rectangle {
+                    height: 24px;
+                    width: xl.preferred-width + 18px;
+                    border-radius: 12px;
+                    background: (root.n.xml ? Theme.available : Theme.closing).with-alpha(0.12);
+                    xl := HorizontalLayout {
+                        alignment: center;
+                        spacing: 6px;
+                        VerticalLayout { alignment: center; Bolinha { verde: root.n.xml; } }
+                        Text { text: root.n.xml ? "XML Baixado" : "XML Pendente"; color: root.n.xml ? Theme.available : Theme.closing; font-size: 11px; font-weight: 800; vertical-alignment: center; }
+                    }
+                }
+                FxBadge {
+                    text: root.n.estado == 0 ? "PENDENTE (AGUARDANDO 1º BIP)" : root.n.estado == 1 ? "RECEBIDA (AGUARDANDO 2º BIP)" : "FINALIZADA (NO ESTOQUE)";
+                    cor: root.n.estado == 0 ? FxCor.ambar : root.n.estado == 1 ? FxCor.azul : FxCor.verde;
+                }
+                Text { text: root.n.nf; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                VerticalLayout { alignment: center; Icon { source: FiscalIcons.building-2; color: Theme.text-muted; size: 15px; } }
+                Text { text: root.n.emitente; color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; overflow: elide; }
+                if root.n.cnpj != "": Text { text: "• CNPJ: " + root.n.cnpj; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                Text { text: root.n.chave-fmt; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; vertical-alignment: center; }
+                Rectangle {
+                    width: 26px;
+                    height: 22px;
+                    border-radius: 6px;
+                    background: c.has-hover ? Theme.surface-2 : transparent;
+                    Icon { source: FiscalStore.pd-copiada == root.n.chave ? FiscalIcons.check : FiscalIcons.copy; color: FiscalStore.pd-copiada == root.n.chave ? Theme.available : Theme.text-muted; size: 13px; }
+                    c := TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.pd-copiar(root.n.chave); } }
+                }
+                Text { text: "•  Emissão: " + root.n.data; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 10px;
+            VerticalLayout {
+                FxLabel { text: "VALOR TOTAL"; horizontal-alignment: right; }
+                Text { text: root.n.valor; color: Theme.text; font-size: 20px; font-weight: 900; horizontal-alignment: right; }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                if root.n.estado == 0: FxButton {
+                    text: "Receber (1º Bip)";
+                    icone: root.ocupado ? FiscalIcons.refresh-cw : FiscalIcons.scan;
+                    tipo: FxBotao.primario;
+                    enabled: !root.ocupado;
+                    clicked => { FiscalStore.pd-acao("receber", root.n.chave); }
+                }
+                if root.n.estado == 1 || (root.n.estado == 0 && root.n.xml): FxButton {
+                    text: "2º Bip (Entrada Estoque) →";
+                    icone: FiscalIcons.file-text;
+                    tipo: FxBotao.sucesso;
+                    clicked => { FiscalStore.importar(root.n.chave); }
+                }
+                if root.n.estado != 2: FxButton {
+                    text: "Já dei entrada";
+                    icone: FiscalIcons.circle-check;
+                    enabled: !root.ocupado;
+                    clicked => { FiscalStore.pd-acao("finalizar", root.n.chave); }
+                }
+                if root.n.estado == 2: FxButton {
+                    text: "Reabrir";
+                    icone: FiscalIcons.clock;
+                    enabled: !root.ocupado;
+                    clicked => { FiscalStore.pd-acao("reabrir", root.n.chave); }
+                }
+                if !root.n.xml: FxButton {
+                    text: "Buscar XML";
+                    icone: FiscalIcons.refresh-cw;
+                    enabled: !root.ocupado;
+                    clicked => { FiscalStore.pd-buscar-xml(root.n.chave); }
+                }
+                if root.n.xml: AcaoPequena { icone: FiscalIcons.download; clicked => { FiscalStore.pd-baixar-xml(root.n.chave); } }
+                if root.n.xml: AcaoPequena { icone: FiscalIcons.external-link; clicked => { FiscalStore.pd-ver-danfe(root.n.chave); } }
+            }
+        }
+    }
+}
+
+export component NotasPendentes inherits Rectangle {
+    property <bool> tem-filtro: FiscalStore.pd-inicio != "" || FiscalStore.pd-fim != "" || FiscalStore.pd-busca != "";
+    Flickable {
+        content-height: corpo.preferred-height;
+        corpo := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 80px;
+            spacing: 18px;
+            HorizontalLayout {
+                spacing: 14px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 10px;
+                    HorizontalLayout { FxButton { text: "Voltar ao Módulo Fiscal"; icone: FiscalIcons.arrow-left; tipo: FxBotao.fantasma; clicked => { FiscalStore.abrir("hub"); } } Rectangle { } }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.package; color: Theme.closing; size: 28px; } }
+                        VerticalLayout {
+                            Text { text: "Notas Fiscais Pendentes (DF-e)"; color: Theme.text; font-size: 24px; font-weight: 900; }
+                            Text { text: "Monitoramento das notas emitidas contra o CNPJ da sua empresa na SEFAZ."; color: Theme.text-muted; font-size: 13px; }
+                        }
+                    }
+                }
+                VerticalLayout {
+                    alignment: end;
+                    FxButton {
+                        text: FiscalStore.pd-sincronizando ? "Sincronizando SEFAZ..." : "Sincronizar com SEFAZ";
+                        icone: FiscalIcons.refresh-cw;
+                        tipo: FxBotao.primario;
+                        enabled: !FiscalStore.pd-sincronizando;
+                        clicked => { FiscalStore.pd-sincronizar(); }
+                    }
+                }
+            }
+            if FiscalStore.pd-aviso != "": HorizontalLayout {
+                spacing: 10px;
+                FxAviso { horizontal-stretch: 1; text: FiscalStore.pd-aviso; icone: FiscalStore.pd-aviso-ok ? FiscalIcons.circle-check : FiscalIcons.circle-alert; cor: FiscalStore.pd-aviso-ok ? FxCor.verde : FxCor.vermelho; }
+                VerticalLayout { alignment: center; FxButton { text: "Fechar"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-fechar-aviso(); } } }
+            }
+            HorizontalLayout {
+                spacing: 14px;
+                Metrica { rotulo: "TOTAL DE NOTAS"; icone: FiscalIcons.package; valor: FiscalStore.pd-total; legenda: "Notas capturadas da SEFAZ"; cor: FxCor.neutro; clicavel: false; }
+                Metrica {
+                    rotulo: "PENDENTES"; icone: FiscalIcons.clock; valor: FiscalStore.pd-pendentes; legenda: "Aguardando 1º BIP"; cor: FxCor.ambar;
+                    ativo: FiscalStore.pd-status == "pendente";
+                    clicked => { FiscalStore.pd-status = "pendente"; FiscalStore.pd-filtrar(); }
+                }
+                Metrica {
+                    rotulo: "RECEBIDAS"; icone: FiscalIcons.scan; valor: FiscalStore.pd-recebidas; legenda: "1º BIP OK • Aguardando 2º BIP"; cor: FxCor.azul;
+                    ativo: FiscalStore.pd-status == "recebida";
+                    clicked => { FiscalStore.pd-status = "recebida"; FiscalStore.pd-filtrar(); }
+                }
+                Metrica {
+                    rotulo: "FINALIZADAS"; icone: FiscalIcons.circle-check; valor: FiscalStore.pd-finalizadas; legenda: "Entrada no Estoque Realizada"; cor: FxCor.verde;
+                    ativo: FiscalStore.pd-status == "finalizada";
+                    clicked => { FiscalStore.pd-status = "finalizada"; FiscalStore.pd-filtrar(); }
+                }
+            }
+            FxCard {
+                height: filtros.preferred-height;
+                filtros := VerticalLayout {
+                    padding: 18px;
+                    spacing: 14px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        FxOpcao { text: "Todas as Notas  " + FiscalStore.pd-total; cor: FxCor.azul; ativo: FiscalStore.pd-status == "todos"; clicked => { FiscalStore.pd-status = "todos"; FiscalStore.pd-filtrar(); } }
+                        FxOpcao { text: "Pendentes (1º Bip)  " + FiscalStore.pd-pendentes; cor: FxCor.ambar; ativo: FiscalStore.pd-status == "pendente"; clicked => { FiscalStore.pd-status = "pendente"; FiscalStore.pd-filtrar(); } }
+                        FxOpcao { text: "Recebidas (2º Bip)  " + FiscalStore.pd-recebidas; cor: FxCor.azul; ativo: FiscalStore.pd-status == "recebida"; clicked => { FiscalStore.pd-status = "recebida"; FiscalStore.pd-filtrar(); } }
+                        FxOpcao { text: "Finalizadas  " + FiscalStore.pd-finalizadas; cor: FxCor.verde; ativo: FiscalStore.pd-status == "finalizada"; clicked => { FiscalStore.pd-status = "finalizada"; FiscalStore.pd-filtrar(); } }
+                        Rectangle { horizontal-stretch: 1; }
+                        FxOpcao { text: "Todos XMLs"; cor: FxCor.neutro; ativo: FiscalStore.pd-xml == "todos"; clicked => { FiscalStore.pd-xml = "todos"; FiscalStore.pd-filtrar(); } }
+                        FxOpcao { text: "XML Baixado (" + FiscalStore.pd-com-xml + ")"; cor: FxCor.verde; ativo: FiscalStore.pd-xml == "com_xml"; clicked => { FiscalStore.pd-xml = "com_xml"; FiscalStore.pd-filtrar(); } }
+                        FxOpcao { text: "XML Pendente (" + FiscalStore.pd-sem-xml + ")"; cor: FxCor.ambar; ativo: FiscalStore.pd-xml == "sem_xml"; clicked => { FiscalStore.pd-xml = "sem_xml"; FiscalStore.pd-filtrar(); } }
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        FxInput { horizontal-stretch: 3; text <=> FiscalStore.pd-busca; placeholder: "Buscar por Fornecedor, CNPJ, Número da Nota ou Chave..."; accepted => { FiscalStore.pd-filtrar(); } }
+                        FxInput { horizontal-stretch: 1; text <=> FiscalStore.pd-inicio; placeholder: "Início AAAA-MM-DD"; mono: true; accepted => { FiscalStore.pd-filtrar(); } }
+                        FxInput { horizontal-stretch: 1; text <=> FiscalStore.pd-fim; placeholder: "Fim AAAA-MM-DD"; mono: true; accepted => { FiscalStore.pd-filtrar(); } }
+                        FxButton { text: "Filtrar"; icone: FiscalIcons.filter; tipo: FxBotao.primario; clicked => { FiscalStore.pd-filtrar(); } }
+                        if root.tem-filtro: FxButton { text: "Limpar"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-limpar(); } }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.calendar; color: Theme.text-muted; size: 14px; } }
+                        Text { text: "Período rápido:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                        FxButton { text: "Hoje"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-periodo("hoje"); } }
+                        FxButton { text: "Últimos 7 dias"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-periodo("7d"); } }
+                        FxButton { text: "Últimos 30 dias"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-periodo("30d"); } }
+                        FxButton { text: "Este Mês"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-periodo("mes"); } }
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 18px;
+                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: true; } } Text { text: "Bolinha Verde: XML baixado e pronto para entrada"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; } }
+                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: false; } } Text { text: "Bolinha Amarela: XML pendente de liberação SEFAZ"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; } }
+                Rectangle { horizontal-stretch: 1; }
+                Text { text: "Exibindo " + FiscalStore.pd-notas.length + " de " + FiscalStore.pd-total + " notas"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+            }
+            if FiscalStore.pd-carregando: VerticalLayout {
+                padding: 40px;
+                spacing: 6px;
+                HorizontalLayout { alignment: center; Icon { source: FiscalIcons.refresh-cw; color: Theme.closing; size: 30px; } }
+                Text { text: "Carregando notas pendentes..."; color: Theme.text; font-size: 14px; font-weight: 800; horizontal-alignment: center; }
+                Text { text: "Consultando registros e status fiscais"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+            }
+            if !FiscalStore.pd-carregando && FiscalStore.pd-notas.length == 0: FxCard {
+                height: vazio.preferred-height;
+                vazio := VerticalLayout {
+                    padding: 40px;
+                    spacing: 10px;
+                    alignment: center;
+                    HorizontalLayout { alignment: center; Icon { source: FiscalIcons.package; color: Theme.text-muted; size: 34px; } }
+                    Text { text: "Nenhuma nota fiscal encontrada"; color: Theme.text; font-size: 16px; font-weight: 900; horizontal-alignment: center; }
+                    Text { text: "Nenhuma nota corresponde aos filtros atuais. Você pode clicar no botão de sincronização para consultar se há novas emissões contra seu CNPJ na SEFAZ."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; wrap: word-wrap; }
+                    HorizontalLayout { alignment: center; FxButton { text: "Sincronizar Agora com SEFAZ"; icone: FiscalIcons.refresh-cw; tipo: FxBotao.primario; clicked => { FiscalStore.pd-sincronizar(); } } }
+                }
+            }
+            if !FiscalStore.pd-carregando: VerticalLayout {
+                spacing: 12px;
+                for n in FiscalStore.pd-notas: LinhaPendente { n: n; }
+            }
+        }
+    }
+    if FiscalStore.pd-confirma.visivel: FxSheet {
+        titulo: FiscalStore.pd-confirma.titulo;
+        icone: FiscalIcons.circle-alert;
+        cor: FxCor.ambar;
+        largura: 480px;
+        fechar => { FiscalStore.pd-confirmar(false); }
+        Text { text: FiscalStore.pd-confirma.texto; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 12px;
+            alignment: end;
+            FxButton { text: "Cancelar"; clicked => { FiscalStore.pd-confirmar(false); } }
+            FxButton { text: "Confirmar"; tipo: FxBotao.primario; clicked => { FiscalStore.pd-confirmar(true); } }
+        }
+    }
+}

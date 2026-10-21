@@ -1,0 +1,46 @@
+---
+source: crates/barerp-print/tests/layouts.rs
+expression: text
+---
+           BAR DO ZÉ
+   José da Silva Comércio de
+          Bebidas LTDA
+    CNPJ: 12.345.678/0001-90
+ Rua das Flores, 123 - Centro,
+            São João
+--------------------------------
+     COMPROVANTE DE CONSUMO
+   DOCUMENTO SEM VALOR FISCAL
+--------------------------------
+MESA: Mesa 7            CMD: #42
+FECHADA: 18/10/2026 22:05
+GARÇOM: João
+CLIENTE: Maria Conceição
+--------------------------------
+ITEM                       TOTAL
+X-Burguer Artesanal com Cheddar
+e Cebola Caramelizada
+  + Ao ponto
+  + Bacon (4,00)
+2 x 38,00                  76,00
+Chopp Pilsen 500ml
+  * Happy Hour
+6 x 9,90                   59,40
+--------------------------------
+SUBTOTAL:              R$ 135,40
+TX SERVIÇO (12%):       R$ 16,25
+DESCONTO:             - R$ 10,00
+TOTAL:                 R$ 141,65
+VALOR PAGO:            R$ 100,00
+SALDO RESTANTE:         R$ 41,65
+--------------------------------
+PAGAMENTOS:
+PIX (Pessoa 1/2)        R$ 60,00
+Cartão Crédito          R$ 40,00
+--------------------------------
+Agradecemos a preferência! Volte
+            sempre!
+  Impresso em 18/10/2026 22:06
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

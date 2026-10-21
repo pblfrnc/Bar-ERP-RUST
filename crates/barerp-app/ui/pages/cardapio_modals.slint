@@ -1,0 +1,1367 @@
+// Modais da área Cardápio & Estoque: categoria, histórico de preços, relatório de estoque, NCM, folha de
+// balanço, fornecedor rápido/completo, cliente, receber fiado, adicionais (ModifierGroupsManager),
+// promoções (PromotionsManager), itens do cardápio digital (DigitalMenuItemsModal) e confirmação.
+
+import { LineEdit, ComboBox, ScrollView, TextEdit, ListView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons, Icon } from "../icons.slint";
+import { CardapioIcons } from "cardapio_icons.slint";
+import { CardapioStore, CdModal, CdHistory, CdReportCat, CdModGroup, CdModOption, CdPromo, CdChoice, CdMenuRow } from "cardapio_store.slint";
+import { Pill, Btn, CloseX, FieldLabel, Hint, Toggle, MiniChip, Notice, Field, Check, Sheet } from "cardapio_widgets.slint";
+
+component ErrorBox inherits Notice {
+    text: CardapioStore.modal-error;
+    tone: Theme.danger;
+}
+
+// ---------- Categoria ----------
+component CategorySheet inherits Sheet {
+    panel-width: 480px;
+    icon: Icons.tag;
+    title: CardapioStore.c-editing ? "Editar Categoria" : "Nova Categoria";
+    subtitle: CardapioStore.c-subtitle;
+    close => { CardapioStore.close-modal(); }
+    VerticalLayout {
+        padding: 20px;
+        spacing: 10px;
+        ErrorBox { }
+        FieldLabel { text: "NOME DA CATEGORIA *"; }
+        LineEdit { height: 42px; placeholder-text: "Ex: Alimentos, Lanches, Cervejas, Porções..."; text <=> CardapioStore.c-name; accepted => { CardapioStore.c-save(); } }
+        HorizontalLayout {
+            FieldLabel { text: "FAIXA NUMÉRICA INICIAL (CÓDIGO INTERNO) *"; horizontal-stretch: 1; }
+            Text { text: "#" + (CardapioStore.c-code-start != "" ? CardapioStore.c-code-start : "1001") + "+"; color: Theme.primary; font-size: 11px; font-weight: 800; font-family: "Menlo"; }
+        }
+        LineEdit { height: 42px; input-type: number; placeholder-text: "Ex: 1001, 2001, 5001..."; text <=> CardapioStore.c-code-start; }
+        FieldLabel { text: "ATALHOS DE FAIXAS RECOMENDADAS:"; }
+        for line in [
+            [{ code: "1001", label: "1001 (Cozinha/Pratos)" }, { code: "2001", label: "2001 (Alimentos/Porções)" }, { code: "3001", label: "3001 (Pizzas/Massas)" }],
+            [{ code: "4001", label: "4001 (Sucos/Refrigerantes)" }, { code: "5001", label: "5001 (Bar/Bebidas/Chopp)" }],
+            [{ code: "6001", label: "6001 (Doces/Chicletes/Balas)" }, { code: "7001", label: "7001 (Combos/Especiais)" }],
+        ]: HorizontalLayout {
+            spacing: 5px;
+            alignment: start;
+            for preset in line: MiniChip {
+                text: preset.label;
+                mono: true;
+                active: CardapioStore.c-code-start == preset.code;
+                clicked => { CardapioStore.c-code-start = preset.code; }
+            }
+        }
+        Hint { text: "Novos produtos cadastrados nesta categoria receberão numeração a partir de #" + (CardapioStore.c-code-start != "" ? CardapioStore.c-code-start : "1001") + "."; }
+        if CardapioStore.c-editing: Rectangle {
+            height: ren.preferred-height;
+            border-radius: 12px;
+            background: Theme.primary.with-alpha(0.1);
+            border-width: 1px;
+            border-color: Theme.primary.with-alpha(0.35);
+            ren := HorizontalLayout {
+                padding: 12px;
+                spacing: 10px;
+                Check { checked: CardapioStore.c-renumber; clicked => { CardapioStore.c-renumber = !CardapioStore.c-renumber; } }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    Text { text: "Renumerar produtos existentes desta categoria"; color: Theme.text; font-size: 12px; font-weight: 800; }
+                    Text {
+                        text: "Atualiza os códigos internos de todos os produtos desta categoria para ficarem no intervalo sequencial iniciando em #" + (CardapioStore.c-code-start != "" ? CardapioStore.c-code-start : "1001") + ".";
+                        color: Theme.text-muted;
+                        font-size: 11px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            padding-top: 4px;
+            Btn { horizontal-stretch: 1; text: "Cancelar"; clicked => { CardapioStore.close-modal(); } }
+            Btn { horizontal-stretch: 1; text: CardapioStore.c-editing ? "Salvar Alterações" : "Criar Categoria"; fill: Theme.primary; tone: Theme.primary-text; weight: 800; clicked => { CardapioStore.c-save(); } }
+        }
+    }
+}
+
+// ---------- Histórico de preços ----------
+component HistoryCard inherits Rectangle {
+    in property <CdHistory> data;
+    height: col.preferred-height;
+    background: Theme.bg;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    col := VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 6px;
+            Text { text: root.data.date; color: Theme.text; font-size: 11px; font-weight: 800; font-family: "Menlo"; horizontal-stretch: 1; vertical-alignment: center; }
+            Pill { text: "Por: " + root.data.by; }
+            Pill { text: root.data.xml ? "Entrada NF-e (XML)" : "Edição Manual"; tone: root.data.xml ? Theme.closing : Theme.purple; }
+        }
+        HorizontalLayout {
+            spacing: 10px;
+            Rectangle {
+                horizontal-stretch: 1;
+                height: sale.preferred-height;
+                background: Theme.surface;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                sale := VerticalLayout {
+                    padding: 10px;
+                    spacing: 3px;
+                    Text { text: "PREÇO DE VENDA"; color: Theme.text-muted; font-size: 10px; font-weight: 800; }
+                    HorizontalLayout {
+                        Text { text: root.data.old-price; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; stroke: Theme.text-muted; horizontal-stretch: 1; }
+                        Icon { source: CardapioIcons.arrow-right; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
+                        Text { text: root.data.new-price; color: Theme.text; font-size: 12px; font-weight: 900; font-family: "Menlo"; horizontal-stretch: 1; horizontal-alignment: right; }
+                    }
+                    Text {
+                        text: root.data.price-diff;
+                        color: root.data.price-dir > 0 ? Theme.available : root.data.price-dir < 0 ? Theme.danger : Theme.text-muted;
+                        font-size: 10px;
+                        font-weight: 800;
+                        horizontal-alignment: right;
+                    }
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                height: cost.preferred-height;
+                background: Theme.surface;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                cost := VerticalLayout {
+                    padding: 10px;
+                    spacing: 3px;
+                    Text { text: "PREÇO DE CUSTO"; color: Theme.text-muted; font-size: 10px; font-weight: 800; }
+                    HorizontalLayout {
+                        Text { text: root.data.old-cost; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; horizontal-stretch: 1; }
+                        Icon { source: CardapioIcons.arrow-right; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
+                        Text { text: root.data.new-cost; color: Theme.text; font-size: 12px; font-weight: 800; font-family: "Menlo"; horizontal-stretch: 1; horizontal-alignment: right; }
+                    }
+                    Text {
+                        text: root.data.cost-diff;
+                        color: root.data.cost-dir > 0 ? Theme.danger : root.data.cost-dir < 0 ? Theme.available : Theme.text-muted;
+                        font-size: 10px;
+                        font-weight: 800;
+                        horizontal-alignment: right;
+                    }
+                }
+            }
+        }
+        if root.data.chave != "": Text { text: "Chave NF-e: " + root.data.chave; color: Theme.text-muted; font-size: 10px; font-family: "Menlo"; overflow: elide; }
+    }
+}
+
+component HistorySheet inherits Sheet {
+    panel-width: 680px;
+    panel-height: 620px;
+    icon: CardapioIcons.history;
+    tone: Theme.purple;
+    title: "Histórico de Alterações de Preço";
+    subtitle: CardapioStore.h-subtitle;
+    close => { CardapioStore.close-modal(); }
+    VerticalLayout {
+        vertical-stretch: 1;
+        padding: 18px;
+        spacing: 10px;
+        if CardapioStore.h-loading: Text { vertical-stretch: 1; text: "Carregando histórico..."; color: Theme.text-muted; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+        if !CardapioStore.h-loading && CardapioStore.h-rows.length == 0: VerticalLayout {
+            vertical-stretch: 1;
+            alignment: center;
+            spacing: 4px;
+            HorizontalLayout { alignment: center; Icon { source: CardapioIcons.history; color: Theme.text-muted.with-alpha(0.5); size: 32px; } }
+            Text { text: "Nenhuma alteração registrada ainda"; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-alignment: center; }
+            Text {
+                text: "As alterações manuais e importações de XML aparecerão registradas aqui com responsável e variações.";
+                color: Theme.text-muted;
+                font-size: 12px;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+        if !CardapioStore.h-loading && CardapioStore.h-rows.length > 0: ListView {
+            vertical-stretch: 1;
+            for h in CardapioStore.h-rows: VerticalLayout {
+                padding-bottom: 8px;
+                HistoryCard { data: h; }
+            }
+        }
+        HorizontalLayout {
+            alignment: end;
+            Btn { text: "Fechar"; clicked => { CardapioStore.close-modal(); } }
+        }
+    }
+}
+
+// ---------- Relatório de estoque ----------
+component ReportTile inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <string> sub;
+    in property <color> tone: Theme.text;
+    in property <bool> highlight;
+    horizontal-stretch: 1;
+    height: 90px;
+    background: root.highlight ? Theme.purple.with-alpha(0.1) : Theme.bg;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: root.highlight ? Theme.purple.with-alpha(0.35) : Theme.surface-2;
+    VerticalLayout {
+        padding: 14px;
+        spacing: 3px;
+        Text { text: root.label; color: root.highlight ? Theme.purple : Theme.text-muted; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; }
+        Text { text: root.value; color: root.tone; font-size: 17px; font-weight: 900; font-family: "Menlo"; }
+        Text { text: root.sub; color: root.highlight ? Theme.purple : Theme.text-muted; font-size: 10px; }
+    }
+}
+
+component ReportSheet inherits Sheet {
+    panel-width: 900px;
+    panel-height: 640px;
+    icon: CardapioIcons.chart-column;
+    tone: Theme.purple;
+    title: "Relatório de Estoque & Lucro Previsto";
+    subtitle: "Posição consolidada a preço de custo e venda, e lucratividade total e por categoria";
+    close => { CardapioStore.close-modal(); }
+    VerticalLayout {
+        vertical-stretch: 1;
+        padding: 18px;
+        spacing: 12px;
+        if CardapioStore.r-loading: Text { vertical-stretch: 1; text: "Calculando valores do inventário..."; color: Theme.text-muted; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+        if !CardapioStore.r-loading && CardapioStore.r-failed: Text { vertical-stretch: 1; text: "Falha ao carregar relatório."; color: Theme.text-muted; horizontal-alignment: center; vertical-alignment: center; }
+        if !CardapioStore.r-loading && !CardapioStore.r-failed: HorizontalLayout {
+            spacing: 10px;
+            ReportTile { label: "TOTAL A CUSTO"; value: CardapioStore.r-cost; sub: CardapioStore.r-cost-sub; }
+            ReportTile { label: "TOTAL A VENDA"; value: CardapioStore.r-sale; sub: CardapioStore.r-sale-sub; tone: Theme.available; }
+            ReportTile { label: "LUCRO PREVISTO TOTAL"; value: CardapioStore.r-profit; sub: "Venda - Custo"; tone: Theme.purple; highlight: true; }
+            ReportTile { label: "MARGEM MÉDIA"; value: CardapioStore.r-margin; sub: "Rentabilidade Geral"; tone: Theme.primary; }
+        }
+        if !CardapioStore.r-loading && !CardapioStore.r-failed: Rectangle {
+            vertical-stretch: 1;
+            background: Theme.bg;
+            border-radius: 16px;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            clip: true;
+            VerticalLayout {
+                Rectangle {
+                    height: 42px;
+                    background: Theme.surface-2.with-alpha(0.45);
+                    HorizontalLayout {
+                        padding-left: 14px;
+                        padding-right: 14px;
+                        spacing: 6px;
+                        Icon { source: Icons.tag; color: Theme.primary; size: 15px; y: (parent.height - self.height) / 2; }
+                        Text { text: "LUCRO PREVISTO AGRUPADO POR CATEGORIA"; color: Theme.text; font-size: 11px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
+                        Text { text: CardapioStore.r-count; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                    }
+                }
+                HorizontalLayout {
+                    height: 32px;
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    spacing: 8px;
+                    for h in ["CATEGORIA", "PRODUTOS", "UNIDADES", "ESTOQUE CUSTO", "ESTOQUE VENDA", "LUCRO PREVISTO", "MARGEM"]: Text {
+                        horizontal-stretch: h == "CATEGORIA" ? 2 : 1;
+                        text: h;
+                        color: Theme.text-muted;
+                        font-size: 10px;
+                        font-weight: 800;
+                        vertical-alignment: center;
+                        horizontal-alignment: h == "CATEGORIA" ? left : h == "PRODUTOS" || h == "UNIDADES" || h == "MARGEM" ? center : right;
+                    }
+                }
+                ListView {
+                    vertical-stretch: 1;
+                    for r in CardapioStore.r-rows: Rectangle {
+                        height: 38px;
+                        Rectangle { y: 0; height: 1px; background: Theme.surface-2; }
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            spacing: 8px;
+                            Text { horizontal-stretch: 2; text: r.name; color: Theme.text; font-size: 12px; font-weight: 800; vertical-alignment: center; overflow: elide; }
+                            Text { horizontal-stretch: 1; text: r.items; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: r.units; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: r.cost; color: Theme.text; font-size: 12px; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: r.sale; color: Theme.available; font-size: 12px; font-weight: 800; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: r.profit; color: Theme.purple; font-size: 12px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
+                            HorizontalLayout {
+                                horizontal-stretch: 1;
+                                alignment: center;
+                                Pill { y: (parent.height - self.height) / 2; text: r.margin; tone: r.tone == 0 ? Theme.available : r.tone == 1 ? Theme.closing : Theme.danger; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            alignment: end;
+            Btn { text: "Fechar Relatório"; clicked => { CardapioStore.close-modal(); } }
+        }
+    }
+}
+
+// ---------- Consulta de NCM ----------
+component NcmSheet inherits Sheet {
+    panel-width: 560px;
+    icon: CardapioIcons.book-open;
+    tone: Theme.purple;
+    title: "Consulta Oficial de NCM";
+    subtitle: "Classificação fiscal e alíquotas oficiais da Receita Federal";
+    close => { CardapioStore.close-modal(); }
+    VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 8px;
+            LineEdit {
+                height: 42px;
+                horizontal-stretch: 1;
+                placeholder-text: "Digite o código NCM (ex: 22030000)";
+                text <=> CardapioStore.n-code;
+                accepted => { CardapioStore.n-search(); }
+            }
+            Btn {
+                h: 42px;
+                text: "Consultar";
+                fill: Theme.purple;
+                tone: #ffffff;
+                busy: CardapioStore.n-loading;
+                enabled: CardapioStore.n-code.character-count >= 4;
+                clicked => { CardapioStore.n-search(); }
+            }
+        }
+        FieldLabel { text: "ATALHOS COMUNS NO BAR & RESTAURANTE"; }
+        for line in [
+            [{ code: "22030000", label: "Cervejas e Chopes" }, { code: "22021000", label: "Refrigerantes" }, { code: "22011000", label: "Águas Minerais" }],
+            [{ code: "22084000", label: "Cachaças e Aguardentes" }, { code: "22083020", label: "Whiskies" }, { code: "22086000", label: "Vodkas" }],
+            [{ code: "22085000", label: "Gins" }, { code: "22042100", label: "Vinhos de Mesa" }, { code: "21069090", label: "Lanches e Porções" }],
+            [{ code: "19059090", label: "Pastéis e Salgados" }, { code: "24022000", label: "Cigarros e Tabacaria" }],
+        ]: HorizontalLayout {
+            spacing: 5px;
+            alignment: start;
+            for q in line: Rectangle {
+                height: 26px;
+                width: qr.preferred-width + 16px;
+                border-radius: 8px;
+                background: qt.has-hover ? Theme.border : Theme.surface-2;
+                qr := HorizontalLayout {
+                    x: 8px;
+                    spacing: 4px;
+                    Text { text: q.code; color: Theme.purple; font-size: 11px; font-weight: 800; font-family: "Menlo"; vertical-alignment: center; }
+                    Text { text: "— " + q.label; color: Theme.text; font-size: 11px; vertical-alignment: center; }
+                }
+                qt := TouchArea { clicked => { CardapioStore.n-quick(q.code); } }
+            }
+        }
+        Notice { text: CardapioStore.n-error; tone: Theme.danger; }
+        if CardapioStore.n-has-result: Rectangle {
+            height: res.preferred-height;
+            background: Theme.bg;
+            border-radius: 16px;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            res := VerticalLayout {
+                padding: 14px;
+                spacing: 10px;
+                HorizontalLayout {
+                    spacing: 6px;
+                    Icon { source: Icons.circle-check; color: Theme.available; size: 16px; y: (parent.height - self.height) / 2; }
+                    Text { text: CardapioStore.n-result-code; color: Theme.text; font-size: 16px; font-weight: 900; font-family: "Menlo"; horizontal-stretch: 1; }
+                    Pill { text: "VÁLIDO NA SEFAZ"; tone: Theme.available; }
+                }
+                FieldLabel { text: "DESCRIÇÃO OFICIAL"; }
+                Text { text: CardapioStore.n-result-desc; color: Theme.text; font-size: 13px; font-weight: 600; wrap: word-wrap; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    for tax in [{ label: "Imposto Federal", value: CardapioStore.n-fed }, { label: "Imposto Estadual", value: CardapioStore.n-est }]: Rectangle {
+                        horizontal-stretch: 1;
+                        height: 54px;
+                        background: Theme.surface;
+                        border-radius: 12px;
+                        border-width: 1px;
+                        border-color: Theme.surface-2;
+                        VerticalLayout {
+                            padding: 9px;
+                            Text { text: "% " + tax.label; color: Theme.text-muted; font-size: 10px; }
+                            Text { text: tax.value; color: Theme.text; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
+                        }
+                    }
+                }
+                Btn { text: "Usar este NCM no Produto"; fill: Theme.purple; tone: #ffffff; weight: 800; clicked => { CardapioStore.n-use(); } }
+            }
+        }
+    }
+}
+
+// ---------- Folha de balanço ----------
+component SheetModal inherits Sheet {
+    panel-width: 540px;
+    icon: CardapioIcons.clipboard-list;
+    tone: Theme.occupied;
+    title: "Folha de Balanço (PDF)";
+    subtitle: "Imprima, anote a contagem e os preços novos à mão e depois lance no sistema.";
+    close => { CardapioStore.close-modal(); }
+    VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+        FieldLabel { text: "CATEGORIA"; }
+        ComboBox {
+            height: 40px;
+            model: CardapioStore.s-category-labels;
+            current-index <=> CardapioStore.s-category-index;
+            selected => { CardapioStore.s-changed(); }
+        }
+        FieldLabel { text: "ORDEM"; }
+        HorizontalLayout {
+            spacing: 8px;
+            for o in [{ alpha: true, label: "Alfabética", hint: "Todos os produtos de A a Z" }, { alpha: false, label: "Por categoria", hint: "Agrupado por categoria, A a Z dentro de cada uma" }]: Rectangle {
+                horizontal-stretch: 1;
+                height: ob.preferred-height;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: CardapioStore.s-alpha == o.alpha ? Theme.primary : Theme.border;
+                background: CardapioStore.s-alpha == o.alpha ? Theme.primary.with-alpha(0.1) : transparent;
+                ob := VerticalLayout {
+                    padding: 10px;
+                    Text { text: o.label; color: Theme.text; font-size: 13px; font-weight: 800; }
+                    Text { text: o.hint; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                }
+                TouchArea { clicked => { CardapioStore.s-alpha = o.alpha; CardapioStore.s-changed(); } }
+            }
+        }
+        HorizontalLayout {
+            spacing: 10px;
+            Check { y: (parent.height - self.height) / 2; checked: CardapioStore.s-show-cost; clicked => { CardapioStore.s-show-cost = !CardapioStore.s-show-cost; } }
+            Text { text: "Mostrar preço de custo (desmarque se a folha for para funcionários)"; color: Theme.text; font-size: 13px; wrap: word-wrap; horizontal-stretch: 1; }
+        }
+        Text {
+            text: "A folha traz código, produto, unidade, estoque atual, Contagem em branco, " + (CardapioStore.s-show-cost ? "custo, " : "") + "preço atual e Novo preço em branco.";
+            color: Theme.text-muted;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+        if CardapioStore.s-feedback != "": Text { text: CardapioStore.s-feedback; color: CardapioStore.s-error ? Theme.danger : Theme.available; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            Btn { text: "Fechar"; clicked => { CardapioStore.close-modal(); } }
+            Btn {
+                text: CardapioStore.s-count == 0 ? "Nenhum produto" : "Gerar PDF (" + CardapioStore.s-count + " produtos)";
+                icon: Icons.printer;
+                has-icon: true;
+                fill: Theme.primary;
+                tone: Theme.primary-text;
+                weight: 900;
+                enabled: CardapioStore.s-count > 0;
+                busy: CardapioStore.s-busy;
+                clicked => { CardapioStore.s-export(); }
+            }
+        }
+    }
+}
+
+// ---------- Fornecedor rápido ----------
+component QuickSupplierSheet inherits Sheet {
+    panel-width: 420px;
+    icon: CardapioIcons.truck;
+    title: "Adicionar Fornecedor Rápido";
+    subtitle: "Cadastre e vincule este fornecedor imediatamente ao produto atual.";
+    close => { CardapioStore.close-modal(); }
+    VerticalLayout {
+        padding: 20px;
+        spacing: 8px;
+        ErrorBox { }
+        FieldLabel { text: "RAZÃO SOCIAL / NOME *"; }
+        LineEdit { height: 40px; placeholder-text: "Ex: Cervejaria Heineken do Brasil"; text <=> CardapioStore.q-name; }
+        FieldLabel { text: "NOME FANTASIA"; }
+        LineEdit { height: 40px; placeholder-text: "Ex: Heineken"; text <=> CardapioStore.q-trade; }
+        FieldLabel { text: "CNPJ OU CPF (OPCIONAL)"; }
+        LineEdit { height: 40px; placeholder-text: "00.000.000/0000-00"; text <=> CardapioStore.q-doc; }
+        FieldLabel { text: "TELEFONE / WHATSAPP (OPCIONAL)"; }
+        LineEdit { height: 40px; placeholder-text: "(11) 99999-8888"; text <=> CardapioStore.q-phone; }
+        HorizontalLayout {
+            spacing: 8px;
+            padding-top: 6px;
+            Btn { horizontal-stretch: 1; text: "Cancelar"; clicked => { CardapioStore.close-modal(); } }
+            Btn { horizontal-stretch: 1; text: "Vincular Agora"; fill: Theme.primary; tone: Theme.primary-text; weight: 800; clicked => { CardapioStore.q-save(); } }
+        }
+    }
+}
+
+// ---------- Fornecedor completo ----------
+component SupplierFormSheet inherits Sheet {
+    panel-width: 560px;
+    icon: CardapioIcons.truck;
+    tone: Theme.available;
+    title: CardapioStore.sf-editing ? "Editar Fornecedor" : "Novo Fornecedor";
+    close => { CardapioStore.close-modal(); }
+    ScrollView {
+        VerticalLayout {
+            padding: 20px;
+            spacing: 8px;
+            ErrorBox { }
+            FieldLabel { text: "RAZÃO SOCIAL / NOME PRINCIPAL *"; }
+            LineEdit { height: 40px; placeholder-text: "Ex: Cervejaria Ambev S.A. ou Distribuidora Modelo"; text <=> CardapioStore.sf-name; }
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    FieldLabel { text: "NOME FANTASIA"; }
+                    LineEdit { height: 40px; placeholder-text: "Ex: Ambev Chopp"; text <=> CardapioStore.sf-trade; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    HorizontalLayout {
+                        FieldLabel { text: "CNPJ OU CPF"; horizontal-stretch: 1; }
+                        Text {
+                            text: CardapioStore.sf-cnpj-busy ? "Consultando..." : "Consultar CNPJ";
+                            color: Theme.available;
+                            font-size: 11px;
+                            font-weight: 800;
+                            TouchArea { clicked => { CardapioStore.sf-cnpj(); } }
+                        }
+                    }
+                    LineEdit { height: 40px; placeholder-text: "00.000.000/0000-00"; text <=> CardapioStore.sf-doc; }
+                }
+            }
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    FieldLabel { text: "TELEFONE / WHATSAPP"; }
+                    LineEdit { height: 40px; placeholder-text: "(11) 98888-7777"; text <=> CardapioStore.sf-phone; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    FieldLabel { text: "INSCRIÇÃO ESTADUAL (IE)"; }
+                    LineEdit { height: 40px; placeholder-text: "Ex: 123456789"; text <=> CardapioStore.sf-ie; }
+                }
+            }
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    FieldLabel { text: "E-MAIL"; }
+                    LineEdit { height: 40px; placeholder-text: "pedidos@fornecedor.com.br"; text <=> CardapioStore.sf-email; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    FieldLabel { text: "CONTATO / VENDEDOR"; }
+                    LineEdit { height: 40px; placeholder-text: "Ex: Carlos Representante"; text <=> CardapioStore.sf-contact; }
+                }
+            }
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    horizontal-stretch: 2;
+                    spacing: 4px;
+                    FieldLabel { text: "CIDADE"; }
+                    LineEdit { height: 40px; placeholder-text: "Ex: São Paulo"; text <=> CardapioStore.sf-city; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    FieldLabel { text: "UF"; }
+                    LineEdit { height: 40px; placeholder-text: "SP"; text <=> CardapioStore.sf-uf; }
+                }
+            }
+            FieldLabel { text: "ENDEREÇO"; }
+            LineEdit { height: 40px; placeholder-text: "Rua, número, bairro..."; text <=> CardapioStore.sf-address; }
+            FieldLabel { text: "OBSERVAÇÕES / CONDIÇÕES COMERCIAIS"; }
+            TextEdit { height: 64px; wrap: word-wrap; placeholder-text: "Ex: Entrega às terças-feiras. Pedido mínimo R$ 500. Boleto 28 dias."; text <=> CardapioStore.sf-notes; }
+            HorizontalLayout {
+                spacing: 8px;
+                padding-top: 6px;
+                Btn { horizontal-stretch: 1; text: "Cancelar"; clicked => { CardapioStore.close-modal(); } }
+                Btn {
+                    horizontal-stretch: 1;
+                    text: CardapioStore.sf-editing ? "Atualizar Fornecedor" : "Salvar Fornecedor";
+                    fill: Theme.available;
+                    tone: Theme.primary-text;
+                    weight: 800;
+                    clicked => { CardapioStore.sf-save(); }
+                }
+            }
+        }
+    }
+}
+
+// ---------- Cliente ----------
+component CustomerFormSheet inherits Sheet {
+    panel-width: 460px;
+    icon: Icons.users;
+    title: "Cadastrar Cliente";
+    close => { CardapioStore.close-modal(); }
+    VerticalLayout {
+        padding: 20px;
+        spacing: 8px;
+        ErrorBox { }
+        FieldLabel { text: "NOME COMPLETO *"; }
+        LineEdit { height: 42px; placeholder-text: "Ex: Carlos Eduardo"; text <=> CardapioStore.cf-name; }
+        FieldLabel { text: "TELEFONE / WHATSAPP"; }
+        LineEdit { height: 42px; placeholder-text: "(11) 98888-7777"; text <=> CardapioStore.cf-phone; }
+        FieldLabel { text: "DOCUMENTO CPF / CNPJ (OPCIONAL)"; }
+        LineEdit { height: 42px; placeholder-text: "000.000.000-00"; text <=> CardapioStore.cf-doc; }
+        HorizontalLayout {
+            spacing: 8px;
+            padding-top: 6px;
+            Btn { horizontal-stretch: 1; h: 44px; text: "Cancelar"; clicked => { CardapioStore.close-modal(); } }
+            Btn { horizontal-stretch: 1; h: 44px; text: "Salvar Cliente"; fill: Theme.primary; tone: Theme.primary-text; weight: 900; font-size: 13px; clicked => { CardapioStore.cf-save(); } }
+        }
+    }
+}
+
+component PayDebtSheet inherits Sheet {
+    panel-width: 420px;
+    icon: Icons.hand-coins;
+    tone: Theme.available;
+    title: "Receber Fiado";
+    subtitle: CardapioStore.pd-name + " · deve " + CardapioStore.pd-debt;
+    close => { CardapioStore.close-modal(); }
+    VerticalLayout {
+        padding: 20px;
+        spacing: 8px;
+        ErrorBox { }
+        FieldLabel { text: "VALOR RECEBIDO (R$)"; }
+        Field { big: true; prefix: "R$"; placeholder: "0,00"; text <=> CardapioStore.pd-amount; accepted => { CardapioStore.pd-save(); } }
+        HorizontalLayout {
+            spacing: 8px;
+            padding-top: 6px;
+            Btn { horizontal-stretch: 1; text: "Cancelar"; clicked => { CardapioStore.close-modal(); } }
+            Btn { horizontal-stretch: 1; text: "Registrar Pagamento"; fill: Theme.available; tone: Theme.primary-text; weight: 800; clicked => { CardapioStore.pd-save(); } }
+        }
+    }
+}
+
+// ---------- Adicionais e perguntas ----------
+component GroupCard inherits Rectangle {
+    in property <CdModGroup> data;
+    height: col.preferred-height;
+    opacity: root.data.inactive ? 0.6 : 1;
+    background: Theme.bg;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    col := HorizontalLayout {
+        padding: 14px;
+        spacing: 10px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 4px;
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; }
+                Pill { y: (parent.height - self.height) / 2; text: root.data.rule; tone: root.data.required ? Theme.primary : Theme.text-muted; }
+                if root.data.inactive: Text { text: "INATIVO"; color: Theme.text-muted; font-size: 10px; font-weight: 900; vertical-alignment: center; }
+            }
+            Text { text: root.data.options; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+            Text { text: root.data.usage; color: Theme.text-muted; font-size: 11px; }
+        }
+        Rectangle {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: e.has-hover ? Theme.primary.with-alpha(0.15) : transparent;
+            Icon { source: Icons.pencil; color: e.has-hover ? Theme.primary : Theme.text-muted; size: 16px; }
+            e := TouchArea { clicked => { CardapioStore.m-edit(root.data.id); } }
+        }
+        Rectangle {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: d.has-hover ? Theme.danger.with-alpha(0.15) : transparent;
+            Icon { source: Icons.trash-2; color: d.has-hover ? Theme.danger : Theme.text-muted; size: 16px; }
+            d := TouchArea { clicked => { CardapioStore.m-delete(root.data.id); } }
+        }
+    }
+}
+
+component OptionRow inherits HorizontalLayout {
+    in property <CdModOption> data;
+    in property <int> slot;
+    in property <bool> last;
+    spacing: 6px;
+    height: 42px;
+    VerticalLayout {
+        alignment: center;
+        Rectangle {
+            width: 22px;
+            height: 18px;
+            opacity: root.slot == 0 ? 0.3 : 1;
+            Icon { source: CardapioIcons.arrow-up; color: up.has-hover ? Theme.primary : Theme.text-muted; size: 13px; }
+            up := TouchArea { enabled: root.slot > 0; clicked => { CardapioStore.m-opt-move(root.slot, -1); } }
+        }
+        Rectangle {
+            width: 22px;
+            height: 18px;
+            opacity: root.last ? 0.3 : 1;
+            Icon { source: CardapioIcons.arrow-down; color: dn.has-hover ? Theme.primary : Theme.text-muted; size: 13px; }
+            dn := TouchArea { enabled: !root.last; clicked => { CardapioStore.m-opt-move(root.slot, 1); } }
+        }
+    }
+    LineEdit { horizontal-stretch: 1; placeholder-text: "Ex.: Bacon extra"; text: root.data.name; edited(t) => { CardapioStore.m-opt-name(root.slot, t); } }
+    Field { width: 120px; prefix: "+R$"; text: root.data.price; edited(t) => { CardapioStore.m-opt-price(root.slot, t); } }
+    HorizontalLayout {
+        spacing: 4px;
+        Check { y: (parent.height - self.height) / 2; checked: root.data.active; clicked => { CardapioStore.m-opt-active(root.slot, !root.data.active); } }
+        Text { text: "Ativa"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+    }
+    Rectangle {
+        width: 34px;
+        border-radius: 10px;
+        background: rm.has-hover ? Theme.danger.with-alpha(0.15) : transparent;
+        Icon { source: Icons.trash-2; color: rm.has-hover ? Theme.danger : Theme.text-muted; size: 16px; }
+        rm := TouchArea { clicked => { CardapioStore.m-opt-remove(root.slot); } }
+    }
+}
+
+component ModifiersSheet inherits Sheet {
+    panel-width: 820px;
+    panel-height: 660px;
+    icon: Icons.list-checks;
+    title: "Adicionais e Perguntas";
+    subtitle: "Ponto da carne, gelo e limão, adicionais pagos. Depois marque os grupos em cada produto.";
+    close => { CardapioStore.close-modal(); }
+    ScrollView {
+        vertical-stretch: 1;
+        VerticalLayout {
+            padding: 20px;
+            spacing: 10px;
+            ErrorBox { }
+            if CardapioStore.m-draft: VerticalLayout {
+                spacing: 10px;
+                HorizontalLayout {
+                    spacing: 10px;
+                    VerticalLayout {
+                        horizontal-stretch: 2;
+                        spacing: 4px;
+                        FieldLabel { text: "NOME DO GRUPO"; }
+                        LineEdit { height: 40px; placeholder-text: "Ex.: Ponto da carne"; text <=> CardapioStore.m-name; }
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 4px;
+                        FieldLabel { text: "MÁXIMO DE ESCOLHAS"; }
+                        LineEdit { height: 40px; input-type: number; text <=> CardapioStore.m-max; }
+                        Hint { text: "1 = escolha única · 0 = sem limite"; }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 18px;
+                    alignment: start;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Check { y: (parent.height - self.height) / 2; checked: CardapioStore.m-required; clicked => { CardapioStore.m-required = !CardapioStore.m-required; } }
+                        Text { text: "Pergunta obrigatória"; color: Theme.text; font-size: 13px; font-weight: 800; vertical-alignment: center; }
+                        Text { text: "(o garçom precisa escolher)"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                    }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Check { y: (parent.height - self.height) / 2; checked: CardapioStore.m-active; clicked => { CardapioStore.m-active = !CardapioStore.m-active; } }
+                        Text { text: "Grupo ativo"; color: Theme.text; font-size: 13px; font-weight: 800; vertical-alignment: center; }
+                    }
+                }
+                FieldLabel { text: "OPÇÕES"; }
+                for o[i] in CardapioStore.m-options: OptionRow { data: o; slot: i; last: i == CardapioStore.m-options.length - 1; opacity: o.active ? 1 : 0.6; }
+                Rectangle {
+                    height: 40px;
+                    border-radius: 12px;
+                    border-width: 1px;
+                    border-color: oa.has-hover ? Theme.primary : Theme.border;
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 6px;
+                        Icon { source: Icons.plus; color: Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
+                        Text { text: "Adicionar opção"; color: Theme.text-muted; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                    }
+                    oa := TouchArea { clicked => { CardapioStore.m-opt-add(); } }
+                }
+                Hint { text: "Preço 0 = sem custo. Opções vazias são ignoradas."; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+                    Btn { text: "Cancelar"; clicked => { CardapioStore.m-cancel(); } }
+                    Btn {
+                        text: CardapioStore.m-draft-new ? "Criar grupo" : "Salvar grupo";
+                        icon: Icons.check;
+                        has-icon: true;
+                        fill: Theme.primary;
+                        tone: Theme.primary-text;
+                        weight: 900;
+                        busy: CardapioStore.m-saving;
+                        clicked => { CardapioStore.m-save(); }
+                    }
+                }
+            }
+            if !CardapioStore.m-draft: HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                Btn { text: "Novo grupo"; icon: Icons.plus; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; clicked => { CardapioStore.m-new(); } }
+                Text { text: "ou comece de um modelo:"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                Btn { text: "Ponto da carne"; clicked => { CardapioStore.m-preset(0); } }
+                Btn { text: "Gelo e limão"; clicked => { CardapioStore.m-preset(1); } }
+                Btn { text: "Adicionais"; clicked => { CardapioStore.m-preset(2); } }
+            }
+            if !CardapioStore.m-draft && CardapioStore.m-loading: Text { text: "Carregando..."; color: Theme.text-muted; horizontal-alignment: center; }
+            if !CardapioStore.m-draft && !CardapioStore.m-loading && CardapioStore.m-groups.length == 0: Text {
+                text: "Nenhum grupo cadastrado ainda.";
+                color: Theme.text-muted;
+                font-size: 13px;
+                horizontal-alignment: center;
+            }
+            if !CardapioStore.m-draft: VerticalLayout {
+                spacing: 8px;
+                for g in CardapioStore.m-groups: GroupCard { data: g; }
+            }
+        }
+    }
+}
+
+// ---------- Promoções do dia ----------
+component DayChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked;
+    height: 32px;
+    width: t.preferred-width + 24px;
+    border-radius: 11px;
+    background: root.active ? Theme.primary : (touch.has-hover ? Theme.border : Theme.surface-2);
+    border-width: 1px;
+    border-color: root.active ? Theme.primary : Theme.border;
+    t := Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 800; }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component PromoCard inherits Rectangle {
+    in property <CdPromo> data;
+    height: col.preferred-height;
+    opacity: root.data.active ? 1 : 0.6;
+    background: Theme.bg;
+    border-radius: 16px;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    col := HorizontalLayout {
+        padding: 14px;
+        spacing: 10px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 4px;
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; }
+                if root.data.running: Pill { y: (parent.height - self.height) / 2; text: "AGORA"; tone: Theme.available; solid: true; }
+            }
+            Text { text: root.data.description; color: Theme.text; font-size: 12px; font-weight: 600; }
+            Text { text: root.data.targets; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+        }
+        Toggle { y: (parent.height - self.height) / 2; checked: root.data.active; toggled => { CardapioStore.p-toggle(root.data.id); } }
+        Rectangle {
+            width: 34px;
+            height: 34px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 10px;
+            background: e.has-hover ? Theme.primary.with-alpha(0.15) : transparent;
+            Icon { source: Icons.pencil; color: e.has-hover ? Theme.primary : Theme.text-muted; size: 16px; }
+            e := TouchArea { clicked => { CardapioStore.p-edit(root.data.id); } }
+        }
+        Rectangle {
+            width: 34px;
+            height: 34px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 10px;
+            background: d.has-hover ? Theme.danger.with-alpha(0.15) : transparent;
+            Icon { source: Icons.trash-2; color: d.has-hover ? Theme.danger : Theme.text-muted; size: 16px; }
+            d := TouchArea { clicked => { CardapioStore.p-delete(root.data.id); } }
+        }
+    }
+}
+
+component PromotionsSheet inherits Sheet {
+    panel-width: 820px;
+    panel-height: 680px;
+    icon: CardapioIcons.badge-percent;
+    tone: Theme.danger;
+    title: "Promoções do Dia";
+    subtitle: "Happy hour e preços especiais por dia da semana e horário. O desconto entra sozinho ao lançar o pedido.";
+    close => { CardapioStore.close-modal(); }
+    ScrollView {
+        vertical-stretch: 1;
+        VerticalLayout {
+            padding: 20px;
+            spacing: 10px;
+            ErrorBox { }
+            if CardapioStore.p-draft: VerticalLayout {
+                spacing: 10px;
+                FieldLabel { text: "NOME DA PROMOÇÃO"; }
+                LineEdit { height: 40px; placeholder-text: "Ex.: Happy Hour do Chopp"; text <=> CardapioStore.p-name; }
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        spacing: 4px;
+                        FieldLabel { text: "TIPO"; }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            DayChip { text: "% de desconto"; active: !CardapioStore.p-fixed; clicked => { CardapioStore.p-type(false); } }
+                            DayChip { text: "Preço fixo"; active: CardapioStore.p-fixed; clicked => { CardapioStore.p-type(true); } }
+                        }
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 4px;
+                        FieldLabel { text: CardapioStore.p-fixed ? "PREÇO PROMOCIONAL (R$)" : "DESCONTO (%)"; }
+                        LineEdit { height: 38px; placeholder-text: CardapioStore.p-fixed ? "Ex.: 9,90" : "Ex.: 25"; text <=> CardapioStore.p-value; edited => { CardapioStore.p-search-changed(); } }
+                    }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: end;
+                        Check { y: parent.height - self.height - 10px; checked: CardapioStore.p-active; clicked => { CardapioStore.p-active = !CardapioStore.p-active; } }
+                        Text { text: "Promoção ativa"; color: Theme.text; font-size: 13px; font-weight: 800; vertical-alignment: bottom; y: parent.height - self.height - 10px; }
+                    }
+                }
+                FieldLabel { text: "DIAS DA SEMANA"; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    for label[i] in ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]: DayChip {
+                        text: label;
+                        active: CardapioStore.p-days[i];
+                        clicked => { CardapioStore.p-day(i); }
+                    }
+                    Rectangle { width: 1px; background: Theme.border; }
+                    DayChip { text: "Todos"; clicked => { CardapioStore.p-all-days(); } }
+                    DayChip { text: "Fim de semana"; clicked => { CardapioStore.p-weekend(); } }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: start;
+                    VerticalLayout {
+                        width: 140px;
+                        spacing: 4px;
+                        FieldLabel { text: "INÍCIO"; }
+                        LineEdit { height: 38px; placeholder-text: "17:00"; text <=> CardapioStore.p-start; }
+                    }
+                    VerticalLayout {
+                        width: 140px;
+                        spacing: 4px;
+                        FieldLabel { text: "FIM"; }
+                        LineEdit { height: 38px; placeholder-text: "20:00"; text <=> CardapioStore.p-end; }
+                    }
+                }
+                Hint { text: "Fim menor que início = vira a noite, ex.: 18:00 às 02:00."; }
+                FieldLabel { text: "CATEGORIAS INTEIRAS"; }
+                Flickable {
+                    height: 34px;
+                    content-width: cats.preferred-width;
+                    cats := HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        for c in CardapioStore.p-categories: DayChip { text: c.label; active: c.selected; clicked => { CardapioStore.p-cat(c.id); } }
+                    }
+                }
+                FieldLabel { text: "PRODUTOS"; }
+                if CardapioStore.p-chosen.length > 0: Flickable {
+                    height: 30px;
+                    content-width: chosen.preferred-width;
+                    chosen := HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        for c in CardapioStore.p-chosen: Rectangle {
+                            height: 28px;
+                            width: cr.preferred-width + 20px;
+                            border-radius: 10px;
+                            background: Theme.primary.with-alpha(0.18);
+                            cr := HorizontalLayout {
+                                x: 10px;
+                                spacing: 4px;
+                                Text { text: c.label; color: Theme.primary; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                                Rectangle {
+                                    width: 18px;
+                                    Icon { source: Icons.x; color: Theme.primary; size: 13px; }
+                                    TouchArea { clicked => { CardapioStore.p-prod(c.id); } }
+                                }
+                            }
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    Icon { source: Icons.search; color: Theme.text-muted; size: 15px; y: (parent.height - self.height) / 2; }
+                    LineEdit {
+                        height: 38px;
+                        horizontal-stretch: 1;
+                        placeholder-text: "Buscar produto pelo nome ou código...";
+                        text <=> CardapioStore.p-search;
+                        edited => { CardapioStore.p-search-changed(); }
+                    }
+                }
+                if CardapioStore.p-results.length > 0: Rectangle {
+                    height: min(CardapioStore.p-results.length * 38px, 192px);
+                    border-radius: 12px;
+                    border-width: 1px;
+                    border-color: Theme.surface-2;
+                    clip: true;
+                    ListView {
+                        for r in CardapioStore.p-results: Rectangle {
+                            height: 38px;
+                            background: rt.has-hover ? Theme.surface-2 : transparent;
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 12px;
+                                spacing: 8px;
+                                Check { y: (parent.height - self.height) / 2; size: 18px; checked: r.selected; clicked => { CardapioStore.p-prod(r.id); } }
+                                Text { text: r.label; color: Theme.text; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
+                                Text { text: r.detail; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; vertical-alignment: center; }
+                            }
+                            rt := TouchArea { clicked => { CardapioStore.p-prod(r.id); } }
+                        }
+                    }
+                }
+                if CardapioStore.p-preview.length > 0: Rectangle {
+                    height: prev.preferred-height;
+                    border-radius: 16px;
+                    background: Theme.available.with-alpha(0.1);
+                    border-width: 1px;
+                    border-color: Theme.available.with-alpha(0.35);
+                    prev := VerticalLayout {
+                        padding: 12px;
+                        spacing: 3px;
+                        Text { text: CardapioStore.p-preview-title; color: Theme.available; font-size: 10px; font-weight: 900; }
+                        for p in CardapioStore.p-preview: Text {
+                            text: p.label;
+                            color: p.selected ? Theme.available : Theme.danger;
+                            font-size: 12px;
+                            font-weight: 600;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+                    Btn { text: "Cancelar"; clicked => { CardapioStore.p-cancel(); } }
+                    Btn {
+                        text: CardapioStore.p-draft-new ? "Criar promoção" : "Salvar promoção";
+                        icon: Icons.check;
+                        has-icon: true;
+                        fill: Theme.primary;
+                        tone: Theme.primary-text;
+                        weight: 900;
+                        busy: CardapioStore.p-saving;
+                        clicked => { CardapioStore.p-save(); }
+                    }
+                }
+            }
+            if !CardapioStore.p-draft: HorizontalLayout {
+                alignment: start;
+                Btn { text: "Nova promoção"; icon: Icons.plus; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; clicked => { CardapioStore.p-new(); } }
+            }
+            if !CardapioStore.p-draft && CardapioStore.p-loading: Text { text: "Carregando..."; color: Theme.text-muted; horizontal-alignment: center; }
+            if !CardapioStore.p-draft && !CardapioStore.p-loading && CardapioStore.p-list.length == 0: Text {
+                text: "Nenhuma promoção cadastrada ainda.";
+                color: Theme.text-muted;
+                font-size: 13px;
+                horizontal-alignment: center;
+            }
+            if !CardapioStore.p-draft: VerticalLayout {
+                spacing: 8px;
+                for p in CardapioStore.p-list: PromoCard { data: p; }
+            }
+        }
+    }
+}
+
+// ---------- Itens do cardápio digital ----------
+component MenuRowView inherits Rectangle {
+    in property <CdMenuRow> data;
+    height: col.preferred-height;
+    background: root.data.kind == 1 ? Theme.surface-2.with-alpha(0.55) : root.data.kind == 2 ? Theme.surface-2.with-alpha(0.25)
+        : root.data.kind == 3 && !root.data.selected ? Theme.bg.with-alpha(0.6) : transparent;
+    col := VerticalLayout {
+        // Comidas / Bebidas
+        if root.data.kind == 0: HorizontalLayout {
+            padding-top: 14px;
+            padding-bottom: 6px;
+            spacing: 8px;
+            Rectangle {
+                width: 28px;
+                height: 28px;
+                border-radius: 9px;
+                background: Theme.primary;
+                Icon { source: root.data.id == "food" ? Icons.utensils-crossed : Icons.beer; color: Theme.primary-text; size: 15px; }
+            }
+            Text { text: root.data.title; color: Theme.text; font-size: 13px; font-weight: 900; letter-spacing: 0.5px; vertical-alignment: center; }
+        }
+        // Categoria
+        if root.data.kind == 1: HorizontalLayout {
+            padding: 10px;
+            padding-left: 14px;
+            spacing: 8px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                Text { text: root.data.title; color: Theme.text; font-size: 13px; font-weight: 900; }
+                if root.data.subtitle != "": Text { text: root.data.subtitle; color: Theme.closing; font-size: 11px; font-weight: 600; wrap: word-wrap; }
+            }
+            Text {
+                text: root.data.action;
+                color: Theme.primary;
+                font-size: 12px;
+                font-weight: 800;
+                vertical-alignment: center;
+                TouchArea { clicked => { CardapioStore.d-toggle-many(1, root.data.id); } }
+            }
+        }
+        // Subgrupo
+        if root.data.kind == 2: HorizontalLayout {
+            padding: 6px;
+            padding-left: 14px;
+            padding-right: 10px;
+            spacing: 8px;
+            Text { text: root.data.title + "  " + root.data.subtitle; color: Theme.text-muted; font-size: 11px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+            Text {
+                text: root.data.action;
+                color: Theme.primary;
+                font-size: 11px;
+                font-weight: 800;
+                vertical-alignment: center;
+                TouchArea { clicked => { CardapioStore.d-toggle-many(2, root.data.id); } }
+            }
+        }
+        // Produto
+        if root.data.kind == 3: VerticalLayout {
+            HorizontalLayout {
+                padding: 8px;
+                padding-left: 14px;
+                spacing: 10px;
+                Check { y: (parent.height - self.height) / 2; size: 22px; checked: root.data.selected; clicked => { CardapioStore.d-toggle(root.data.id); } }
+                Rectangle {
+                    width: 46px;
+                    height: 46px;
+                    border-radius: 12px;
+                    background: Theme.surface-2;
+                    clip: true;
+                    if root.data.has-photo: Image { width: 100%; height: 100%; source: root.data.photo; image-fit: cover; }
+                    if !root.data.has-photo: Icon { source: CardapioIcons.image-off; color: Theme.text-muted; size: 16px; }
+                    TouchArea { clicked => { CardapioStore.d-expand(root.data.id); } }
+                }
+                Rectangle {
+                horizontal-stretch: 1;
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: root.data.title; color: root.data.selected ? Theme.text : Theme.text-muted; font-size: 13px; font-weight: 800; overflow: elide; }
+                    Text {
+                        text: root.data.subtitle;
+                        color: root.data.no-price ? Theme.danger : Theme.text-muted;
+                        font-size: 12px;
+                        font-weight: root.data.no-price ? 700 : 400;
+                        overflow: elide;
+                    }
+                }
+                    TouchArea { clicked => { CardapioStore.d-toggle(root.data.id); } }
+                }
+                Rectangle {
+                    width: ex.preferred-width + 16px;
+                    border-radius: 9px;
+                    background: et.has-hover ? Theme.surface-2 : transparent;
+                    ex := Text { text: "Foto e descrição " + (root.data.expanded ? "▴" : "▾"); color: Theme.text-muted; font-size: 12px; font-weight: 800; }
+                    et := TouchArea { clicked => { CardapioStore.d-expand(root.data.id); } }
+                }
+            }
+            if root.data.expanded: HorizontalLayout {
+                padding: 10px;
+                padding-left: 58px;
+                spacing: 14px;
+                Rectangle {
+                    width: 64px;
+                    height: 64px;
+                    border-radius: 12px;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    background: Theme.bg;
+                    clip: true;
+                    opacity: CardapioStore.d-photo-busy == root.data.id ? 0.5 : 1;
+                    if root.data.has-photo: Image { width: 100%; height: 100%; source: root.data.photo; image-fit: cover; }
+                    if !root.data.has-photo: Icon { source: Icons.utensils-crossed; color: Theme.text-muted; size: 20px; }
+                    TouchArea { clicked => { CardapioStore.d-photo(root.data.id); } }
+                }
+                VerticalLayout {
+                    spacing: 6px;
+                    Btn { text: root.data.has-photo ? "Trocar foto" : "Adicionar foto"; icon: CardapioIcons.image-plus; has-icon: true; busy: CardapioStore.d-photo-busy == root.data.id; clicked => { CardapioStore.d-photo(root.data.id); } }
+                    if root.data.has-photo: Btn { text: "Remover"; icon: Icons.trash-2; has-icon: true; tone: Theme.danger; clicked => { CardapioStore.d-remove-photo(root.data.id); } }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 6px;
+                    TextEdit {
+                        height: 58px;
+                        wrap: word-wrap;
+                        placeholder-text: "Descrição para o cliente (ingredientes, tamanho, quantas pessoas serve...)";
+                        text <=> CardapioStore.d-desc;
+                        edited => { CardapioStore.d-desc-edited(); }
+                    }
+                    HorizontalLayout {
+                        alignment: end;
+                        Btn { text: "Salvar descrição"; fill: Theme.text; tone: Theme.bg; weight: 900; enabled: CardapioStore.d-desc-changed; clicked => { CardapioStore.d-save-desc(root.data.id); } }
+                    }
+                }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.surface-2; }
+    }
+}
+
+component MenuItemsSheet inherits Sheet {
+    panel-width: 820px;
+    panel-height: 720px;
+    icon: Icons.qr-code;
+    title: "Itens do Cardápio Digital";
+    subtitle: "Marque o que aparece para o cliente. Clique na foto para adicionar foto e descrição.";
+    close => { CardapioStore.d-close(); }
+    VerticalLayout {
+        vertical-stretch: 1;
+        VerticalLayout {
+            padding: 18px;
+            padding-bottom: 10px;
+            spacing: 10px;
+            HorizontalLayout {
+                spacing: 6px;
+                Icon { source: Icons.search; color: Theme.text-muted; size: 15px; y: (parent.height - self.height) / 2; }
+                LineEdit { height: 40px; horizontal-stretch: 1; placeholder-text: "Buscar produto"; text <=> CardapioStore.d-search; edited => { CardapioStore.d-search-changed(); } }
+            }
+            HorizontalLayout {
+                spacing: 6px;
+                for f[i] in ["Todos", "No cardápio", "Fora do cardápio", "Sem foto"]: Rectangle {
+                    height: 30px;
+                    width: ft.preferred-width + 24px;
+                    border-radius: 15px;
+                    background: CardapioStore.d-filter == i ? Theme.primary : transparent;
+                    border-width: 1px;
+                    border-color: CardapioStore.d-filter == i ? Theme.primary : Theme.border;
+                    ft := Text { text: f; color: CardapioStore.d-filter == i ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 800; }
+                    TouchArea { clicked => { CardapioStore.d-filter-pick(i); } }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Text { text: CardapioStore.d-count; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.surface-2; }
+        if CardapioStore.d-not-menu-count > 0: Rectangle {
+            height: nm.preferred-height + 16px;
+            Rectangle {
+                x: 16px;
+                width: parent.width - 32px;
+                height: nm.preferred-height;
+                border-radius: 14px;
+                background: Theme.closing.with-alpha(0.1);
+                border-width: 1px;
+                border-color: Theme.closing.with-alpha(0.4);
+                nm := HorizontalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+                    Text { text: CardapioStore.d-not-menu; color: Theme.closing; font-size: 12px; wrap: word-wrap; horizontal-stretch: 1; vertical-alignment: center; }
+                    Btn { y: (parent.height - self.height) / 2; text: "Desmarcar esses " + CardapioStore.d-not-menu-count; fill: Theme.primary; tone: Theme.primary-text; weight: 900; clicked => { CardapioStore.d-uncheck-store(); } }
+                }
+            }
+        }
+        if CardapioStore.d-loading: Text { vertical-stretch: 1; text: "Carregando..."; color: Theme.text-muted; horizontal-alignment: center; vertical-alignment: center; }
+        if !CardapioStore.d-loading && CardapioStore.d-rows.length == 0: Text {
+            vertical-stretch: 1;
+            text: "Nenhum produto encontrado com esse filtro.";
+            color: Theme.text-muted;
+            font-size: 13px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        if !CardapioStore.d-loading && CardapioStore.d-rows.length > 0: ListView {
+            vertical-stretch: 1;
+            for r in CardapioStore.d-rows: HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                MenuRowView { horizontal-stretch: 1; data: r; }
+            }
+        }
+        Rectangle { height: 1px; background: Theme.surface-2; }
+        VerticalLayout {
+            padding: 16px;
+            spacing: 8px;
+            if CardapioStore.d-feedback != "": Text { text: CardapioStore.d-feedback; color: CardapioStore.d-error ? Theme.danger : Theme.available; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                Btn { text: "Fechar"; clicked => { CardapioStore.d-close(); } }
+                Btn {
+                    text: CardapioStore.d-changes > 0 ? "Salvar " + CardapioStore.d-changes + " alteração(ões)" : "Nada para salvar";
+                    fill: Theme.primary;
+                    tone: Theme.primary-text;
+                    weight: 900;
+                    enabled: CardapioStore.d-changes > 0;
+                    busy: CardapioStore.d-saving;
+                    clicked => { CardapioStore.d-save(); }
+                }
+            }
+        }
+    }
+}
+
+// ---------- Confirmação ----------
+component ConfirmSheet inherits Rectangle {
+    background: Theme.overlay;
+    TouchArea { }
+    Rectangle {
+        width: min(440px, root.width - 32px);
+        height: col.preferred-height;
+        background: Theme.surface;
+        border-radius: 22px;
+        border-width: 1px;
+        border-color: Theme.surface-2;
+        col := VerticalLayout {
+            padding: 22px;
+            spacing: 12px;
+            HorizontalLayout {
+                spacing: 10px;
+                Icon { source: Icons.triangle-alert; color: CardapioStore.confirm-danger ? Theme.danger : Theme.primary; size: 22px; y: (parent.height - self.height) / 2; }
+                Text { text: CardapioStore.confirm-title; color: Theme.text; font-size: 17px; font-weight: 900; wrap: word-wrap; horizontal-stretch: 1; }
+            }
+            Text { text: CardapioStore.confirm-text; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                Btn { text: "Cancelar"; clicked => { CardapioStore.confirm-no(); } }
+                Btn {
+                    text: CardapioStore.confirm-ok;
+                    fill: CardapioStore.confirm-danger ? Theme.danger : Theme.primary;
+                    tone: CardapioStore.confirm-danger ? #ffffff : Theme.primary-text;
+                    weight: 900;
+                    clicked => { CardapioStore.confirm-yes(); }
+                }
+            }
+        }
+    }
+}
+
+export component CardapioModals inherits Rectangle {
+    if CardapioStore.modal == CdModal.category: CategorySheet { }
+    if CardapioStore.modal == CdModal.history: HistorySheet { }
+    if CardapioStore.modal == CdModal.report: ReportSheet { }
+    if CardapioStore.modal == CdModal.ncm: NcmSheet { }
+    if CardapioStore.modal == CdModal.sheet: SheetModal { }
+    if CardapioStore.modal == CdModal.quick-supplier: QuickSupplierSheet { }
+    if CardapioStore.modal == CdModal.supplier-form: SupplierFormSheet { }
+    if CardapioStore.modal == CdModal.customer-form: CustomerFormSheet { }
+    if CardapioStore.modal == CdModal.pay-debt: PayDebtSheet { }
+    if CardapioStore.modal == CdModal.modifiers: ModifiersSheet { }
+    if CardapioStore.modal == CdModal.promotions: PromotionsSheet { }
+    if CardapioStore.modal == CdModal.menu-items: MenuItemsSheet { }
+    if CardapioStore.confirm-open: ConfirmSheet { }
+}

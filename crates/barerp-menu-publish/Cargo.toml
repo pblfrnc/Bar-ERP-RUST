@@ -1,0 +1,26 @@
+[package]
+name = "barerp-menu-publish"
+description = "Cardápio digital do BarERP: monta o cardápio público e publica no site do Netlify"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+barerp-db = { path = "../barerp-db" }
+chrono = "0.4.39"
+hex = "0.4.3"
+rand = "0.8.5"
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+sha2 = "0.10.8"
+thiserror = "2.0.11"
+tokio = { version = "1.43.0", features = ["macros", "rt", "sync", "time"] }
+tracing = "0.1.41"
+
+[dev-dependencies]
+barerp-core = { path = "../barerp-core" }
+sqlx = { version = "0.8.3", default-features = false, features = ["runtime-tokio", "sqlite"] }
+tokio = { version = "1.43.0", features = ["full"] }
+wiremock = "0.6.2"

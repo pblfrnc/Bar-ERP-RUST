@@ -1,0 +1,2189 @@
+// Modais da área Mesas & Salão, portados de TableDetailsModal, OpenTableModal, AddOrderModal,
+// ModifierPickerModal, CheckoutModal, TransferModal, MergeModal, OrderHistoryModal, ManageTablesModal e do
+// formulário "Adicionar Nova Mesa" do TablesView. Estado no global `MesasModalStore` (src/pages/mesas.rs).
+
+import { LineEdit, ComboBox, Switch } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons, Icon } from "../icons.slint";
+
+export enum MesasModal { none, details, open-table, add-order, modifiers, checkout, transfer, merge, history, manage, new-table, confirm, waiters, staff, connect }
+
+export struct DetailLine {
+    id: string,
+    quantity: string,        // "2x"
+    name: string,
+    kds: string,             // PENDING, PREPARING, READY, DELIVERED, "" (sem praça)
+    modifiers: string,
+    promotion: string,
+    notes: string,
+    unit-info: string,       // "R$ 8,00 cada • 🍺 Bar"
+    total: string,
+}
+
+export struct AddProduct {
+    id: string,
+    station: string,         // "Bar" / "Cozinha"
+    name: string,
+    description: string,
+    price: string,
+    base-price: string,      // preço cheio riscado quando há promoção
+    promotion: string,
+    has-options: bool,
+    has-box: bool,
+    box-label: string,       // "Cx 12x"
+    box-price: string,
+    unit-count: int,         // no carrinho
+    box-count: int,
+}
+
+export struct AddCart {
+    name: string,
+    is-box: bool,
+    box-label: string,
+    options: string,
+    promotion: string,
+    total: string,
+    quantity: int,
+    notes: string,
+}
+
+export struct Choice { id: string, label: string, detail: string, selected: bool }
+
+export struct PayLine { when: string, amount: string }
+
+export struct ModGroup {
+    name: string,
+    rule: string,            // "Obrigatório · escolha 1", "Opcional · até 3"
+    missing: bool,           // obrigatório ainda não respondido (fica vermelho)
+    options: [Choice],       // label = opção, detail = "+ R$ 4,00"
+}
+
+export struct SplitItem {
+    id: string,
+    name: string,
+    modifiers: string,
+    info: string,            // "2x R$ 8,00"
+    selected: int,
+}
+
+export struct HistoryRow {
+    id: string,
+    number: string,          // "#123"
+    place: string,           // "Mesa 4" / "Balcão / Direto"
+    when: string,            // "18/10 21:42"
+    info: string,            // "3 itens · Desc. R$ 2,00"
+    total: string,
+    loss: bool,              // Calote / Perda
+    selected: bool,
+}
+
+export struct ManageTable {
+    id: string,
+    number: int,
+    name: string,
+    capacity: int,
+    section: string,
+    free: bool,
+}
+
+export struct WaiterRow {
+    id: string,
+    name: string,
+    badge: string,           // código ou iniciais
+    code: string,
+    commission: string,      // "10%"
+    active: bool,
+}
+
+export struct StaffRow {
+    id: string,
+    name: string,
+    role: string,            // "Operador de Caixa / PDV"
+    perms: string,           // "Mesas & Salão · Caixa & PDV"
+    active: bool,
+}
+
+export struct PermItem { id: string, label: string, desc: string, on: bool }
+
+export struct ManageSection {
+    name: string,
+    tables: [ManageTable],
+}
+
+export global MesasModalStore {
+    in-out property <MesasModal> modal: MesasModal.none;
+    in property <string> error;
+    in property <bool> busy;
+
+    // ---- Detalhes da mesa ----
+    in property <string> d-title;            // "Mesa 4" ou nome
+    in property <string> d-order;            // "CMD #123"
+    in property <bool> d-closing;
+    in property <string> d-customer;         // "Mariana (3p)"
+    in property <string> d-waiter;
+    in property <string> d-elapsed;
+    in property <[DetailLine]> d-lines;
+    in property <string> d-total;
+    in property <bool> d-fee;
+    in property <string> d-haver;
+    in property <string> print-label: "Imprimir Conferência";
+    callback d-add-order();
+    callback d-transfer();
+    callback d-merge();
+    callback d-closing-toggle();
+    callback d-loss();
+    callback d-print();
+    callback d-checkout();
+    callback d-remove(string);
+
+    // ---- Abrir mesa ----
+    in property <string> o-title;            // "Abrir Mesa 4"
+    in property <string> o-section;
+    in-out property <int> o-people: 2;
+    in-out property <string> o-customer;
+    in property <[Choice]> o-waiters;
+    in-out property <string> o-waiter-id;
+    in-out property <bool> o-custom-waiter;
+    in-out property <string> o-waiter-name: "Garçom";
+    callback o-confirm();
+
+    // ---- Lançar pedido ----
+    in property <string> a-order;            // "Comanda #123"
+    in property <string> a-title;            // "Mesa 4 • Mariana"
+    in property <[Choice]> a-categories;
+    in-out property <string> a-category: "ALL";
+    in-out property <string> a-search;
+    in property <[AddProduct]> a-products;
+    in property <bool> a-loading;
+    in property <[AddCart]> a-cart;
+    in property <string> a-total: "R$ 0,00";
+    callback a-filter();
+    callback a-add-unit(string);
+    callback a-add-box(string);
+    callback a-qty(int, int);
+    callback a-notes(int, string);
+    callback a-chip(int, string);
+    callback a-clear();
+    callback a-send();
+
+    // ---- Adicionais ----
+    in property <string> m-product;
+    in property <string> m-price;
+    in property <[ModGroup]> m-groups;
+    callback m-toggle(int, int);
+    callback m-confirm();
+    callback m-cancel();
+
+    // ---- Fechar conta ----
+    in property <string> c-order;
+    in property <string> c-title;
+    in property <string> c-items: "Subtotal (0 itens):";
+    in property <string> c-subtotal;
+    in property <bool> c-fee-active;
+    in property <string> c-fee;
+    in-out property <string> c-discount;
+    in property <string> c-total;
+    in property <string> c-remaining;
+    in property <string> c-paid;             // "- R$ 20,00" ou ""
+    in property <[PayLine]> c-payments;
+    in-out property <string> c-split-mode: "simple";   // simple | items | amount
+    in property <int> c-split-count: 2;
+    in property <string> c-per-person;
+    in property <[SplitItem]> c-split-items;
+    in property <string> c-split-total;
+    in property <[int]> c-amount-shortcuts;
+    in property <string> c-amount-preview;   // "Abatendo R$ 20,00 → restará R$ 46,00"
+    in-out property <string> c-method: "PIX";
+    in property <[Choice]> c-customers;
+    in-out property <string> c-customer-id;
+    in-out property <string> c-new-customer;
+    in-out property <string> c-amount;
+    in-out property <string> c-cash;
+    in property <string> c-change;           // "" quando não há
+    in property <string> c-over-warning;     // aviso valor maior que o saldo
+    in property <string> c-partial-warning;  // aviso pagamento parcial
+    in property <string> c-button;           // texto do botão principal
+    in property <bool> c-partial;            // botão azul (parcial) ou verde (quitar)
+    in property <bool> c-success;
+    callback c-toggle-fee();
+    callback c-apply-discount();
+    callback c-set-split(string);
+    callback c-set-count(int);
+    callback c-item-qty(int, int);
+    callback c-shortcut(int);
+    callback c-all();
+    callback c-changed();
+    callback c-whatsapp();
+    callback c-confirm();
+
+    // ---- Transferir / Juntar ----
+    in property <string> t-title;
+    in property <string> t-hint;
+    in property <string> t-empty;
+    in property <[Choice]> t-choices;
+    in-out property <string> t-selected;
+    in property <string> t-button;
+    callback t-confirm();
+
+    // ---- Nova mesa ----
+    in-out property <string> n-number;
+    in-out property <string> n-name;
+    in-out property <int> n-capacity: 4;
+    in-out property <string> n-section: "Salão Principal";
+    in property <[string]> n-sections: ["Salão Principal", "Deck Externo", "Balcão", "Área VIP"];
+    callback n-confirm();
+
+    // ---- Confirmação (perda, cancelar item) ----
+    in property <string> q-title;
+    in property <string> q-message;
+    in property <string> q-button;
+    in property <bool> q-danger;
+    callback q-confirm();
+
+    // ---- Comandas finalizadas ----
+    in-out property <string> h-search;
+    in-out property <string> h-date;          // dd/mm/aaaa ou vazio
+    in property <[HistoryRow]> h-rows;
+    in property <int> h-total-count;
+    in property <bool> h-loading;
+    in property <bool> h-has-selection;
+    in property <string> h-place;
+    in property <string> h-number;
+    in property <string> h-when;
+    in property <string> h-waiter;
+    in property <string> h-customer;
+    in property <bool> h-loss;
+    in property <[DetailLine]> h-lines;
+    in property <string> h-subtotal;
+    in property <string> h-fee;
+    in property <string> h-discount;
+    in property <string> h-final;
+    in property <[PayLine]> h-payments;
+    callback h-filter();
+    callback h-refresh();
+    callback h-select(string);
+    callback h-date-quick(string);           // "today", "yesterday", "clear"
+    callback h-print();
+
+    // ---- Editar locais & mesas ----
+    in property <[ManageSection]> g-sections;
+    in property <[string]> g-section-options;     // setores existentes + "+ Criar Novo Setor..."
+    in property <string> g-success;
+    in-out property <string> g-editing-id;
+    in-out property <string> g-edit-number;
+    in-out property <string> g-edit-name;
+    in-out property <int> g-edit-capacity: 4;
+    in-out property <string> g-edit-section;
+    in-out property <string> g-renaming;
+    in-out property <string> g-rename-text;
+    in-out property <string> g-deleting-id;
+    in-out property <bool> g-adding;
+    in-out property <string> g-new-number;
+    in-out property <string> g-new-name;
+    in-out property <int> g-new-capacity: 4;
+    in-out property <string> g-new-section;
+    in-out property <string> g-new-custom;
+    callback g-save-edit();
+    callback g-confirm-rename();
+    callback g-delete(string);
+    callback g-add();
+
+    // ---- Garçons ----
+    in property <[WaiterRow]> w-list;
+    in property <bool> w-loading;
+    in-out property <string> w-name;
+    in-out property <string> w-code;
+    in-out property <string> w-commission: "10";
+    in-out property <string> w-editing-id;
+    in-out property <string> w-deleting-id;
+    callback w-save();
+    callback w-edit(string);
+    callback w-cancel();
+    callback w-toggle(string);
+    callback w-delete(string);
+
+    // ---- Funcionários ----
+    in property <[StaffRow]> s-list;
+    in property <[string]> s-roles: ["Administrador (Acesso Total)", "Gerente de Turno", "Operador de Caixa / PDV", "Atendente / Garçom", "Cozinha / Bar KDS", "Estoquista / Compras"];
+    in-out property <string> s-role: "Operador de Caixa / PDV";
+    in-out property <string> s-name;
+    in-out property <string> s-password;
+    in-out property <bool> s-active: true;
+    in property <[PermItem]> s-perms;
+    in-out property <string> s-editing-id;
+    in-out property <string> s-deleting-id;
+    callback s-save();
+    callback s-edit(string);
+    callback s-cancel();
+    callback s-delete(string);
+    callback s-preset(string);
+    callback s-toggle-perm(int);
+
+    // ---- Conectar celular ----
+    in property <image> x-qr;
+    in property <string> x-url;
+    in property <[string]> x-ips;
+    in property <string> x-status;
+
+    callback close();
+}
+
+// ---------- Peças visuais ----------
+
+component Pill inherits Rectangle {
+    in property <string> text;
+    in property <color> tone;
+    height: 20px;
+    width: t.preferred-width + 14px;
+    border-radius: 6px;
+    background: root.tone.with-alpha(0.15);
+    border-width: 1px;
+    border-color: root.tone.with-alpha(0.35);
+    t := Text { text: root.text; color: root.tone; font-size: 10px; font-weight: 800; }
+}
+
+component Btn inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon: false;
+    in property <color> tone: Theme.text;
+    in property <color> fill: Theme.surface-2;
+    in property <bool> enabled: true;
+    in property <length> font-size: 12px;
+    in property <int> weight: 700;
+    callback clicked;
+    min-height: 36px;
+    min-width: row.preferred-width + 24px;
+    border-radius: 12px;
+    opacity: root.enabled ? 1 : 0.5;
+    background: touch.has-hover && root.enabled ? root.fill.brighter(Theme.dark ? 0.25 : -0.06) : root.fill;
+    border-width: root.fill == Theme.surface-2 ? 1px : 0px;
+    border-color: Theme.border;
+    row := HorizontalLayout {
+        alignment: center;
+        spacing: 6px;
+        if root.has-icon: Icon { source: root.icon; color: root.tone; size: 15px; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: root.tone; font-size: root.font-size; font-weight: root.weight; vertical-alignment: center; }
+    }
+    touch := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+}
+
+component CloseX inherits Rectangle {
+    callback clicked;
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    background: touch.has-hover ? Theme.border : Theme.surface-2;
+    Icon { source: Icons.x; color: Theme.text-muted; size: 18px; }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component Label inherits Text {
+    color: Theme.text-muted;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+// Janela com cabeçalho (selo + título), corpo e rodapé
+component Sheet inherits Rectangle {
+    in property <length> panel-width: 640px;
+    in property <length> panel-height: 0px;      // 0 = altura do conteúdo
+    in property <string> tag;
+    in property <color> tag-tone: Theme.primary;
+    in property <string> caption;
+    in property <string> title;
+    callback close();
+    background: Theme.overlay;
+    TouchArea { }
+    panel := Rectangle {
+        width: min(root.panel-width, root.width - 24px);
+        height: root.panel-height > 0 ? min(root.panel-height, root.height - 24px) : min(content.preferred-height, root.height - 24px);
+        background: Theme.surface;
+        border-radius: 24px;
+        border-width: 1px;
+        border-color: Theme.surface-2;
+        clip: true;
+        content := VerticalLayout {
+            Rectangle {
+                background: Theme.surface-2.with-alpha(0.35);
+                height: head.preferred-height;
+                head := HorizontalLayout {
+                    padding: 16px;
+                    padding-left: 22px;
+                    spacing: 10px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 2px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            if root.tag != "": Pill { text: root.tag; tone: root.tag-tone; }
+                            if root.caption != "": Text { text: root.caption; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                        }
+                        Text { text: root.title; color: Theme.text; font-size: 22px; font-weight: 900; overflow: elide; }
+                    }
+                    CloseX { y: (parent.height - self.height) / 2; clicked => { root.close(); } }
+                }
+            }
+            @children
+        }
+    }
+}
+
+// ---------- Detalhes da mesa (TableDetailsModal) ----------
+
+component KdsBadge inherits Rectangle {
+    in property <string> status;
+    property <color> tone: status == "PREPARING" ? Theme.orange : status == "READY" ? Theme.available : status == "DELIVERED" ? Theme.text-muted : Theme.closing;
+    visible: status != "";
+    height: 20px;
+    width: status == "" ? 0px : label.preferred-width + 32px;
+    border-radius: 10px;
+    background: tone.with-alpha(0.18);
+    HorizontalLayout {
+        alignment: center;
+        spacing: 3px;
+        if root.status != "DELIVERED": Icon {
+            source: root.status == "PREPARING" ? Icons.flame : root.status == "READY" ? Icons.circle-check : Icons.hourglass;
+            color: root.tone;
+            size: 11px;
+            y: (parent.height - self.height) / 2;
+        }
+        label := Text {
+            text: root.status == "PREPARING" ? "Em Preparo" : root.status == "READY" ? "Pronto!" : root.status == "DELIVERED" ? "Entregue" : "Fila";
+            color: root.tone;
+            font-size: 10px;
+            font-weight: 800;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component DetailsSheet inherits Sheet {
+    panel-width: 920px;
+    panel-height: 780px;
+    title: MesasModalStore.d-title;
+    close => { MesasModalStore.close(); }
+
+    // Linha de informações
+    HorizontalLayout {
+        padding-left: 22px;
+        padding-right: 22px;
+        padding-top: 4px;
+        padding-bottom: 8px;
+        spacing: 8px;
+        alignment: start;
+        Pill { text: MesasModalStore.d-order; tone: Theme.text-muted; }
+        if MesasModalStore.d-closing: Pill { text: "Em Fechamento"; tone: Theme.closing; }
+        Icon { source: Icons.user; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
+        Text { text: MesasModalStore.d-customer; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+        Text { text: "•"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+        Icon { source: Icons.utensils; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
+        Text { text: MesasModalStore.d-waiter; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+        if MesasModalStore.d-elapsed != "": HorizontalLayout {
+            spacing: 4px;
+            Icon { source: Icons.clock; color: Theme.primary; size: 13px; y: (parent.height - self.height) / 2; }
+            Text { text: MesasModalStore.d-elapsed; color: Theme.primary; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+        }
+    }
+
+    // Ações rápidas
+    Rectangle {
+        background: Theme.bg.with-alpha(0.6);
+        height: actions.preferred-height;
+        actions := HorizontalLayout {
+            padding: 10px;
+            padding-left: 22px;
+            spacing: 8px;
+            alignment: start;
+            Btn { text: "Lançar Pedido"; icon: Icons.plus; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; clicked => { MesasModalStore.d-add-order(); } }
+            Btn { text: "Transferir Mesa"; icon: Icons.arrow-right-left; has-icon: true; clicked => { MesasModalStore.d-transfer(); } }
+            Btn { text: "Juntar Mesa"; icon: Icons.merge; has-icon: true; clicked => { MesasModalStore.d-merge(); } }
+            Btn {
+                text: MesasModalStore.d-closing ? "Reabrir Mesa" : "Pedir Pré-Conta";
+                icon: Icons.receipt-text;
+                has-icon: !MesasModalStore.d-closing;
+                tone: Theme.closing;
+                clicked => { MesasModalStore.d-closing-toggle(); }
+            }
+            Btn { text: "Perda (Calote)"; icon: Icons.triangle-alert; has-icon: true; tone: Theme.danger; clicked => { MesasModalStore.d-loss(); } }
+            Btn { text: MesasModalStore.print-label; icon: Icons.printer; has-icon: true; clicked => { MesasModalStore.d-print(); } }
+        }
+    }
+
+    // Itens consumidos
+    VerticalLayout {
+        vertical-stretch: 1;
+        padding: 16px;
+        padding-left: 22px;
+        padding-right: 22px;
+        spacing: 8px;
+        HorizontalLayout {
+            Label { text: "ITENS CONSUMIDOS (" + MesasModalStore.d-lines.length + ")"; horizontal-stretch: 1; }
+            Label { text: "TOTAL"; }
+        }
+        if MesasModalStore.d-lines.length == 0: Text {
+            vertical-stretch: 1;
+            text: "Nenhum item consumido ainda nesta comanda.";
+            color: Theme.text-muted;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        Flickable {
+            vertical-stretch: 1;
+            content-height: list.preferred-height;
+            list := VerticalLayout {
+                alignment: start;
+                spacing: 8px;
+                for line in MesasModalStore.d-lines: Rectangle {
+                    border-radius: 16px;
+                    background: Theme.bg;
+                    border-width: 1px;
+                    border-color: Theme.surface-2;
+                    height: item-row.preferred-height;
+                    item-row := HorizontalLayout {
+                        padding: 12px;
+                        spacing: 10px;
+                        Rectangle {
+                            width: qty.preferred-width + 16px;
+                            height: 24px;
+                            border-radius: 8px;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            qty := Text { text: line.quantity; color: Theme.primary; font-size: 13px; font-weight: 900; }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 2px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                Text { text: line.name; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
+                                KdsBadge { status: line.kds; }
+                            }
+                            if line.modifiers != "": Text { text: line.modifiers; color: Theme.occupied; font-size: 12px; font-weight: 600; wrap: word-wrap; }
+                            if line.promotion != "": Text { text: line.promotion; color: Theme.danger; font-size: 11px; font-weight: 800; }
+                            if line.notes != "": Text { text: "Obs: " + line.notes; color: Theme.closing; font-size: 12px; font-italic: true; wrap: word-wrap; }
+                            Text { text: line.unit-info; color: Theme.text-muted; font-size: 11px; }
+                        }
+                        Text { text: line.total; color: Theme.text; font-size: 14px; font-weight: 900; vertical-alignment: center; }
+                        Rectangle {
+                            width: 32px;
+                            height: 32px;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: 8px;
+                            background: trash.has-hover ? Theme.danger.with-alpha(0.15) : transparent;
+                            Icon { source: Icons.trash-2; color: trash.has-hover ? Theme.danger : Theme.text-muted; size: 16px; }
+                            trash := TouchArea { clicked => { MesasModalStore.d-remove(line.id); } }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Rodapé com total
+    Rectangle {
+        background: Theme.surface-2.with-alpha(0.35);
+        height: foot.preferred-height;
+        foot := HorizontalLayout {
+            padding: 16px;
+            padding-left: 22px;
+            spacing: 10px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Label { text: "TOTAL ACUMULADO"; vertical-alignment: center; }
+                    if MesasModalStore.d-fee: Pill { text: "10% incluso"; tone: Theme.closing; }
+                }
+                Text { text: MesasModalStore.d-total; color: Theme.available; font-size: 26px; font-weight: 900; }
+                if MesasModalStore.d-haver != "": Text { text: MesasModalStore.d-haver; color: Theme.occupied; font-size: 12px; font-weight: 800; }
+            }
+            Btn {
+                y: (parent.height - self.height) / 2;
+                min-height: 48px;
+                text: "FECHAR CONTA / PDV";
+                icon: Icons.dollar-sign;
+                has-icon: true;
+                fill: Theme.available;
+                tone: Theme.primary-text;
+                font-size: 14px;
+                weight: 900;
+                clicked => { MesasModalStore.d-checkout(); }
+            }
+        }
+    }
+}
+
+// ---------- Abrir mesa (OpenTableModal) ----------
+
+component OpenTableSheet inherits Sheet {
+    panel-width: 480px;
+    tag: "NOVA OCUPAÇÃO";
+    tag-tone: Theme.available;
+    caption: MesasModalStore.o-section;
+    title: MesasModalStore.o-title;
+    close => { MesasModalStore.close(); }
+
+    VerticalLayout {
+        padding: 22px;
+        spacing: 14px;
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            Icon { source: Icons.users; color: Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
+            Label { text: "QUANTIDADE DE PESSOAS:"; vertical-alignment: center; }
+            Text { text: MesasModalStore.o-people; color: Theme.primary; font-size: 13px; font-weight: 900; vertical-alignment: center; }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            for n in [1, 2, 3, 4, 5, 6, 8, 10]: Rectangle {
+                height: 40px;
+                horizontal-stretch: 1;
+                border-radius: 12px;
+                background: MesasModalStore.o-people == n ? Theme.primary : (pt.has-hover ? Theme.border : Theme.surface-2);
+                Text { text: n; color: MesasModalStore.o-people == n ? Theme.primary-text : Theme.text; font-weight: 900; }
+                pt := TouchArea { clicked => { MesasModalStore.o-people = n; } }
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            Icon { source: Icons.user; color: Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
+            Label { text: "NOME DO CLIENTE (OPCIONAL)"; vertical-alignment: center; }
+        }
+        LineEdit { height: 42px; placeholder-text: "Ex: Carlos, Família Souza..."; text <=> MesasModalStore.o-customer; accepted => { MesasModalStore.o-confirm(); } }
+        HorizontalLayout {
+            spacing: 6px;
+            Icon { source: Icons.utensils; color: Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
+            Label { text: "GARÇOM RESPONSÁVEL"; vertical-alignment: center; horizontal-stretch: 1; }
+            if MesasModalStore.o-waiters.length > 0: Text {
+                text: MesasModalStore.o-custom-waiter ? "Selecionar da Lista" : "Digitar Outro";
+                color: Theme.primary;
+                font-size: 12px;
+                font-weight: 700;
+                TouchArea { clicked => { MesasModalStore.o-custom-waiter = !MesasModalStore.o-custom-waiter; } }
+            }
+        }
+        if MesasModalStore.o-waiters.length > 0 && !MesasModalStore.o-custom-waiter: Flickable {
+            height: min(132px, ceil(MesasModalStore.o-waiters.length / 2) * 46px);
+            content-height: ceil(MesasModalStore.o-waiters.length / 2) * 46px;
+            for w[i] in MesasModalStore.o-waiters: Rectangle {
+                x: mod(i, 2) * (parent.width / 2);
+                y: floor(i / 2) * 46px;
+                width: parent.width / 2 - 6px;
+                height: 40px;
+                border-radius: 12px;
+                background: MesasModalStore.o-waiter-id == w.id ? Theme.primary.with-alpha(0.18) : Theme.surface-2;
+                border-width: 1px;
+                border-color: MesasModalStore.o-waiter-id == w.id ? Theme.primary : Theme.surface-2;
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 10px;
+                    Text { text: w.label; color: Theme.text; font-weight: 700; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                    if MesasModalStore.o-waiter-id == w.id: Icon { source: Icons.check; color: Theme.primary; size: 16px; y: (parent.height - self.height) / 2; }
+                }
+                TouchArea { clicked => { MesasModalStore.o-waiter-id = w.id; MesasModalStore.o-waiter-name = w.label; } }
+            }
+        }
+        if MesasModalStore.o-waiters.length == 0 || MesasModalStore.o-custom-waiter: LineEdit {
+            height: 42px;
+            placeholder-text: "Nome do garçom";
+            text <=> MesasModalStore.o-waiter-name;
+        }
+        if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 8px;
+            Btn { horizontal-stretch: 1; text: "Cancelar"; clicked => { MesasModalStore.close(); } }
+            Btn { horizontal-stretch: 2; text: "Abrir Mesa"; icon: Icons.check; has-icon: true; fill: Theme.available; tone: Theme.primary-text; weight: 900; enabled: !MesasModalStore.busy; clicked => { MesasModalStore.o-confirm(); } }
+        }
+    }
+}
+
+// ---------- Transferir / Juntar (TransferModal, MergeModal) ----------
+
+component TableChoiceSheet inherits Sheet {
+    panel-width: 560px;
+    title: MesasModalStore.t-title;
+    close => { MesasModalStore.close(); }
+    VerticalLayout {
+        padding: 22px;
+        spacing: 12px;
+        Text { text: MesasModalStore.t-hint; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
+        if MesasModalStore.t-choices.length == 0: Rectangle {
+            height: 90px;
+            border-radius: 14px;
+            background: Theme.bg;
+            Text { text: MesasModalStore.t-empty; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; horizontal-alignment: center; width: parent.width - 32px; }
+        }
+        if MesasModalStore.t-choices.length > 0: Flickable {
+            height: min(300px, ceil(MesasModalStore.t-choices.length / 4) * 76px);
+            content-height: ceil(MesasModalStore.t-choices.length / 4) * 76px;
+            for c[i] in MesasModalStore.t-choices: Rectangle {
+                x: mod(i, 4) * (parent.width / 4);
+                y: floor(i / 4) * 76px;
+                width: parent.width / 4 - 8px;
+                height: 68px;
+                border-radius: 14px;
+                background: MesasModalStore.t-selected == c.id ? Theme.primary.with-alpha(0.2) : (ct.has-hover ? Theme.border : Theme.surface-2);
+                border-width: 1px;
+                border-color: MesasModalStore.t-selected == c.id ? Theme.primary : Theme.surface-2;
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: c.label; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-alignment: center; overflow: elide; }
+                    if c.detail != "": Text { text: c.detail; color: Theme.text-muted; font-size: 11px; horizontal-alignment: center; overflow: elide; }
+                }
+                ct := TouchArea { clicked => { MesasModalStore.t-selected = c.id; } }
+            }
+        }
+        if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 8px;
+            Btn { horizontal-stretch: 1; text: "Cancelar"; clicked => { MesasModalStore.close(); } }
+            Btn {
+                horizontal-stretch: 2;
+                text: MesasModalStore.busy ? "Aguarde..." : MesasModalStore.t-button;
+                fill: Theme.primary;
+                tone: Theme.primary-text;
+                weight: 900;
+                enabled: MesasModalStore.t-selected != "" && !MesasModalStore.busy;
+                clicked => { MesasModalStore.t-confirm(); }
+            }
+        }
+    }
+}
+
+// ---------- Nova mesa (formulário do TablesView) ----------
+
+component NewTableSheet inherits Sheet {
+    panel-width: 460px;
+    title: "Adicionar Nova Mesa";
+    close => { MesasModalStore.close(); }
+    VerticalLayout {
+        padding: 22px;
+        spacing: 10px;
+        Label { text: "NÚMERO DA MESA *"; }
+        LineEdit { height: 42px; placeholder-text: "Ex: 13"; input-type: number; text <=> MesasModalStore.n-number; }
+        Label { text: "NOME / IDENTIFICAÇÃO (OPCIONAL)"; }
+        LineEdit { height: 42px; placeholder-text: "Ex: Mesa 13, Bistrô 01, VIP 02"; text <=> MesasModalStore.n-name; }
+        Label { text: "CAPACIDADE (LUGARES)"; }
+        HorizontalLayout {
+            spacing: 6px;
+            for n in [2, 4, 6, 8, 10, 12]: Rectangle {
+                height: 38px;
+                horizontal-stretch: 1;
+                border-radius: 10px;
+                background: MesasModalStore.n-capacity == n ? Theme.primary : (cap.has-hover ? Theme.border : Theme.surface-2);
+                Text { text: n; color: MesasModalStore.n-capacity == n ? Theme.primary-text : Theme.text; font-weight: 800; }
+                cap := TouchArea { clicked => { MesasModalStore.n-capacity = n; } }
+            }
+        }
+        Label { text: "AMBIENTE / ÁREA"; }
+        ComboBox { height: 42px; model: MesasModalStore.n-sections; current-value <=> MesasModalStore.n-section; }
+        if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
+        HorizontalLayout {
+            padding-top: 6px;
+            spacing: 8px;
+            Btn { horizontal-stretch: 1; text: "Cancelar"; clicked => { MesasModalStore.close(); } }
+            Btn { horizontal-stretch: 1; text: "Criar Mesa"; fill: Theme.primary; tone: Theme.primary-text; weight: 900; enabled: !MesasModalStore.busy; clicked => { MesasModalStore.n-confirm(); } }
+        }
+    }
+}
+
+// ---------- Confirmação ----------
+
+component ConfirmSheet inherits Sheet {
+    panel-width: 480px;
+    title: MesasModalStore.q-title;
+    close => { MesasModalStore.close(); }
+    VerticalLayout {
+        padding: 22px;
+        spacing: 14px;
+        Text { text: MesasModalStore.q-message; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+        if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 8px;
+            Btn { horizontal-stretch: 1; text: "Voltar"; clicked => { MesasModalStore.close(); } }
+            Btn {
+                horizontal-stretch: 1;
+                text: MesasModalStore.q-button;
+                fill: MesasModalStore.q-danger ? Theme.danger : Theme.primary;
+                tone: MesasModalStore.q-danger ? #ffffff : Theme.primary-text;
+                weight: 900;
+                enabled: !MesasModalStore.busy;
+                clicked => { MesasModalStore.q-confirm(); }
+            }
+        }
+    }
+}
+
+
+// ---------- Lançar pedido (AddOrderModal) ----------
+
+component CategoryChip inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> active;
+    callback clicked;
+    height: 32px;
+    width: row.preferred-width + 22px;
+    border-radius: 11px;
+    background: root.active ? Theme.primary : (touch.has-hover ? Theme.border : Theme.surface);
+    border-width: root.active ? 0px : 1px;
+    border-color: Theme.surface-2;
+    row := HorizontalLayout {
+        alignment: center;
+        spacing: 5px;
+        Icon { source: root.icon; color: root.active ? Theme.primary-text : Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component ProductCard inherits Rectangle {
+    in property <AddProduct> p;
+    callback unit();
+    callback box();
+    property <int> in-cart: p.unit-count + p.box-count;
+    border-radius: 16px;
+    background: in-cart > 0 ? Theme.primary.with-alpha(0.10) : (card-touch.has-hover ? Theme.surface-2.with-alpha(0.6) : Theme.bg);
+    border-width: 1px;
+    border-color: in-cart > 0 ? Theme.primary.with-alpha(0.6) : Theme.surface-2;
+    card-touch := TouchArea { clicked => { if (!root.p.has-box) { root.unit(); } } }
+    VerticalLayout {
+        padding: 10px;
+        spacing: 3px;
+        HorizontalLayout {
+            Icon { source: p.station == "Bar" ? Icons.beer : Icons.chef-hat; color: Theme.text-muted; size: 11px; y: (parent.height - self.height) / 2; }
+            Text { text: p.station == "Bar" ? " BAR" : " COZINHA"; color: Theme.text-muted; font-size: 10px; font-weight: 800; horizontal-stretch: 1; }
+            if root.in-cart > 0: Rectangle {
+                height: 18px;
+                width: badge.preferred-width + 12px;
+                border-radius: 9px;
+                background: Theme.primary;
+                badge := Text { text: root.in-cart + "x"; color: Theme.primary-text; font-size: 10px; font-weight: 900; }
+            }
+        }
+        Text { text: p.name; color: Theme.text; font-size: 13px; font-weight: 800; wrap: word-wrap; overflow: elide; max-height: 36px; }
+        if p.promotion != "": HorizontalLayout {
+            alignment: start;
+            Rectangle {
+                height: 18px;
+                width: promo.preferred-width + 26px;
+                border-radius: 5px;
+                background: Theme.danger.with-alpha(0.15);
+                HorizontalLayout {
+                    x: 5px;
+                    spacing: 3px;
+                    Icon { source: Icons.tag; color: Theme.danger; size: 10px; y: (parent.height - self.height) / 2; }
+                    promo := Text { text: p.promotion; color: Theme.danger; font-size: 10px; font-weight: 900; vertical-alignment: center; }
+                }
+            }
+        }
+        if p.has-options: Text { text: "Com opções / adicionais"; color: Theme.occupied; font-size: 10px; font-weight: 700; }
+        if p.description != "": Text { text: p.description; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+        Rectangle { vertical-stretch: 1; }
+        Rectangle { height: 1px; background: Theme.surface-2; }
+        if !p.has-box: HorizontalLayout {
+            VerticalLayout {
+                horizontal-stretch: 1;
+                if p.base-price != "": Text { text: p.base-price; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
+                Text { text: p.price; color: Theme.primary; font-size: 14px; font-weight: 900; }
+            }
+            Rectangle {
+                width: 28px;
+                height: 28px;
+                y: (parent.height - self.height) / 2;
+                border-radius: 8px;
+                background: card-touch.has-hover ? Theme.primary : Theme.primary.with-alpha(0.2);
+                Icon { source: Icons.plus; color: card-touch.has-hover ? Theme.primary-text : Theme.primary; size: 16px; }
+            }
+        }
+        if p.has-box: HorizontalLayout {
+            spacing: 4px;
+            Rectangle {
+                horizontal-stretch: 1;
+                height: 46px;
+                border-radius: 11px;
+                background: u.has-hover ? Theme.primary : Theme.surface;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: "UNIDADE"; color: u.has-hover ? Theme.primary-text : Theme.text-muted; font-size: 9px; font-weight: 800; horizontal-alignment: center; }
+                    Text { text: p.price; color: u.has-hover ? Theme.primary-text : Theme.available; font-size: 12px; font-weight: 900; horizontal-alignment: center; }
+                    if p.unit-count > 0: Text { text: "(" + p.unit-count + "x)"; color: u.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 800; horizontal-alignment: center; }
+                }
+                u := TouchArea { clicked => { root.unit(); } }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+                height: 46px;
+                border-radius: 11px;
+                background: b.has-hover ? Theme.primary : Theme.primary.with-alpha(0.12);
+                border-width: 1px;
+                border-color: Theme.primary.with-alpha(0.3);
+                VerticalLayout {
+                    alignment: center;
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 3px;
+                        Icon { source: Icons.package; color: b.has-hover ? Theme.primary-text : Theme.closing; size: 10px; y: (parent.height - self.height) / 2; }
+                        Text { text: p.box-label; color: b.has-hover ? Theme.primary-text : Theme.closing; font-size: 9px; font-weight: 900; }
+                    }
+                    Text { text: p.box-price; color: b.has-hover ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 900; horizontal-alignment: center; }
+                    if p.box-count > 0: Text { text: "(" + p.box-count + " cx)"; color: b.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 900; horizontal-alignment: center; }
+                }
+                b := TouchArea { clicked => { root.box(); } }
+            }
+        }
+    }
+}
+
+component AddOrderSheet inherits Sheet {
+    panel-width: 1180px;
+    panel-height: 900px;
+    tag: "LANÇAMENTO DE PEDIDO";
+    tag-tone: Theme.occupied;
+    caption: MesasModalStore.a-order;
+    title: MesasModalStore.a-title;
+    close => { MesasModalStore.close(); }
+
+    property <length> tile-w: 172px;
+    property <length> tile-h: 176px;
+
+    HorizontalLayout {
+        vertical-stretch: 1;
+        // Catálogo
+        VerticalLayout {
+            horizontal-stretch: 1;
+            Rectangle {
+                background: Theme.bg.with-alpha(0.5);
+                height: filters.preferred-height;
+                filters := VerticalLayout {
+                    padding: 14px;
+                    spacing: 10px;
+                    LineEdit {
+                        height: 40px;
+                        placeholder-text: "Buscar produto (ex: chope, batata, caipirinha)...";
+                        text <=> MesasModalStore.a-search;
+                        edited => { MesasModalStore.a-filter(); }
+                    }
+                    Flickable {
+                        height: 32px;
+                        content-width: cats.preferred-width;
+                        cats := HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            CategoryChip {
+                                text: "Todos os Itens";
+                                icon: Icons.sparkles;
+                                active: MesasModalStore.a-category == "ALL";
+                                clicked => { MesasModalStore.a-category = "ALL"; MesasModalStore.a-filter(); }
+                            }
+                            for c in MesasModalStore.a-categories: CategoryChip {
+                                text: c.label;
+                                icon: c.detail == "Beer" ? Icons.beer : c.detail == "Wine" ? Icons.wine : c.detail == "Flame" ? Icons.flame
+                                    : c.detail == "UtensilsCrossed" ? Icons.utensils-crossed : c.detail == "Beef" ? Icons.beef
+                                    : c.detail == "GlassWater" ? Icons.glass-water : Icons.sparkles;
+                                active: MesasModalStore.a-category == c.id;
+                                clicked => { MesasModalStore.a-category = c.id; MesasModalStore.a-filter(); }
+                            }
+                        }
+                    }
+                }
+            }
+            grid := Rectangle {
+                vertical-stretch: 1;
+                property <int> cols: max(1, floor((self.width - 28px + 10px) / (root.tile-w + 10px)));
+                property <length> w: (self.width - 28px - (cols - 1) * 10px) / cols;
+                if MesasModalStore.a-loading: Text { text: "Carregando cardápio..."; color: Theme.text-muted; }
+                if !MesasModalStore.a-loading && MesasModalStore.a-products.length == 0: Text { text: "Nenhum item encontrado"; color: Theme.text-muted; }
+                Flickable {
+                    x: 14px;
+                    y: 14px;
+                    width: parent.width - 28px;
+                    height: parent.height - 14px;
+                    content-height: ceil(MesasModalStore.a-products.length / grid.cols) * (root.tile-h + 10px);
+                    for p[i] in MesasModalStore.a-products: ProductCard {
+                        x: mod(i, grid.cols) * (grid.w + 10px);
+                        y: floor(i / grid.cols) * (root.tile-h + 10px);
+                        width: grid.w;
+                        height: root.tile-h;
+                        p: p;
+                        unit => { MesasModalStore.a-add-unit(p.id); }
+                        box => { MesasModalStore.a-add-box(p.id); }
+                    }
+                }
+            }
+        }
+        Rectangle { width: 1px; background: Theme.surface-2; }
+        // Itens a enviar
+        Rectangle {
+            width: 360px;
+            background: Theme.bg.with-alpha(0.7);
+            VerticalLayout {
+                HorizontalLayout {
+                    padding: 14px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        Text { text: "ITENS A ENVIAR"; color: Theme.text; font-size: 13px; font-weight: 900; letter-spacing: 0.5px; }
+                        Text { text: MesasModalStore.a-cart.length + " produto(s) selecionado(s)"; color: Theme.text-muted; font-size: 12px; }
+                    }
+                    if MesasModalStore.a-cart.length > 0: HorizontalLayout {
+                        spacing: 4px;
+                        Icon { source: Icons.trash-2; color: Theme.danger; size: 14px; y: (parent.height - self.height) / 2; }
+                        Text { text: "Limpar"; color: Theme.danger; font-size: 12px; font-weight: 700; vertical-alignment: center; TouchArea { clicked => { MesasModalStore.a-clear(); } } }
+                    }
+                }
+                Rectangle { height: 1px; background: Theme.surface-2; }
+                Rectangle {
+                    vertical-stretch: 1;
+                    if MesasModalStore.a-cart.length == 0: VerticalLayout {
+                        alignment: center;
+                        spacing: 6px;
+                        padding: 20px;
+                        Icon { source: Icons.beer; color: Theme.border; size: 40px; x: (parent.width - self.width) / 2; }
+                        Text { text: "Nenhum item selecionado"; color: Theme.text-muted; font-size: 14px; font-weight: 600; horizontal-alignment: center; }
+                        Text { text: "Toque nos produtos ao lado para adicionar à rodada."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+                    }
+                    Flickable {
+                        content-height: cart-list.preferred-height + 24px;
+                        cart-list := VerticalLayout {
+                            alignment: start;
+                            padding: 12px;
+                            spacing: 10px;
+                            for item[i] in MesasModalStore.a-cart: Rectangle {
+                                border-radius: 16px;
+                                background: Theme.surface;
+                                border-width: 1px;
+                                border-color: Theme.surface-2;
+                                height: cart-item.preferred-height;
+                                cart-item := VerticalLayout {
+                                    padding: 10px;
+                                    spacing: 6px;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        VerticalLayout {
+                                            horizontal-stretch: 1;
+                                            spacing: 2px;
+                                            HorizontalLayout {
+                                                spacing: 6px;
+                                                alignment: start;
+                                                Text { text: item.name; color: Theme.text; font-size: 12px; font-weight: 800; wrap: word-wrap; }
+                                                Pill { text: item.is-box ? item.box-label : "Un"; tone: item.is-box ? Theme.closing : Theme.text-muted; }
+                                            }
+                                            if item.options != "": Text { text: item.options; color: Theme.occupied; font-size: 10px; font-weight: 700; wrap: word-wrap; }
+                                            if item.promotion != "": Text { text: item.promotion; color: Theme.danger; font-size: 10px; font-weight: 800; }
+                                            Text { text: item.total; color: Theme.primary; font-size: 12px; font-weight: 800; }
+                                        }
+                                        Rectangle {
+                                            width: qty-row.preferred-width + 6px;
+                                            height: 32px;
+                                            border-radius: 10px;
+                                            background: Theme.bg;
+                                            border-width: 1px;
+                                            border-color: Theme.surface-2;
+                                            qty-row := HorizontalLayout {
+                                                x: 3px;
+                                                Rectangle { width: 28px; Icon { source: Icons.minus; color: Theme.text-muted; size: 14px; } TouchArea { clicked => { MesasModalStore.a-qty(i, -1); } } }
+                                                Text { text: item.quantity; color: Theme.text; font-weight: 900; vertical-alignment: center; min-width: 22px; horizontal-alignment: center; }
+                                                Rectangle { width: 28px; Icon { source: Icons.plus; color: Theme.primary; size: 14px; } TouchArea { clicked => { MesasModalStore.a-qty(i, 1); } } }
+                                            }
+                                        }
+                                    }
+                                    LineEdit {
+                                        height: 34px;
+                                        font-size: 12px;
+                                        placeholder-text: "Observação (ex: sem gelo, bem passada)...";
+                                        text: item.notes;
+                                        edited(t) => { MesasModalStore.a-notes(i, t); }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        alignment: start;
+                                        for chip in ["Com gelo e limão", "Sem gelo", "Bem gelada", "Sem cebola"]: Rectangle {
+                                            height: 22px;
+                                            width: chip-t.preferred-width + 12px;
+                                            border-radius: 5px;
+                                            background: chip-touch.has-hover ? Theme.border : Theme.surface-2;
+                                            chip-t := Text { text: "+ " + chip; color: Theme.text-muted; font-size: 10px; }
+                                            chip-touch := TouchArea { clicked => { MesasModalStore.a-chip(i, chip); } }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Rectangle {
+                    background: Theme.surface;
+                    height: send-box.preferred-height;
+                    send-box := VerticalLayout {
+                        padding: 14px;
+                        spacing: 10px;
+                        HorizontalLayout {
+                            Label { text: "TOTAL DESTA RODADA"; vertical-alignment: center; horizontal-stretch: 1; }
+                            Text { text: MesasModalStore.a-total; color: Theme.primary; font-size: 21px; font-weight: 900; }
+                        }
+                        if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+                        Btn {
+                            min-height: 48px;
+                            text: MesasModalStore.busy ? "ENVIANDO..." : "ENVIAR PARA BAR / COZINHA";
+                            icon: Icons.send;
+                            has-icon: true;
+                            fill: Theme.primary;
+                            tone: Theme.primary-text;
+                            font-size: 13px;
+                            weight: 900;
+                            enabled: MesasModalStore.a-cart.length > 0 && !MesasModalStore.busy;
+                            clicked => { MesasModalStore.a-send(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------- Adicionais (ModifierPickerModal) ----------
+
+component ModifiersSheet inherits Sheet {
+    panel-width: 540px;
+    tag: "ESCOLHA AS OPÇÕES DO PEDIDO";
+    tag-tone: Theme.occupied;
+    caption: MesasModalStore.m-price;
+    title: MesasModalStore.m-product;
+    close => { MesasModalStore.m-cancel(); }
+    Flickable {
+        min-height: min(460px, groups.preferred-height);
+        content-height: groups.preferred-height;
+        groups := VerticalLayout {
+                alignment: start;
+            padding: 20px;
+            spacing: 14px;
+            for g[gi] in MesasModalStore.m-groups: VerticalLayout {
+                spacing: 6px;
+                HorizontalLayout {
+                    Text { text: g.name; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; }
+                    Text { text: g.rule; color: g.missing ? Theme.danger : Theme.closing; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+                }
+                for o[oi] in g.options: Rectangle {
+                    height: 44px;
+                    border-radius: 12px;
+                    background: o.selected ? Theme.primary.with-alpha(0.15) : (ot.has-hover ? Theme.surface-2 : Theme.bg);
+                    border-width: 1px;
+                    border-color: o.selected ? Theme.primary : Theme.surface-2;
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 8px;
+                        Rectangle {
+                            width: 18px;
+                            height: 18px;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: 5px;
+                            background: o.selected ? Theme.primary : transparent;
+                            border-width: 1px;
+                            border-color: o.selected ? Theme.primary : Theme.border;
+                            if o.selected: Icon { source: Icons.check; color: Theme.primary-text; size: 13px; }
+                        }
+                        Text { text: o.label; color: Theme.text; font-weight: 700; vertical-alignment: center; horizontal-stretch: 1; }
+                        Text { text: o.detail; color: Theme.text-muted; vertical-alignment: center; }
+                    }
+                    ot := TouchArea { clicked => { MesasModalStore.m-toggle(gi, oi); } }
+                }
+            }
+        }
+    }
+    VerticalLayout {
+        padding: 20px;
+        padding-top: 0px;
+        spacing: 10px;
+        if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 8px;
+            Btn { horizontal-stretch: 1; text: "Cancelar"; clicked => { MesasModalStore.m-cancel(); } }
+            Btn { horizontal-stretch: 2; text: "Adicionar ao Pedido"; icon: Icons.check; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; clicked => { MesasModalStore.m-confirm(); } }
+        }
+    }
+}
+
+// ---------- Fechar conta (CheckoutModal) ----------
+
+component Segment inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <bool> has-icon;
+    in property <bool> active;
+    callback clicked;
+    height: 30px;
+    width: seg.preferred-width + 20px;
+    border-radius: 7px;
+    background: root.active ? Theme.surface : transparent;
+    seg := HorizontalLayout {
+        alignment: center;
+        spacing: 4px;
+        if root.has-icon: Icon { source: root.icon; color: root.active ? Theme.text : Theme.text-muted; size: 12px; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: root.active ? Theme.text : Theme.text-muted; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+    }
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+component MethodButton inherits Rectangle {
+    in property <string> method;
+    in property <string> text;
+    in property <image> icon;
+    property <bool> active: MesasModalStore.c-method == root.method;
+    height: 46px;
+    horizontal-stretch: 1;
+    border-radius: 14px;
+    background: active ? Theme.primary.with-alpha(0.2) : (mt.has-hover ? Theme.surface-2 : Theme.bg);
+    border-width: active ? 2px : 1px;
+    border-color: active ? Theme.primary : Theme.surface-2;
+    HorizontalLayout {
+        padding-left: 12px;
+        spacing: 8px;
+        Icon { source: root.icon; color: Theme.primary; size: 16px; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: active ? Theme.primary : Theme.text; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+    }
+    mt := TouchArea { clicked => { MesasModalStore.c-method = root.method; MesasModalStore.c-changed(); } }
+}
+
+component Card inherits Rectangle {
+    border-radius: 16px;
+    background: Theme.bg;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+}
+
+component CheckoutSheet inherits Sheet {
+    panel-width: 760px;
+    panel-height: 940px;
+    tag: "FECHAMENTO & PDV";
+    tag-tone: Theme.primary;
+    caption: MesasModalStore.c-order;
+    title: MesasModalStore.c-title;
+    close => { MesasModalStore.close(); }
+
+    // Imprimir / WhatsApp
+    HorizontalLayout {
+        padding-left: 22px;
+        padding-right: 22px;
+        padding-bottom: 8px;
+        spacing: 8px;
+        alignment: end;
+        Btn { text: MesasModalStore.print-label; icon: Icons.printer; has-icon: true; clicked => { MesasModalStore.d-print(); } }
+        Btn { text: "WhatsApp"; icon: Icons.share-2; has-icon: true; tone: Theme.available; fill: Theme.available.with-alpha(0.12); clicked => { MesasModalStore.c-whatsapp(); } }
+    }
+
+    Flickable {
+        vertical-stretch: 1;
+        content-height: body.preferred-height;
+        body := VerticalLayout {
+                alignment: start;
+            padding: 22px;
+            padding-top: 6px;
+            spacing: 16px;
+
+            // Resumo financeiro
+            Card {
+                height: summary.preferred-height;
+                summary := VerticalLayout {
+                    padding: 14px;
+                    spacing: 10px;
+                    HorizontalLayout {
+                        Text { text: MesasModalStore.c-items; color: Theme.text; font-size: 13px; horizontal-stretch: 1; }
+                        Text { text: MesasModalStore.c-subtotal; color: Theme.text; font-size: 13px; font-weight: 800; }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Rectangle {
+                            width: 36px;
+                            height: 20px;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: 10px;
+                            background: MesasModalStore.c-fee-active ? Theme.primary : Theme.border;
+                            Rectangle {
+                                x: MesasModalStore.c-fee-active ? 19px : 3px;
+                                width: 14px;
+                                height: 14px;
+                                border-radius: 7px;
+                                background: Theme.surface;
+                                animate x { duration: 120ms; }
+                            }
+                            TouchArea { clicked => { MesasModalStore.c-toggle-fee(); } }
+                        }
+                        Text { text: "Taxa de Serviço (10% Garçom):"; color: Theme.text; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; }
+                        Text { text: MesasModalStore.c-fee; color: Theme.closing; font-size: 13px; font-weight: 800; vertical-alignment: center; }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text { text: "Desconto:"; color: Theme.text; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; }
+                        LineEdit { width: 100px; height: 32px; placeholder-text: "0,00"; horizontal-alignment: right; text <=> MesasModalStore.c-discount; accepted => { MesasModalStore.c-apply-discount(); } }
+                        Btn { min-height: 32px; text: "Aplicar"; tone: Theme.closing; fill: Theme.closing.with-alpha(0.18); clicked => { MesasModalStore.c-apply-discount(); } }
+                    }
+                    Rectangle { height: 1px; background: Theme.surface-2; }
+                    HorizontalLayout {
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            Label { text: "TOTAL DA CONTA"; }
+                            Text { text: MesasModalStore.c-total; color: Theme.text; font-size: 24px; font-weight: 900; }
+                        }
+                        VerticalLayout {
+                            Label { text: "SALDO RESTANTE A PAGAR"; horizontal-alignment: right; }
+                            Text { text: MesasModalStore.c-remaining; color: Theme.available; font-size: 24px; font-weight: 900; horizontal-alignment: right; }
+                        }
+                    }
+                    if MesasModalStore.c-paid != "": VerticalLayout {
+                        spacing: 3px;
+                        Rectangle { height: 1px; background: Theme.surface-2; }
+                        HorizontalLayout {
+                            Text { text: "JÁ ABATIDO (HAVER)"; color: Theme.occupied; font-size: 11px; font-weight: 800; horizontal-stretch: 1; }
+                            Text { text: MesasModalStore.c-paid; color: Theme.occupied; font-size: 11px; font-weight: 800; }
+                        }
+                        for pay in MesasModalStore.c-payments: HorizontalLayout {
+                            Text { text: pay.when; color: Theme.text-muted; font-size: 11px; horizontal-stretch: 1; overflow: elide; }
+                            Text { text: pay.amount; color: Theme.text-muted; font-size: 11px; }
+                        }
+                    }
+                }
+            }
+
+            // Racha-conta
+            Card {
+                height: split.preferred-height;
+                split := VerticalLayout {
+                    padding: 14px;
+                    spacing: 10px;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Icon { source: Icons.users; color: Theme.primary; size: 16px; y: (parent.height - self.height) / 2; }
+                        Text { text: "RACHA-CONTA"; color: Theme.text; font-size: 12px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
+                        Rectangle {
+                            width: segs.preferred-width + 6px;
+                            height: 36px;
+                            border-radius: 9px;
+                            background: Theme.surface-2;
+                            segs := HorizontalLayout {
+                                x: 3px;
+                                y: 3px;
+                                spacing: 2px;
+                                Segment { text: "DIVISÃO IGUAL"; active: MesasModalStore.c-split-mode == "simple"; clicked => { MesasModalStore.c-set-split("simple"); } }
+                                Segment { text: "POR ITENS"; icon: Icons.list-checks; has-icon: true; active: MesasModalStore.c-split-mode == "items"; clicked => { MesasModalStore.c-set-split("items"); } }
+                                Segment { text: "ABATER VALOR"; icon: Icons.hand-coins; has-icon: true; active: MesasModalStore.c-split-mode == "amount"; clicked => { MesasModalStore.c-set-split("amount"); } }
+                            }
+                        }
+                    }
+                    if MesasModalStore.c-split-mode == "simple": VerticalLayout {
+                        spacing: 6px;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            for n in [1, 2, 3, 4, 5, 6, 8]: Rectangle {
+                                height: 36px;
+                                horizontal-stretch: 1;
+                                border-radius: 11px;
+                                background: MesasModalStore.c-split-count == n ? Theme.primary : (sc.has-hover ? Theme.border : Theme.surface);
+                                Text { text: n + "x"; color: MesasModalStore.c-split-count == n ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 800; }
+                                sc := TouchArea { clicked => { MesasModalStore.c-set-count(n); } }
+                            }
+                        }
+                        Text { text: MesasModalStore.c-per-person + " por pessoa"; color: Theme.primary; font-size: 12px; font-weight: 800; horizontal-alignment: right; }
+                    }
+                    if MesasModalStore.c-split-mode == "items": VerticalLayout {
+                        spacing: 6px;
+                        for it[ii] in MesasModalStore.c-split-items: Rectangle {
+                            height: 52px;
+                            border-radius: 12px;
+                            background: it.selected > 0 ? Theme.primary.with-alpha(0.10) : Theme.surface;
+                            border-width: 1px;
+                            border-color: it.selected > 0 ? Theme.primary.with-alpha(0.3) : Theme.surface-2;
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 6px;
+                                VerticalLayout {
+                                    alignment: center;
+                                    horizontal-stretch: 1;
+                                    Text { text: it.name; color: it.selected > 0 ? Theme.primary : Theme.text; font-size: 13px; font-weight: 800; overflow: elide; }
+                                    if it.modifiers != "": Text { text: it.modifiers; color: Theme.occupied; font-size: 10px; font-weight: 700; overflow: elide; }
+                                    Text { text: it.info; color: Theme.text-muted; font-size: 10px; }
+                                }
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: center;
+                                    Rectangle { width: 28px; height: 28px; y: (parent.height - self.height) / 2; border-radius: 7px; background: Theme.surface-2; Icon { source: Icons.minus; color: Theme.text; size: 12px; } TouchArea { clicked => { MesasModalStore.c-item-qty(ii, -1); } } }
+                                    Text { text: it.selected; color: it.selected > 0 ? Theme.primary : Theme.text-muted; font-weight: 900; vertical-alignment: center; min-width: 18px; horizontal-alignment: center; }
+                                    Rectangle { width: 28px; height: 28px; y: (parent.height - self.height) / 2; border-radius: 7px; background: Theme.surface-2; Icon { source: Icons.plus; color: Theme.text; size: 12px; } TouchArea { clicked => { MesasModalStore.c-item-qty(ii, 1); } } }
+                                }
+                            }
+                        }
+                        if MesasModalStore.c-split-total != "": HorizontalLayout {
+                            Label { text: "SUBTOTAL SELECIONADO" + (MesasModalStore.c-fee-active ? " + 10%" : ""); horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: MesasModalStore.c-split-total; color: Theme.primary; font-size: 14px; font-weight: 900; }
+                        }
+                    }
+                    if MesasModalStore.c-split-mode == "amount": VerticalLayout {
+                        spacing: 8px;
+                        Text { text: "O cliente paga só uma parte da conta (haver). Digite o valor em Valor deste Pagamento ou use um atalho:"; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            for v in MesasModalStore.c-amount-shortcuts: Rectangle {
+                                height: 36px;
+                                horizontal-stretch: 1;
+                                border-radius: 11px;
+                                background: am.has-hover ? Theme.border : Theme.surface;
+                                border-width: 1px;
+                                border-color: Theme.surface-2;
+                                Text { text: "R$ " + v; color: Theme.text; font-size: 12px; font-weight: 800; }
+                                am := TouchArea { clicked => { MesasModalStore.c-shortcut(v); } }
+                            }
+                        }
+                        if MesasModalStore.c-amount-preview != "": Text { text: MesasModalStore.c-amount-preview; color: Theme.primary; font-size: 12px; font-weight: 800; horizontal-alignment: right; }
+                    }
+                }
+            }
+
+            // Meio de pagamento
+            VerticalLayout {
+                spacing: 8px;
+                Label { text: "SELECIONE O MEIO DE PAGAMENTO"; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    MethodButton { method: "PIX"; text: "PIX Instantâneo"; icon: Icons.qr-code; }
+                    MethodButton { method: "CREDIT_CARD"; text: "Cartão Crédito"; icon: Icons.credit-card; }
+                    MethodButton { method: "DEBIT_CARD"; text: "Cartão Débito"; icon: Icons.credit-card; }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    MethodButton { method: "CASH"; text: "Dinheiro"; icon: Icons.banknote; }
+                    MethodButton { method: "VOUCHER"; text: "Voucher / Vale"; icon: Icons.tag; }
+                    MethodButton { method: "CREDIT_TAB"; text: "Conta Fiado (Prazo)"; icon: Icons.book-down; }
+                }
+            }
+
+            if MesasModalStore.c-method == "CREDIT_TAB": Card {
+                height: fiado.preferred-height;
+                fiado := VerticalLayout {
+                    padding: 14px;
+                    spacing: 8px;
+                    Label { text: "VINCULAR CLIENTE (OBRIGATÓRIO / RECOMENDADO)"; }
+                    Flickable {
+                        height: min(140px, ceil(MesasModalStore.c-customers.length / 2) * 46px);
+                        content-height: ceil(MesasModalStore.c-customers.length / 2) * 46px;
+                        for c[i] in MesasModalStore.c-customers: Rectangle {
+                            x: mod(i, 2) * (parent.width / 2);
+                            y: floor(i / 2) * 46px;
+                            width: parent.width / 2 - 6px;
+                            height: 40px;
+                            border-radius: 11px;
+                            background: MesasModalStore.c-customer-id == c.id ? Theme.primary.with-alpha(0.2) : Theme.surface;
+                            border-width: 1px;
+                            border-color: MesasModalStore.c-customer-id == c.id ? Theme.primary : Theme.surface-2;
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                Text { text: c.label; color: Theme.text; font-size: 12px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                                Text { text: c.detail; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                            }
+                            TouchArea { clicked => { MesasModalStore.c-customer-id = c.id; MesasModalStore.c-new-customer = ""; } }
+                        }
+                    }
+                    if MesasModalStore.c-customer-id == "": LineEdit { height: 40px; placeholder-text: "Ou digite o nome de um novo cliente..."; text <=> MesasModalStore.c-new-customer; }
+                }
+            }
+
+            // Valor e troco
+            HorizontalLayout {
+                spacing: 12px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Label { text: "VALOR DESTE PAGAMENTO (R$)"; }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        LineEdit { height: 42px; font-size: 16px; placeholder-text: "0,00"; text <=> MesasModalStore.c-amount; edited => { MesasModalStore.c-changed(); } }
+                        Btn { min-height: 42px; text: "Tudo"; clicked => { MesasModalStore.c-all(); } }
+                    }
+                }
+                if MesasModalStore.c-method == "CASH": VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Label { text: "VALOR ENTREGUE PELO CLIENTE (R$)"; }
+                    LineEdit { height: 42px; font-size: 16px; placeholder-text: "Ex: 100,00"; text <=> MesasModalStore.c-cash; edited => { MesasModalStore.c-changed(); } }
+                    if MesasModalStore.c-change != "": HorizontalLayout {
+                        Text { text: "Troco a Devolver:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
+                        Text { text: MesasModalStore.c-change; color: Theme.available; font-size: 12px; font-weight: 900; }
+                    }
+                }
+            }
+
+            if MesasModalStore.c-over-warning != "": Rectangle {
+                height: over.preferred-height + 20px;
+                border-radius: 12px;
+                background: Theme.danger.with-alpha(0.10);
+                border-width: 1px;
+                border-color: Theme.danger.with-alpha(0.35);
+                over := HorizontalLayout {
+                    x: 12px;
+                    width: parent.width - 24px;
+                    spacing: 8px;
+                    Icon { source: Icons.circle-alert; color: Theme.danger; size: 16px; }
+                    Text { text: MesasModalStore.c-over-warning; color: Theme.danger; font-size: 12px; wrap: word-wrap; horizontal-stretch: 1; }
+                }
+            }
+            if MesasModalStore.c-partial-warning != "": Rectangle {
+                height: partial.preferred-height + 20px;
+                border-radius: 12px;
+                background: Theme.occupied.with-alpha(0.10);
+                border-width: 1px;
+                border-color: Theme.occupied.with-alpha(0.35);
+                partial := HorizontalLayout {
+                    x: 12px;
+                    width: parent.width - 24px;
+                    spacing: 8px;
+                    Icon { source: Icons.circle-alert; color: Theme.occupied; size: 16px; }
+                    Text { text: MesasModalStore.c-partial-warning; color: Theme.occupied; font-size: 12px; wrap: word-wrap; horizontal-stretch: 1; }
+                }
+            }
+            if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
+        }
+    }
+
+    Rectangle {
+        background: Theme.surface-2.with-alpha(0.35);
+        height: foot.preferred-height;
+        foot := HorizontalLayout {
+            padding: 14px;
+            padding-left: 22px;
+            padding-right: 22px;
+            spacing: 10px;
+            Btn { min-height: 48px; text: "Voltar"; clicked => { MesasModalStore.close(); } }
+            Btn {
+                horizontal-stretch: 1;
+                min-height: 48px;
+                text: MesasModalStore.c-success ? (MesasModalStore.c-partial ? "VALOR ABATIDO!" : "LIQUIDADO COM SUCESSO!") : MesasModalStore.c-button;
+                fill: MesasModalStore.c-partial ? Theme.occupied : Theme.available;
+                tone: MesasModalStore.c-partial ? #ffffff : Theme.primary-text;
+                font-size: 13px;
+                weight: 900;
+                enabled: !MesasModalStore.busy && !MesasModalStore.c-success;
+                clicked => { MesasModalStore.c-confirm(); }
+            }
+        }
+    }
+}
+
+
+// ---------- Comandas finalizadas (OrderHistoryModal) ----------
+
+component HistorySheet inherits Sheet {
+    panel-width: 1240px;
+    panel-height: 900px;
+    tag: MesasModalStore.h-total-count + " ENCERRADAS";
+    tag-tone: Theme.text-muted;
+    caption: "Consulte itens consumidos, descontos, 10% de serviço e 2ª via de comprovante";
+    title: "Comandas Finalizadas & Histórico";
+    close => { MesasModalStore.close(); }
+
+    // Filtros
+    Rectangle {
+        background: Theme.bg.with-alpha(0.5);
+        height: hf.preferred-height;
+        hf := HorizontalLayout {
+            padding: 12px;
+            padding-left: 22px;
+            padding-right: 22px;
+            spacing: 8px;
+            LineEdit { horizontal-stretch: 1; height: 38px; placeholder-text: "Buscar por comanda #, mesa, cliente ou garçom..."; text <=> MesasModalStore.h-search; edited => { MesasModalStore.h-filter(); } }
+            Icon { source: Icons.calendar; color: Theme.text-muted; size: 16px; y: (parent.height - self.height) / 2; }
+            LineEdit { width: 130px; height: 38px; placeholder-text: "dd/mm/aaaa"; text <=> MesasModalStore.h-date; accepted => { MesasModalStore.h-refresh(); } }
+            Btn { text: "Hoje"; clicked => { MesasModalStore.h-date-quick("today"); } }
+            Btn { text: "Ontem"; clicked => { MesasModalStore.h-date-quick("yesterday"); } }
+            if MesasModalStore.h-date != "": Btn { text: "Limpar data"; tone: Theme.danger; clicked => { MesasModalStore.h-date-quick("clear"); } }
+            Btn { text: MesasModalStore.h-loading ? "Atualizando..." : "Atualizar"; icon: Icons.refresh-cw; has-icon: true; clicked => { MesasModalStore.h-refresh(); } }
+        }
+    }
+
+    HorizontalLayout {
+        vertical-stretch: 1;
+        // Lista
+        Rectangle {
+            width: 420px;
+            if MesasModalStore.h-rows.length == 0: Text {
+                width: parent.width - 40px;
+                text: MesasModalStore.h-loading ? "Carregando..." : "Nenhuma comanda finalizada encontrada com os filtros atuais.";
+                color: Theme.text-muted;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+            Flickable {
+                content-height: rows.preferred-height + 24px;
+                rows := VerticalLayout {
+                alignment: start;
+                    padding: 12px;
+                    spacing: 8px;
+                    for r in MesasModalStore.h-rows: Rectangle {
+                        height: 72px;
+                        border-radius: 14px;
+                        background: r.selected ? Theme.primary.with-alpha(0.12) : (rt.has-hover ? Theme.surface-2 : Theme.bg);
+                        border-width: 1px;
+                        border-color: r.selected ? Theme.primary : Theme.surface-2;
+                        HorizontalLayout {
+                            padding: 12px;
+                            spacing: 8px;
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                spacing: 2px;
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    Text { text: r.number; color: Theme.primary; font-weight: 900; }
+                                    Text { text: r.place; color: Theme.text; font-weight: 800; overflow: elide; }
+                                    if r.loss: Pill { text: "Calote / Perda"; tone: Theme.danger; }
+                                }
+                                Text { text: r.when; color: Theme.text-muted; font-size: 11px; }
+                                Text { text: r.info; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+                            }
+                            Text { text: r.total; color: r.loss ? Theme.danger : Theme.available; font-size: 15px; font-weight: 900; vertical-alignment: center; }
+                        }
+                        rt := TouchArea { clicked => { MesasModalStore.h-select(r.id); } }
+                    }
+                }
+            }
+        }
+        Rectangle { width: 1px; background: Theme.surface-2; }
+        // Detalhe
+        Rectangle {
+            horizontal-stretch: 1;
+            if !MesasModalStore.h-has-selection: VerticalLayout {
+                alignment: center;
+                spacing: 8px;
+                Icon { source: Icons.eye; color: Theme.border; size: 40px; x: (parent.width - self.width) / 2; }
+                Text { text: "Selecione uma comanda à esquerda para visualizar todos os itens e valores consumidos."; color: Theme.text-muted; horizontal-alignment: center; wrap: word-wrap; }
+            }
+            if MesasModalStore.h-has-selection: Flickable {
+                content-height: det.preferred-height;
+                det := VerticalLayout {
+                alignment: start;
+                    padding: 20px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        Text { text: MesasModalStore.h-number; color: Theme.primary; font-size: 22px; font-weight: 900; }
+                        Text { text: MesasModalStore.h-place; color: Theme.text; font-size: 22px; font-weight: 900; }
+                        if MesasModalStore.h-loss: Pill { text: "Calote / Perda"; tone: Theme.danger; y: 6px; }
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        for info in [
+                            { label: "DATA & HORA", value: MesasModalStore.h-when },
+                            { label: "ATENDENTE", value: MesasModalStore.h-waiter },
+                            { label: "CLIENTE IDENTIFICADO", value: MesasModalStore.h-customer },
+                        ]: Card {
+                            horizontal-stretch: 1;
+                            height: 58px;
+                            VerticalLayout {
+                                padding: 10px;
+                                Label { text: info.label; }
+                                Text { text: info.value; color: Theme.text; font-weight: 700; overflow: elide; }
+                            }
+                        }
+                    }
+                    Card {
+                        height: lines.preferred-height;
+                        lines := VerticalLayout {
+                            padding: 12px;
+                            spacing: 8px;
+                            HorizontalLayout {
+                                Label { text: "ITEM"; horizontal-stretch: 1; }
+                                Label { text: "QTD / UNIT / TOTAL"; }
+                            }
+                            for l in MesasModalStore.h-lines: HorizontalLayout {
+                                spacing: 8px;
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    Text { text: l.name; color: Theme.text; font-weight: 700; wrap: word-wrap; }
+                                    if l.modifiers != "": Text { text: l.modifiers; color: Theme.occupied; font-size: 11px; wrap: word-wrap; }
+                                    if l.notes != "": Text { text: "Obs: " + l.notes; color: Theme.closing; font-size: 11px; wrap: word-wrap; }
+                                }
+                                Text { text: l.quantity + " × " + l.unit-info; color: Theme.text-muted; font-size: 12px; }
+                                Text { text: l.total; color: Theme.text; font-weight: 800; min-width: 80px; horizontal-alignment: right; }
+                            }
+                        }
+                    }
+                    Card {
+                        height: sums.preferred-height;
+                        sums := VerticalLayout {
+                            padding: 12px;
+                            spacing: 6px;
+                            HorizontalLayout { Text { text: "Subtotal dos Itens:"; color: Theme.text; horizontal-stretch: 1; } Text { text: MesasModalStore.h-subtotal; color: Theme.text; font-weight: 700; } }
+                            HorizontalLayout { Text { text: "Taxa de Serviço (10% Garçom):"; color: Theme.text; horizontal-stretch: 1; } Text { text: MesasModalStore.h-fee; color: Theme.closing; font-weight: 700; } }
+                            HorizontalLayout { Text { text: "Desconto Concedido:"; color: Theme.text; horizontal-stretch: 1; } Text { text: MesasModalStore.h-discount; color: Theme.danger; font-weight: 700; } }
+                            Rectangle { height: 1px; background: Theme.surface-2; }
+                            HorizontalLayout { Text { text: "Total Final:"; color: Theme.text; font-size: 16px; font-weight: 900; horizontal-stretch: 1; } Text { text: MesasModalStore.h-final; color: Theme.available; font-size: 18px; font-weight: 900; } }
+                            if MesasModalStore.h-payments.length > 0: VerticalLayout {
+                                spacing: 3px;
+                                Rectangle { height: 1px; background: Theme.surface-2; }
+                                Label { text: "FORMAS DE PAGAMENTO REGISTRADAS"; }
+                                for p in MesasModalStore.h-payments: HorizontalLayout {
+                                    Text { text: p.when; color: Theme.text-muted; font-size: 12px; horizontal-stretch: 1; overflow: elide; }
+                                    Text { text: p.amount; color: Theme.text; font-size: 12px; font-weight: 700; }
+                                }
+                            }
+                        }
+                    }
+                    Btn { min-height: 46px; text: "Imprimir 2ª Via do Cupom"; icon: Icons.printer; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; clicked => { MesasModalStore.h-print(); } }
+                }
+            }
+        }
+    }
+}
+
+
+// ---------- Editar locais & mesas (ManageTablesModal) ----------
+
+component CapacityPicker inherits HorizontalLayout {
+    in-out property <int> value;
+    spacing: 4px;
+    for n in [2, 4, 6, 8, 10, 12]: Rectangle {
+        width: 34px;
+        height: 32px;
+        border-radius: 8px;
+        background: root.value == n ? Theme.primary : (cp.has-hover ? Theme.border : Theme.surface-2);
+        Text { text: n; color: root.value == n ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 800; }
+        cp := TouchArea { clicked => { root.value = n; } }
+    }
+}
+
+component ManageSheet inherits Sheet {
+    panel-width: 860px;
+    panel-height: 880px;
+    title: "Editar Locais & Mesas";
+    close => { MesasModalStore.close(); }
+
+    if MesasModalStore.g-success != "" || MesasModalStore.error != "": Rectangle {
+        height: 38px;
+        background: MesasModalStore.error != "" ? Theme.danger.with-alpha(0.12) : Theme.available.with-alpha(0.12);
+        Text {
+            text: MesasModalStore.error != "" ? MesasModalStore.error : MesasModalStore.g-success;
+            color: MesasModalStore.error != "" ? Theme.danger : Theme.available;
+            font-weight: 700;
+        }
+    }
+
+    Flickable {
+        vertical-stretch: 1;
+        content-height: body.preferred-height;
+        body := VerticalLayout {
+                alignment: start;
+            padding: 20px;
+            spacing: 14px;
+
+            // Adicionar nova mesa
+            Card {
+                height: add.preferred-height;
+                add := VerticalLayout {
+                    padding: 14px;
+                    spacing: 10px;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Icon { source: Icons.plus; color: Theme.primary; size: 16px; y: (parent.height - self.height) / 2; }
+                        Text { text: "Adicionar Nova Mesa"; color: Theme.text; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                        Btn { text: MesasModalStore.g-adding ? "Cancelar" : "Abrir formulário"; clicked => { MesasModalStore.g-adding = !MesasModalStore.g-adding; } }
+                    }
+                    if MesasModalStore.g-adding: VerticalLayout {
+                        spacing: 8px;
+                        HorizontalLayout {
+                            spacing: 10px;
+                            VerticalLayout { width: 110px; spacing: 4px; Label { text: "NÚMERO:"; } LineEdit { height: 38px; input-type: number; text <=> MesasModalStore.g-new-number; } }
+                            VerticalLayout { horizontal-stretch: 1; spacing: 4px; Label { text: "NOME/IDENTIFICAÇÃO:"; } LineEdit { height: 38px; placeholder-text: "Ex: VIP 02"; text <=> MesasModalStore.g-new-name; } }
+                        }
+                        Label { text: "CAPACIDADE (LUGARES):"; }
+                        CapacityPicker { value <=> MesasModalStore.g-new-capacity; }
+                        Label { text: "LOCAL / SETOR:"; }
+                        ComboBox { height: 38px; model: MesasModalStore.g-section-options; current-value <=> MesasModalStore.g-new-section; }
+                        if MesasModalStore.g-new-section == "+ Criar Novo Setor...": LineEdit {
+                            height: 38px;
+                            placeholder-text: "Digite o nome do novo setor (ex: Deck Superior, Piscina, Área VIP)";
+                            text <=> MesasModalStore.g-new-custom;
+                        }
+                        Btn { text: "Criar Mesa"; fill: Theme.primary; tone: Theme.primary-text; weight: 900; enabled: !MesasModalStore.busy; clicked => { MesasModalStore.g-add(); } }
+                    }
+                }
+            }
+
+            // Setores e mesas
+            for sec in MesasModalStore.g-sections: Card {
+                height: sec-box.preferred-height;
+                sec-box := VerticalLayout {
+                    padding: 14px;
+                    spacing: 8px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Icon { source: Icons.map-pin; color: Theme.primary; size: 16px; y: (parent.height - self.height) / 2; }
+                        if MesasModalStore.g-renaming != sec.name: Text { text: sec.name; color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; }
+                        if MesasModalStore.g-renaming != sec.name: Pill { y: (parent.height - self.height) / 2; text: sec.tables.length + " mesas"; tone: Theme.text-muted; }
+                        if MesasModalStore.g-renaming != sec.name: Rectangle { horizontal-stretch: 1; }
+                        if MesasModalStore.g-renaming != sec.name: Btn {
+                            text: "Renomear";
+                            icon: Icons.pencil;
+                            has-icon: true;
+                            clicked => { MesasModalStore.g-renaming = sec.name; MesasModalStore.g-rename-text = sec.name; }
+                        }
+                        if MesasModalStore.g-renaming == sec.name: LineEdit { horizontal-stretch: 1; height: 36px; text <=> MesasModalStore.g-rename-text; accepted => { MesasModalStore.g-confirm-rename(); } }
+                        if MesasModalStore.g-renaming == sec.name: Btn { text: "Confirmar"; icon: Icons.check; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; clicked => { MesasModalStore.g-confirm-rename(); } }
+                        if MesasModalStore.g-renaming == sec.name: Btn { text: "Cancelar"; clicked => { MesasModalStore.g-renaming = ""; } }
+                    }
+                    for t in sec.tables: Rectangle {
+                        height: row.preferred-height;
+                        border-radius: 12px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: MesasModalStore.g-editing-id == t.id ? Theme.primary : Theme.surface-2;
+                        row := VerticalLayout {
+                            padding: 10px;
+                            spacing: 8px;
+                            if MesasModalStore.g-editing-id != t.id: HorizontalLayout {
+                                spacing: 10px;
+                                Text { text: "Mesa " + t.number; color: Theme.text; font-weight: 900; vertical-alignment: center; min-width: 80px; }
+                                Text { text: t.name; color: Theme.text-muted; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    Icon { source: Icons.users; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
+                                    Text { text: t.capacity + " lugares"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                                }
+                                if !t.free: Pill { y: (parent.height - self.height) / 2; text: "Ocupada"; tone: Theme.occupied; }
+                                if MesasModalStore.g-deleting-id != t.id: Btn {
+                                    text: "Editar";
+                                    icon: Icons.pencil;
+                                    has-icon: true;
+                                    clicked => {
+                                        MesasModalStore.g-editing-id = t.id;
+                                        MesasModalStore.g-edit-number = t.number;
+                                        MesasModalStore.g-edit-name = t.name;
+                                        MesasModalStore.g-edit-capacity = t.capacity;
+                                        MesasModalStore.g-edit-section = t.section;
+                                    }
+                                }
+                                if MesasModalStore.g-deleting-id != t.id: Btn { text: "Excluir"; icon: Icons.trash-2; has-icon: true; tone: Theme.danger; clicked => { MesasModalStore.g-deleting-id = t.id; } }
+                                if MesasModalStore.g-deleting-id == t.id: Text { text: "Excluir a Mesa " + t.number + " permanentemente?"; color: Theme.danger; font-weight: 700; vertical-alignment: center; }
+                                if MesasModalStore.g-deleting-id == t.id: Btn { text: "Excluir"; fill: Theme.danger; tone: #ffffff; clicked => { MesasModalStore.g-delete(t.id); } }
+                                if MesasModalStore.g-deleting-id == t.id: Btn { text: "Não"; clicked => { MesasModalStore.g-deleting-id = ""; } }
+                            }
+                            if MesasModalStore.g-editing-id == t.id: VerticalLayout {
+                                spacing: 8px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    VerticalLayout { width: 100px; spacing: 4px; Label { text: "NÚMERO:"; } LineEdit { height: 36px; input-type: number; text <=> MesasModalStore.g-edit-number; } }
+                                    VerticalLayout { horizontal-stretch: 1; spacing: 4px; Label { text: "NOME:"; } LineEdit { height: 36px; text <=> MesasModalStore.g-edit-name; } }
+                                    VerticalLayout { width: 220px; spacing: 4px; Label { text: "MOVER PARA SETOR:"; } ComboBox { height: 36px; model: MesasModalStore.g-section-options; current-value <=> MesasModalStore.g-edit-section; } }
+                                }
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Label { text: "LUGARES:"; vertical-alignment: center; }
+                                    CapacityPicker { value <=> MesasModalStore.g-edit-capacity; }
+                                    Rectangle { horizontal-stretch: 1; }
+                                    Btn { text: "Cancelar"; clicked => { MesasModalStore.g-editing-id = ""; } }
+                                    Btn { text: "Salvar"; icon: Icons.save; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; enabled: !MesasModalStore.busy; clicked => { MesasModalStore.g-save-edit(); } }
+                                }
+                                if MesasModalStore.g-edit-section == "+ Criar Novo Setor...": LineEdit {
+                                    height: 36px;
+                                    placeholder-text: "Digite o nome do novo setor (ex: Deck Superior, Piscina, Área VIP)";
+                                    text <=> MesasModalStore.g-new-custom;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        background: Theme.surface-2.with-alpha(0.35);
+        height: 64px;
+        HorizontalLayout {
+            padding: 14px;
+            alignment: end;
+            Btn { text: "Fechar"; clicked => { MesasModalStore.close(); } }
+        }
+    }
+}
+
+
+// ---------- Garçons (ManageWaitersModal) ----------
+
+component WaitersSheet inherits Sheet {
+    panel-width: 760px;
+    panel-height: 820px;
+    tag: "EQUIPE";
+    tag-tone: Theme.primary;
+    title: "Equipe de Garçons & Comissões";
+    close => { MesasModalStore.close(); }
+
+    Card {
+        height: wform.preferred-height;
+        wform := VerticalLayout {
+            padding: 16px;
+            spacing: 10px;
+            Text { text: MesasModalStore.w-editing-id != "" ? "Editar garçom" : "Cadastrar novo garçom"; color: Theme.text; font-weight: 900; }
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout { horizontal-stretch: 2; spacing: 4px; Label { text: "NOME *"; } LineEdit { height: 40px; placeholder-text: "Ex: Carlos Silva"; text <=> MesasModalStore.w-name; } }
+                VerticalLayout { width: 110px; spacing: 4px; Label { text: "CÓDIGO"; } LineEdit { height: 40px; placeholder-text: "Ex: 01"; text <=> MesasModalStore.w-code; } }
+                VerticalLayout { width: 130px; spacing: 4px; Label { text: "COMISSÃO (%)"; } LineEdit { height: 40px; input-type: decimal; text <=> MesasModalStore.w-commission; } }
+            }
+            if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                if MesasModalStore.w-editing-id != "": Btn { text: "Cancelar"; clicked => { MesasModalStore.w-cancel(); } }
+                Btn { text: MesasModalStore.w-editing-id != "" ? "Salvar Alterações" : "Adicionar Garçom"; icon: Icons.check; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; enabled: !MesasModalStore.busy; clicked => { MesasModalStore.w-save(); } }
+            }
+        }
+    }
+
+    Flickable {
+        vertical-stretch: 1;
+        content-height: wl.preferred-height;
+        wl := VerticalLayout {
+                alignment: start;
+            padding: 16px;
+            spacing: 8px;
+            if MesasModalStore.w-loading: Text { text: "Carregando garçons..."; color: Theme.text-muted; }
+            for w in MesasModalStore.w-list: Rectangle {
+                height: 60px;
+                border-radius: 14px;
+                background: Theme.bg;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                opacity: w.active ? 1 : 0.6;
+                HorizontalLayout {
+                    padding: 10px;
+                    spacing: 10px;
+                    Rectangle {
+                        width: 40px;
+                        height: 40px;
+                        border-radius: 12px;
+                        background: Theme.primary.with-alpha(0.15);
+                        Text { text: w.badge; color: Theme.primary; font-weight: 900; }
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        alignment: center;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            Text { text: w.name; color: Theme.text; font-weight: 800; }
+                            if w.code != "": Pill { text: "#" + w.code; tone: Theme.text-muted; }
+                            if !w.active: Pill { text: "Inativo"; tone: Theme.danger; }
+                        }
+                        Text { text: "Comissão: " + w.commission; color: Theme.text-muted; font-size: 12px; }
+                    }
+                    if MesasModalStore.w-deleting-id != w.id: Btn { y: (parent.height - self.height) / 2; text: w.active ? "Desativar" : "Ativar"; clicked => { MesasModalStore.w-toggle(w.id); } }
+                    if MesasModalStore.w-deleting-id != w.id: Btn { y: (parent.height - self.height) / 2; text: "Editar"; icon: Icons.pencil; has-icon: true; clicked => { MesasModalStore.w-edit(w.id); } }
+                    if MesasModalStore.w-deleting-id != w.id: Btn { y: (parent.height - self.height) / 2; text: "Remover"; icon: Icons.trash-2; has-icon: true; tone: Theme.danger; clicked => { MesasModalStore.w-deleting-id = w.id; } }
+                    if MesasModalStore.w-deleting-id == w.id: Text { text: "Remover ou desativar \"" + w.name + "\"?"; color: Theme.danger; font-weight: 700; vertical-alignment: center; }
+                    if MesasModalStore.w-deleting-id == w.id: Btn { y: (parent.height - self.height) / 2; text: "Sim"; fill: Theme.danger; tone: #ffffff; clicked => { MesasModalStore.w-delete(w.id); } }
+                    if MesasModalStore.w-deleting-id == w.id: Btn { y: (parent.height - self.height) / 2; text: "Não"; clicked => { MesasModalStore.w-deleting-id = ""; } }
+                }
+            }
+        }
+    }
+}
+
+// ---------- Funcionários e permissões (ManageStaffModal) ----------
+
+component StaffSheet inherits Sheet {
+    panel-width: 1060px;
+    panel-height: 880px;
+    tag: "ACESSO";
+    tag-tone: Theme.primary;
+    title: "Funcionários & Permissões";
+    close => { MesasModalStore.close(); }
+
+    HorizontalLayout {
+        vertical-stretch: 1;
+        // Formulário
+        Flickable {
+            width: 520px;
+            content-height: sform.preferred-height;
+            sform := VerticalLayout {
+                alignment: start;
+                padding: 18px;
+                spacing: 10px;
+                Text { text: MesasModalStore.s-editing-id != "" ? "Editar funcionário" : "Novo funcionário"; color: Theme.text; font-size: 16px; font-weight: 900; }
+                Label { text: "NOME COMPLETO *"; }
+                LineEdit { height: 40px; placeholder-text: "Ex: Carlos Silva, Ana Caixa..."; text <=> MesasModalStore.s-name; }
+                Label { text: "CARGO / PERFIL"; }
+                ComboBox { height: 40px; model: MesasModalStore.s-roles; current-value <=> MesasModalStore.s-role; }
+                Label { text: MesasModalStore.s-editing-id != "" ? "NOVA SENHA / PIN (DEIXE EM BRANCO PARA MANTER)" : "SENHA / PIN DE ACESSO *"; }
+                LineEdit { height: 40px; input-type: password; placeholder-text: "Ex: 1234 ou senha forte"; text <=> MesasModalStore.s-password; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Switch { checked <=> MesasModalStore.s-active; }
+                    Text { text: MesasModalStore.s-active ? "Usuário ativo" : "Usuário desativado"; color: Theme.text; vertical-alignment: center; }
+                }
+                HorizontalLayout {
+                    Label { text: "MÓDULOS PERMITIDOS"; vertical-alignment: center; horizontal-stretch: 1; }
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    Btn { text: "Acesso Total"; clicked => { MesasModalStore.s-preset("ALL"); } }
+                    Btn { text: "Caixa"; clicked => { MesasModalStore.s-preset("CAIXA"); } }
+                    Btn { text: "Garçom"; clicked => { MesasModalStore.s-preset("GARCOM"); } }
+                    Btn { text: "KDS"; clicked => { MesasModalStore.s-preset("KDS"); } }
+                }
+                for perm[pi] in MesasModalStore.s-perms: Rectangle {
+                    height: 50px;
+                    border-radius: 12px;
+                    background: perm.on ? Theme.primary.with-alpha(0.12) : Theme.bg;
+                    border-width: 1px;
+                    border-color: perm.on ? Theme.primary : Theme.surface-2;
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 10px;
+                        Rectangle {
+                            width: 18px;
+                            height: 18px;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: 5px;
+                            background: perm.on ? Theme.primary : transparent;
+                            border-width: 1px;
+                            border-color: perm.on ? Theme.primary : Theme.border;
+                            if perm.on: Icon { source: Icons.check; color: Theme.primary-text; size: 13px; }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Text { text: perm.label; color: Theme.text; font-weight: 800; }
+                            Text { text: perm.desc; color: Theme.text-muted; font-size: 11px; }
+                        }
+                    }
+                    TouchArea { clicked => { MesasModalStore.s-toggle-perm(pi); } }
+                }
+                if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+                    if MesasModalStore.s-editing-id != "": Btn { text: "Cancelar"; clicked => { MesasModalStore.s-cancel(); } }
+                    Btn { text: MesasModalStore.s-editing-id != "" ? "Salvar Alterações" : "Cadastrar Funcionário"; icon: Icons.check; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; enabled: !MesasModalStore.busy; clicked => { MesasModalStore.s-save(); } }
+                }
+            }
+        }
+        Rectangle { width: 1px; background: Theme.surface-2; }
+        // Lista
+        Flickable {
+            horizontal-stretch: 1;
+            content-height: sl.preferred-height;
+            sl := VerticalLayout {
+                alignment: start;
+                padding: 18px;
+                spacing: 8px;
+                Label { text: "EQUIPE CADASTRADA (" + MesasModalStore.s-list.length + ")"; }
+                for st in MesasModalStore.s-list: Rectangle {
+                    height: sr.preferred-height;
+                    border-radius: 14px;
+                    background: MesasModalStore.s-editing-id == st.id ? Theme.primary.with-alpha(0.08) : Theme.bg;
+                    border-width: 1px;
+                    border-color: MesasModalStore.s-editing-id == st.id ? Theme.primary : Theme.surface-2;
+                    opacity: st.active ? 1 : 0.6;
+                    sr := VerticalLayout {
+                        padding: 12px;
+                        spacing: 4px;
+                        HorizontalLayout {
+                            spacing: 6px;
+                            Text { text: st.name; color: Theme.text; font-weight: 900; horizontal-stretch: 1; overflow: elide; }
+                            if !st.active: Pill { text: "Desativado"; tone: Theme.danger; }
+                        }
+                        Text { text: st.role; color: Theme.primary; font-size: 12px; font-weight: 700; }
+                        Text { text: st.perms; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: end;
+                            if MesasModalStore.s-deleting-id != st.id: Btn { text: "Editar"; icon: Icons.pencil; has-icon: true; clicked => { MesasModalStore.s-edit(st.id); } }
+                            if MesasModalStore.s-deleting-id != st.id: Btn { text: "Excluir"; icon: Icons.trash-2; has-icon: true; tone: Theme.danger; clicked => { MesasModalStore.s-deleting-id = st.id; } }
+                            if MesasModalStore.s-deleting-id == st.id: Text { text: "Excluir \"" + st.name + "\"?"; color: Theme.danger; font-weight: 700; vertical-alignment: center; }
+                            if MesasModalStore.s-deleting-id == st.id: Btn { text: "Sim"; fill: Theme.danger; tone: #ffffff; clicked => { MesasModalStore.s-delete(st.id); } }
+                            if MesasModalStore.s-deleting-id == st.id: Btn { text: "Não"; clicked => { MesasModalStore.s-deleting-id = ""; } }
+                        }
+                    }
+                }
+                Text { text: "O único Administrador ativo não pode ser excluído nem desativado."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+            }
+        }
+    }
+}
+
+// ---------- Conectar celular (ConnectMobileModal) ----------
+
+component ConnectSheet inherits Sheet {
+    panel-width: 620px;
+    tag: "MODO GARÇOM";
+    tag-tone: Theme.available;
+    title: "Conectar App Android / Celular";
+    close => { MesasModalStore.close(); }
+    VerticalLayout {
+        padding: 22px;
+        spacing: 12px;
+        Text { text: "Conecte o celular na mesma rede Wi-Fi do computador do caixa e aponte a câmera para o QR Code."; color: Theme.text; wrap: word-wrap; }
+        Text { text: "Abra o app no celular. Na tela de IP, digite " + MesasModalStore.x-status + " e clique em Salvar e Conectar. Ou abra o Chrome no celular e acesse direto: " + MesasModalStore.x-url; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 18px;
+            Rectangle {
+                width: 220px;
+                height: 220px;
+                border-radius: 16px;
+                background: #ffffff;
+                Image { width: 196px; height: 196px; source: MesasModalStore.x-qr; image-rendering: pixelated; }
+            }
+            VerticalLayout {
+                spacing: 8px;
+                alignment: center;
+                Label { text: "IP DO COMPUTADOR DO CAIXA:"; }
+                Text { text: MesasModalStore.x-url; color: Theme.primary; font-size: 20px; font-weight: 900; wrap: word-wrap; }
+                for ip in MesasModalStore.x-ips: Text { text: ip; color: Theme.text-muted; font-size: 12px; }
+            }
+        }
+        Card {
+            height: fw.preferred-height;
+            fw := VerticalLayout {
+                padding: 12px;
+                spacing: 4px;
+                Text { text: "O celular não achou o computador? (Firewall do Windows)"; color: Theme.text; font-weight: 800; }
+                Text { text: "Abra o Prompt de Comando (CMD) como Administrador e rode:"; color: Theme.text-muted; font-size: 12px; }
+                Text { text: "netsh advfirewall firewall add rule name=\"BarERP\" dir=in action=allow protocol=TCP localport=3001"; color: Theme.closing; font-size: 11px; font-family: "Menlo"; wrap: word-wrap; }
+            }
+        }
+        HorizontalLayout { alignment: end; Btn { text: "Fechar"; clicked => { MesasModalStore.close(); } } }
+    }
+}
+
+export component MesasModals inherits Rectangle {
+    // Só intercepta cliques quando há um modal aberto
+    if MesasModalStore.modal == MesasModal.details: DetailsSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.open-table: OpenTableSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.transfer || MesasModalStore.modal == MesasModal.merge: TableChoiceSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.new-table: NewTableSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.confirm: ConfirmSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.add-order || MesasModalStore.modal == MesasModal.modifiers: AddOrderSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.modifiers: ModifiersSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.checkout: CheckoutSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.history: HistorySheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.manage: ManageSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.waiters: WaitersSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.staff: StaffSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.connect: ConnectSheet { width: root.width; height: root.height; }
+}
+
+// Só os modais de equipe (garçons, funcionários e conectar celular), abertos também pela Retaguarda
+export component TeamModals inherits Rectangle {
+    if MesasModalStore.modal == MesasModal.waiters: WaitersSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.staff: StaffSheet { width: root.width; height: root.height; }
+    if MesasModalStore.modal == MesasModal.connect: ConnectSheet { width: root.width; height: root.height; }
+}

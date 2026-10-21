@@ -1,0 +1,17 @@
+[package]
+name = "barerp-print"
+description = "Impressão térmica ESC/POS do BarERP (comprovante de consumo e comanda da cozinha)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish.workspace = true
+
+[dependencies]
+chrono = "0.4.39"
+thiserror = "2.0.11"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58.0", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing"] }
+
+[dev-dependencies]
+insta = "1.41.1"

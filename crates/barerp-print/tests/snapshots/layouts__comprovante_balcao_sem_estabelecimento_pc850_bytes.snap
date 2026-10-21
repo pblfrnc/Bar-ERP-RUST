@@ -1,0 +1,32 @@
+---
+source: crates/barerp-print/tests/layouts.rs
+expression: doc.to_text()
+---
+--------------------------------
+     COMPROVANTE DE CONSUMO
+   DOCUMENTO SEM VALOR FISCAL
+--------------------------------
+MESA: Balcão            CMD: #42
+FECHADA: 18/10/2026 22:05
+GARÇOM: João
+CLIENTE: Maria Conceição
+--------------------------------
+ITEM                       TOTAL
+X-Burguer Artesanal com Cheddar
+e Cebola Caramelizada
+  + Ao ponto
+  + Bacon (4,00)
+2 x 38,00                  76,00
+--------------------------------
+SUBTOTAL:              R$ 135,40
+DESCONTO:             - R$ 10,00
+TOTAL:                 R$ 141,65
+VALOR PAGO:            R$ 100,00
+SALDO RESTANTE:         R$ 41,65
+--------------------------------
+Agradecemos a preferência! Volte
+            sempre!
+  Impresso em 18/10/2026 22:06
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

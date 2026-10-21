@@ -1,0 +1,422 @@
+// Estado e callbacks da área Cardápio & Estoque. Ligado em `src/pages/cardapio.rs` com
+// `ui.global::<CardapioStore>()`. Prefixos: f- cadastro do produto · c- categoria · h- histórico · r- relatório
+// · n- NCM · s- folha de balanço · q- fornecedor rápido · sup-/sf- fornecedores · cu-/cf-/pd- clientes
+// · m- adicionais · p- promoções · d- itens do cardápio digital.
+
+export enum CdScreen { products, editor, suppliers, customers }
+export enum CdModal { none, category, history, report, ncm, sheet, quick-supplier, supplier-form, modifiers, promotions, menu-items, customer-form, pay-debt }
+
+export struct CdProduct {
+    id: string,
+    name: string,
+    code: string,          // "#5001" ou ""
+    brand: string,
+    supplier: string,
+    ean: string,
+    description: string,
+    category: string,
+    kds: string,           // BAR, KITCHEN, NONE
+    price: string,
+    box: string,           // "Cx 12x: R$ 84,00" ou ""
+    cost: string,          // "R$ 4,50" ou "-"
+    margin: string,        // "60% margem" ou ""
+    margin-tone: int,      // 0 verde · 1 âmbar · 2 vermelho
+    stock: string,         // "24 un"
+    low: bool,
+    composed: bool,
+}
+
+export struct CdCategory { id: string, name: string, range: string, active: bool }
+
+export struct CdComponent {
+    index: int,            // posição na lista de insumos (f-component-labels); -1 = nenhum
+    quantity: string,
+    unit: string,
+    subtotal: string,      // "R$ 1,20" ou ""
+}
+
+export struct CdGroupPick { id: string, name: string, detail: string, position: int, active: bool }
+
+export struct CdHistory {
+    date: string,
+    by: string,
+    xml: bool,
+    old-price: string,
+    new-price: string,
+    price-diff: string,
+    price-dir: int,        // 1 subiu · -1 caiu · 0 igual
+    old-cost: string,
+    new-cost: string,
+    cost-diff: string,
+    cost-dir: int,
+    chave: string,
+}
+
+export struct CdReportCat { name: string, items: string, units: string, cost: string, sale: string, profit: string, margin: string, tone: int }
+
+export struct CdSupplier {
+    id: string,
+    title: string,         // fantasia ou razão
+    razao: string,         // "(Razão)" quando há fantasia
+    document: string,      // formatado
+    products: string,      // "3 produtos vinculados"
+    phone: string,
+    email: string,
+    contact: string,
+    city: string,
+    notes: string,
+}
+
+export struct CdCustomer { id: string, name: string, phone: string, document: string, debt: string, owes: bool }
+
+export struct CdModGroup { id: string, name: string, rule: string, required: bool, inactive: bool, options: string, usage: string }
+export struct CdModOption { name: string, price: string, active: bool }
+
+export struct CdPromo { id: string, name: string, running: bool, active: bool, description: string, targets: string }
+export struct CdChoice { id: string, label: string, detail: string, selected: bool }
+
+export struct CdMenuRow {
+    kind: int,             // 0 grupo (Comidas/Bebidas) · 1 categoria · 2 subgrupo · 3 produto
+    id: string,
+    title: string,
+    subtitle: string,      // preço · descrição; aviso de categoria escondida; "(2 de 5 no cardápio)"
+    action: string,        // "Marcar todos" / "Desmarcar todos"
+    selected: bool,
+    no-price: bool,
+    has-photo: bool,
+    photo: image,
+    expanded: bool,
+}
+
+export global CardapioStore {
+    in-out property <CdScreen> screen: CdScreen.products;
+    in-out property <CdModal> modal: CdModal.none;
+    in property <bool> loading;
+
+    // ---------- Lista ----------
+    in property <[CdProduct]> products;
+    in property <[CdCategory]> categories;
+    in property <bool> all-categories: true;
+    in property <int> total-count;
+    in property <int> supplier-count;
+    in property <int> duplicate-count;
+    in-out property <string> search;
+    in property <bool> search-is-barcode;
+    in property <bool> organizing;
+    in property <bool> backfilling;
+    in property <bool> fixing;
+    callback search-changed();
+    callback category-picked(string);
+    callback category-edit(string);
+    callback category-delete(string);
+    callback new-product();
+    callback edit-product(string);
+    callback duplicate-product(string);
+    callback delete-product(string);
+    callback history(string);
+    callback quick-stock(string, int);
+    callback open-report();
+    // "Importar do Sistema Antigo" (ImportXmlModal; janela em ui/pages/import_legacy.slint)
+    callback import-xml();
+    // Usuário ADMIN (o botão de importar dos fornecedores só aparece para ele, como no original)
+    in property <bool> is-admin;
+    callback organize();
+    callback open-suppliers();
+    callback open-customers();
+    callback open-modifiers();
+    callback open-promotions();
+    callback open-menu-items();
+    callback open-sheet();
+    callback new-category();
+    callback backfill();
+    callback fix-duplicates();
+    callback register-barcode();
+    callback show-screen(CdScreen);
+    // A página apareceu (recarrega produtos, categorias e fornecedores)
+    callback shown();
+
+    // ---------- Cadastro do produto ----------
+    in property <bool> f-editing;
+    in property <string> f-title;
+    in property <string> f-badge;
+    in-out property <string> f-ean;
+    in-out property <string> f-name;
+    in-out property <string> f-code;
+    in-out property <string> f-brand;
+    in-out property <string> f-unit: "un";
+    in-out property <string> f-cost;
+    in-out property <string> f-margin: "50";
+    in-out property <string> f-price;
+    in-out property <bool> f-has-box;
+    in-out property <string> f-box-qty: "24";
+    in-out property <string> f-box-price;
+    in-out property <string> f-box-ean;
+    in-out property <string> f-conv-factor: "12";
+    in-out property <bool> f-conv-portion;
+    in-out property <bool> f-composed;
+    in-out property <bool> f-show-in-menu: true;
+    in-out property <string> f-description;
+    in-out property <string> f-supplier-name;
+    in-out property <string> f-stock: "100";
+    in-out property <string> f-min-stock: "10";
+    in-out property <string> f-ncm;
+    in-out property <string> f-cest;
+    in-out property <string> f-cfop: "5102";
+    in-out property <int> f-category-index;
+    in-out property <int> f-supplier-index;
+    in-out property <int> f-kds-index;
+    in property <[string]> f-category-labels;
+    in property <[string]> f-supplier-labels;
+    in property <[string]> f-component-labels;
+    in property <[CdComponent]> f-components;
+    in property <[CdGroupPick]> f-groups;
+    in property <bool> f-has-photo;
+    in property <image> f-photo;
+    in property <string> lookup-message;
+    in property <int> lookup-tone;          // 0 aviso · 1 ok · 2 erro
+    in property <string> lookup-busy;       // "", "all", "xml", "global"
+    in property <string> profit;
+    in property <bool> profit-negative;
+    in property <string> margin-label;
+    in property <int> margin-tone;          // 0 verde · 1 âmbar · 2 laranja · 3 vermelho
+    in property <string> markup;
+    in property <string> recipe-cost;       // "" quando não há ficha com custo
+    in property <string> box-unit-label;
+    in property <string> conv-message;
+    in property <string> sup-card-title;
+    in property <string> sup-card-doc;
+    in property <string> sup-card-contact;
+    in property <string> sup-card-phone;
+    in property <int> ncm-state;            // 0 nada · 1 verificando · 2 válido · 3 não localizado
+    in property <string> ncm-detail;
+    in property <string> footer-sale;
+    in property <string> footer-cost;
+    in property <string> footer-margin;
+    in property <int> footer-margin-tone;
+    callback back();
+    callback save();
+    callback delete-current();
+    callback lookup(string);
+    callback name-edited();
+    callback category-changed();
+    callback cost-edited();
+    callback margin-edited();
+    callback price-edited();
+    callback conv-preset(string, bool);
+    callback conv-apply();
+    callback conv-undo();
+    callback use-recipe-cost();
+    callback comp-add();
+    callback comp-remove(int);
+    callback comp-pick(int, int);
+    callback comp-step(int, int);
+    callback comp-qty(int, string);
+    callback group-toggle(string);
+    callback pick-photo();
+    callback remove-photo();
+    callback supplier-changed();
+    callback open-quick-supplier();
+    callback open-category-from-form();
+    callback ncm-edited();
+    callback open-ncm();
+    callback open-whatsapp();
+
+    // ---------- Categoria ----------
+    in property <bool> c-editing;
+    in property <string> c-subtitle;
+    in-out property <string> c-name;
+    in-out property <string> c-code-start;
+    in-out property <bool> c-renumber;
+    callback c-save();
+
+    // ---------- Histórico de preços ----------
+    in property <string> h-subtitle;
+    in property <bool> h-loading;
+    in property <[CdHistory]> h-rows;
+
+    // ---------- Relatório de estoque ----------
+    in property <bool> r-loading;
+    in property <bool> r-failed;
+    in property <string> r-cost;
+    in property <string> r-cost-sub;
+    in property <string> r-sale;
+    in property <string> r-sale-sub;
+    in property <string> r-profit;
+    in property <string> r-margin;
+    in property <string> r-count;
+    in property <[CdReportCat]> r-rows;
+
+    // ---------- Consulta de NCM ----------
+    in-out property <string> n-code;
+    in property <bool> n-loading;
+    in property <string> n-error;
+    in property <bool> n-has-result;
+    in property <string> n-result-code;
+    in property <string> n-result-desc;
+    in property <string> n-fed;
+    in property <string> n-est;
+    callback n-search();
+    callback n-quick(string);
+    callback n-use();
+
+    // ---------- Folha de balanço ----------
+    in property <[string]> s-category-labels;
+    in-out property <int> s-category-index;
+    in-out property <bool> s-alpha: true;
+    in-out property <bool> s-show-cost: true;
+    in property <int> s-count;
+    in property <bool> s-busy;
+    in property <string> s-feedback;
+    in property <bool> s-error;
+    callback s-changed();
+    callback s-export();
+
+    // ---------- Fornecedor rápido ----------
+    in-out property <string> q-name;
+    in-out property <string> q-trade;
+    in-out property <string> q-doc;
+    in-out property <string> q-phone;
+    callback q-save();
+
+    // ---------- Fornecedores ----------
+    in-out property <string> sup-search;
+    in property <[CdSupplier]> suppliers;
+    in property <int> sup-all;
+    in property <string> sup-total;
+    in property <string> sup-with-doc;
+    in property <string> sup-linked;
+    callback sup-search-changed();
+    callback sup-new();
+    callback sup-edit(string);
+    callback sup-delete(string);
+    callback sup-whatsapp(string);
+    in property <bool> sf-editing;
+    in-out property <string> sf-name;
+    in-out property <string> sf-trade;
+    in-out property <string> sf-doc;
+    in-out property <string> sf-phone;
+    in-out property <string> sf-ie;
+    in-out property <string> sf-email;
+    in-out property <string> sf-contact;
+    in-out property <string> sf-city;
+    in-out property <string> sf-uf;
+    in-out property <string> sf-address;
+    in-out property <string> sf-notes;
+    in property <bool> sf-cnpj-busy;
+    callback sf-save();
+    callback sf-cnpj();
+
+    // ---------- Clientes ----------
+    in-out property <string> cu-search;
+    in property <[CdCustomer]> customers;
+    in property <bool> cu-loading;
+    callback cu-search-changed();
+    callback cu-new();
+    callback cu-pay(string);
+    in-out property <string> cf-name;
+    in-out property <string> cf-phone;
+    in-out property <string> cf-doc;
+    callback cf-save();
+    in property <string> pd-name;
+    in property <string> pd-debt;
+    in-out property <string> pd-amount;
+    callback pd-save();
+
+    // ---------- Adicionais e perguntas ----------
+    in property <[CdModGroup]> m-groups;
+    in property <bool> m-loading;
+    in property <bool> m-draft;
+    in property <bool> m-draft-new;
+    in-out property <string> m-name;
+    in-out property <string> m-max: "0";
+    in-out property <bool> m-required;
+    in-out property <bool> m-active: true;
+    in property <[CdModOption]> m-options;
+    in property <bool> m-saving;
+    callback m-new();
+    callback m-preset(int);
+    callback m-edit(string);
+    callback m-delete(string);
+    callback m-cancel();
+    callback m-save();
+    callback m-opt-add();
+    callback m-opt-remove(int);
+    callback m-opt-move(int, int);
+    callback m-opt-name(int, string);
+    callback m-opt-price(int, string);
+    callback m-opt-active(int, bool);
+
+    // ---------- Promoções do dia ----------
+    in property <[CdPromo]> p-list;
+    in property <bool> p-loading;
+    in property <bool> p-draft;
+    in property <bool> p-draft-new;
+    in-out property <string> p-name;
+    in-out property <string> p-value;
+    in-out property <string> p-start: "17:00";
+    in-out property <string> p-end: "20:00";
+    in-out property <bool> p-fixed;
+    in-out property <bool> p-active: true;
+    in property <[bool]> p-days;
+    in property <[CdChoice]> p-categories;
+    in property <[CdChoice]> p-chosen;
+    in-out property <string> p-search;
+    in property <[CdChoice]> p-results;
+    in property <string> p-preview-title;
+    in property <[CdChoice]> p-preview;
+    in property <bool> p-saving;
+    callback p-new();
+    callback p-edit(string);
+    callback p-delete(string);
+    callback p-toggle(string);
+    callback p-cancel();
+    callback p-save();
+    callback p-day(int);
+    callback p-all-days();
+    callback p-weekend();
+    callback p-cat(string);
+    callback p-prod(string);
+    callback p-search-changed();
+    callback p-type(bool);
+
+    // ---------- Itens do cardápio digital ----------
+    in-out property <string> d-search;
+    in-out property <int> d-filter;
+    in property <string> d-count;
+    in property <[CdMenuRow]> d-rows;
+    in property <string> d-not-menu;
+    in property <int> d-not-menu-count;
+    in property <bool> d-loading;
+    in property <bool> d-saving;
+    in property <int> d-changes;
+    in property <string> d-feedback;
+    in property <bool> d-error;
+    in-out property <string> d-desc;
+    in property <bool> d-desc-changed;
+    in property <string> d-photo-busy;
+    callback d-search-changed();
+    callback d-filter-pick(int);
+    callback d-toggle(string);
+    callback d-toggle-many(int, string);
+    callback d-expand(string);
+    callback d-desc-edited();
+    callback d-save-desc(string);
+    callback d-photo(string);
+    callback d-remove-photo(string);
+    callback d-save();
+    callback d-close();
+    callback d-uncheck-store();
+
+    // ---------- Confirmação (por cima de qualquer tela) ----------
+    in property <bool> confirm-open;
+    in property <string> confirm-title;
+    in property <string> confirm-text;
+    in property <string> confirm-ok;
+    in property <bool> confirm-danger;
+    callback confirm-yes();
+    callback confirm-no();
+
+    // Mensagem de erro dentro dos modais (alert do original)
+    in property <string> modal-error;
+    callback close-modal();
+}

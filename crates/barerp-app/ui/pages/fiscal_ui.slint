@@ -1,0 +1,333 @@
+// Componentes visuais da área fiscal (mesmo desenho do Módulo Fiscal do app React, cartões arredondados e
+// rótulos em caixa alta). Só cores do Theme: funcionam no tema claro e no escuro.
+
+import { Theme } from "../theme.slint";
+import { Icon } from "../icons.slint";
+export { Icon }
+
+// Cor de destaque de cada cartão/tela (o React usava amber, emerald, indigo, violet, sky, rose, blue).
+export enum FxCor { ambar, verde, azul, roxo, vermelho, laranja, neutro }
+
+export global FxCores {
+    public pure function de(c: FxCor) -> color {
+        if c == FxCor.ambar { return Theme.closing; }
+        if c == FxCor.verde { return Theme.available; }
+        if c == FxCor.azul { return Theme.occupied; }
+        if c == FxCor.roxo { return Theme.purple; }
+        if c == FxCor.vermelho { return Theme.danger; }
+        if c == FxCor.laranja { return Theme.orange; }
+        return Theme.text-muted;
+    }
+}
+
+export component FxLabel inherits Text {
+    color: Theme.text-muted;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+}
+
+export component FxCard inherits Rectangle {
+    background: Theme.surface;
+    border-radius: 22px;
+    border-width: 1px;
+    border-color: Theme.border;
+}
+
+export component FxBadge inherits Rectangle {
+    in property <string> text;
+    in property <FxCor> cor: FxCor.ambar;
+    height: 22px;
+    width: badge-text.preferred-width + 16px;
+    border-radius: 11px;
+    background: FxCores.de(root.cor).with-alpha(0.15);
+    border-width: 1px;
+    border-color: FxCores.de(root.cor).with-alpha(0.35);
+    badge-text := Text {
+        text: root.text;
+        color: FxCores.de(root.cor);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.8px;
+    }
+}
+
+export enum FxBotao { normal, primario, perigo, sucesso, fantasma }
+
+export component FxButton inherits Rectangle {
+    in property <string> text;
+    in property <image> icone;
+    in property <FxBotao> tipo: FxBotao.normal;
+    in property <bool> enabled: true;
+    in property <bool> busy;
+    in property <length> font-size: 14px;
+    callback clicked;
+    property <color> cor: root.tipo == FxBotao.primario ? Theme.primary
+        : root.tipo == FxBotao.perigo ? Theme.danger
+        : root.tipo == FxBotao.sucesso ? Theme.available
+        : Theme.surface-2;
+    min-height: 42px;
+    min-width: conteudo.preferred-width + 30px;
+    border-radius: 12px;
+    opacity: root.enabled && !root.busy ? 1 : 0.5;
+    background: root.tipo == FxBotao.fantasma ? (touch.has-hover ? Theme.surface-2 : transparent)
+        : root.tipo == FxBotao.normal ? (touch.has-hover ? Theme.border : Theme.surface-2)
+        : (touch.has-hover ? root.cor.brighter(0.12) : root.cor);
+    border-width: root.tipo == FxBotao.normal || root.tipo == FxBotao.fantasma ? 1px : 0;
+    border-color: Theme.border;
+    property <color> cor-texto: root.tipo == FxBotao.primario ? Theme.primary-text
+        : root.tipo == FxBotao.perigo || root.tipo == FxBotao.sucesso ? #ffffff
+        : Theme.text;
+    conteudo := HorizontalLayout {
+        alignment: center;
+        spacing: 8px;
+        if root.icone.width > 0: VerticalLayout {
+            alignment: center;
+            Icon { source: root.icone; color: root.cor-texto; size: root.font-size + 2px; }
+        }
+        Text {
+            text: root.busy ? "Aguarde..." : root.text;
+            font-size: root.font-size;
+            font-weight: 800;
+            color: root.cor-texto;
+            vertical-alignment: center;
+        }
+    }
+    touch := TouchArea {
+        enabled: root.enabled && !root.busy;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Campo de texto de uma linha
+export component FxInput inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    in property <length> font-size: 14px;
+    in property <bool> mono;
+    in property <bool> error;
+    in property <bool> enabled: true;
+    in property <bool> senha;
+    in property <TextHorizontalAlignment> align: left;
+    out property <bool> has-focus: input.has-focus;
+    callback accepted();
+    callback edited(string);
+    callback key-pressed(KeyEvent) -> EventResult;
+    public function select-all() { input.select-all(); }
+
+    forward-focus: input;
+    min-height: 42px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: root.error ? Theme.danger : input.has-focus ? Theme.primary : Theme.border;
+    background: root.enabled ? Theme.bg : Theme.surface-2;
+    TouchArea { mouse-cursor: MouseCursor.text; clicked => { input.focus(); } }
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        Rectangle {
+            Text {
+                x: 0;
+                width: 100%;
+                text: input.text == "" ? root.placeholder : "";
+                color: Theme.text-muted;
+                font-size: root.font-size;
+                vertical-alignment: center;
+                horizontal-alignment: root.align;
+                overflow: elide;
+            }
+            input := TextInput {
+                width: 100%;
+                enabled: root.enabled;
+                color: Theme.text;
+                font-size: root.font-size;
+                font-weight: 600;
+                font-family: root.mono ? "Menlo" : "";
+                vertical-alignment: center;
+                horizontal-alignment: root.align;
+                single-line: true;
+                input-type: root.senha ? InputType.password : InputType.text;
+                selection-background-color: Theme.primary.with-alpha(0.4);
+                accepted => { root.accepted(); }
+                edited => { root.edited(self.text); }
+                key-pressed(event) => { return root.key-pressed(event); }
+            }
+        }
+    }
+}
+
+// Texto de várias linhas (justificativas)
+export component FxTextArea inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder;
+    in property <length> altura: 84px;
+    callback edited(string);
+    forward-focus: input;
+    height: root.altura;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: input.has-focus ? Theme.primary : Theme.border;
+    background: Theme.bg;
+    TouchArea { mouse-cursor: MouseCursor.text; clicked => { input.focus(); } }
+    Text {
+        x: 14px;
+        y: 10px;
+        width: parent.width - 28px;
+        text: input.text == "" ? root.placeholder : "";
+        color: Theme.text-muted;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+    input := TextInput {
+        x: 14px;
+        y: 10px;
+        width: parent.width - 28px;
+        height: parent.height - 20px;
+        color: Theme.text;
+        font-size: 13px;
+        wrap: word-wrap;
+        single-line: false;
+        selection-background-color: Theme.primary.with-alpha(0.4);
+        edited => { root.edited(self.text); }
+    }
+}
+
+// Campo com rótulo em cima
+export component FxField inherits VerticalLayout {
+    in property <string> label;
+    spacing: 6px;
+    FxLabel { text: root.label; }
+    @children
+}
+
+// Faixa de resultado (verde = sucesso, vermelho = erro, âmbar = aviso)
+export component FxAviso inherits Rectangle {
+    in property <string> text;
+    in property <FxCor> cor: FxCor.verde;
+    in property <image> icone;
+    border-radius: 14px;
+    background: FxCores.de(root.cor).with-alpha(0.12);
+    border-width: 1px;
+    border-color: FxCores.de(root.cor).with-alpha(0.35);
+    HorizontalLayout {
+        padding: 12px;
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 10px;
+        if root.icone.width > 0: VerticalLayout {
+            alignment: start;
+            Icon { source: root.icone; color: FxCores.de(root.cor); size: 16px; }
+        }
+        Text {
+            text: root.text;
+            color: FxCores.de(root.cor);
+            font-size: 13px;
+            font-weight: 600;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+    }
+}
+
+// Cabeçalho das telas internas: voltar, título, subtítulo e ações à direita
+export component FxHeader inherits HorizontalLayout {
+    in property <string> titulo;
+    in property <string> subtitulo;
+    in property <FxCor> cor: FxCor.ambar;
+    callback voltar;
+    spacing: 14px;
+    alignment: stretch;
+    Rectangle {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background: back.has-hover ? Theme.surface-2 : Theme.surface;
+        border-width: 1px;
+        border-color: Theme.border;
+        Icon { source: @image-url("../../assets/icons/arrow-left.svg"); color: Theme.text; size: 20px; }
+        back := TouchArea { mouse-cursor: pointer; clicked => { root.voltar(); } }
+    }
+    VerticalLayout {
+        alignment: center;
+        spacing: 2px;
+        horizontal-stretch: 1;
+        Text { text: root.titulo; color: Theme.text; font-size: 22px; font-weight: 900; wrap: word-wrap; }
+        if root.subtitulo != "": Text { text: root.subtitulo; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
+    }
+    @children
+}
+
+// Fundo escurecido + painel central (modais da área fiscal)
+export component FxSheet inherits Rectangle {
+    in property <length> largura: 560px;
+    in property <string> titulo;
+    in property <string> subtitulo;
+    in property <FxCor> cor: FxCor.ambar;
+    in property <image> icone;
+    callback fechar;
+    background: Theme.overlay;
+    TouchArea { }
+    Rectangle {
+        width: min(root.largura, root.width - 32px);
+        height: min(corpo.preferred-height, root.height - 32px);
+        background: Theme.surface;
+        border-radius: 24px;
+        border-width: 1px;
+        border-color: Theme.border;
+        clip: true;
+        corpo := VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+            HorizontalLayout {
+                spacing: 12px;
+                if root.icone.width > 0: Rectangle {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 14px;
+                    background: FxCores.de(root.cor).with-alpha(0.12);
+                    border-width: 1px;
+                    border-color: FxCores.de(root.cor).with-alpha(0.3);
+                    Icon { source: root.icone; color: FxCores.de(root.cor); size: 20px; }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Text { text: root.titulo; color: Theme.text; font-size: 19px; font-weight: 900; wrap: word-wrap; }
+                    if root.subtitulo != "": Text { text: root.subtitulo; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                }
+                Rectangle {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 10px;
+                    background: x-touch.has-hover ? Theme.surface-2 : transparent;
+                    Icon { source: @image-url("../../assets/icons/x.svg"); color: Theme.text-muted; size: 18px; }
+                    x-touch := TouchArea { mouse-cursor: pointer; clicked => { root.fechar(); } }
+                }
+            }
+            @children
+        }
+    }
+}
+
+// Opção selecionável (formas de pagamento, ambiente, filtros)
+export component FxOpcao inherits Rectangle {
+    in property <string> text;
+    in property <bool> ativo;
+    in property <FxCor> cor: FxCor.verde;
+    callback clicked;
+    min-height: 44px;
+    min-width: op-text.preferred-width + 24px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: root.ativo ? FxCores.de(root.cor) : Theme.border;
+    background: root.ativo ? FxCores.de(root.cor).with-alpha(0.14) : (t.has-hover ? Theme.surface-2 : Theme.bg);
+    op-text := Text {
+        text: root.text;
+        color: root.ativo ? FxCores.de(root.cor) : Theme.text-muted;
+        font-size: 13px;
+        font-weight: 800;
+    }
+    t := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}

@@ -1,0 +1,22 @@
+---
+source: crates/barerp-print/tests/layouts.rs
+expression: doc.to_text()
+---
+        *** COZINHA ***
+              VARANDA 3
+COMANDA: #42                      HORA: 20:15:09
+ATENDENTE: Garçom
+------------------------------------------------
+1x PORÇÃO DE FRITAS
+   >> OBS: SEM SAL · MOLHO À PARTE
+2x X-BURGUER ARTESANAL COM CHEDDAR E CEBOLA
+   CARAMELIZADA
+   >> OBS: AO PONTO, SEM CEBOLA, PÃO SEM
+      GERGELIM E MAIONESE VERDE EXTRA
+------------------------------------------------
+               TOTAL DE ITENS: 3
+================================================
+     SISTEMA BAR ERP - IMPRESSÃO AUTOMÁTICA
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

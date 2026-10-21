@@ -1,0 +1,390 @@
+// Módulo Fiscal Central (FiscalHubView), selo da SEFAZ (SefazStatusBadge) e modais de inutilização de
+// numeração de NFC-e e NF-e (NfceInutilizacaoModal / NfeInutilizacaoModal).
+
+import { Theme } from "../theme.slint";
+import { FiscalStore } from "fiscal_store.slint";
+import { FxCor, FxCores, FxBadge, FxLabel, FxButton, FxBotao, FxInput, FxTextArea, FxField, FxAviso, FxSheet, Icon } from "fiscal_ui.slint";
+import { FiscalIcons } from "fiscal_icons.slint";
+
+// Cartão de destino do hub
+component HubCard inherits Rectangle {
+    in property <image> icone;
+    // texto no lugar do ícone (cartão do contador: "ZIP")
+    in property <string> sigla;
+    in property <string> selo;
+    in property <FxCor> cor: FxCor.ambar;
+    in property <string> titulo;
+    in property <string> descricao;
+    in property <bool> grande;
+    in property <bool> destaque;
+    callback clicked;
+    property <color> c: FxCores.de(root.cor);
+    border-radius: 24px;
+    background: t.has-hover ? Theme.surface-2 : Theme.surface;
+    border-width: 1px;
+    border-color: t.has-hover || root.destaque ? root.c.with-alpha(t.has-hover ? 1 : 0.4) : Theme.border;
+    min-height: corpo.preferred-height;
+    clip: true;
+    // brilho no canto, como o blur do React
+    Rectangle {
+        x: parent.width - self.width * 0.6;
+        y: -self.height * 0.4;
+        width: root.grande ? 160px : 120px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: root.c.with-alpha(t.has-hover ? 0.16 : 0.07);
+    }
+    corpo := VerticalLayout {
+        padding: root.grande ? 28px : 22px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 12px;
+            alignment: start;
+            Rectangle {
+                width: 42px;
+                height: 42px;
+                border-radius: 12px;
+                background: root.c.with-alpha(0.12);
+                border-width: 1px;
+                border-color: root.c.with-alpha(0.3);
+                if root.sigla == "": Icon { source: root.icone; color: root.c; size: 20px; }
+                if root.sigla != "": Text { text: root.sigla; font-size: 13px; font-weight: 900; color: root.c; }
+            }
+            if root.selo != "": VerticalLayout {
+                alignment: center;
+                FxBadge { text: root.selo; cor: root.cor; }
+            }
+            @children
+        }
+        Text {
+            text: root.titulo;
+            color: Theme.text;
+            font-size: root.grande ? 20px : 16px;
+            font-weight: 800;
+            wrap: word-wrap;
+        }
+        Text {
+            text: root.descricao;
+            color: Theme.text-muted;
+            font-size: root.grande ? 14px : 12px;
+            wrap: word-wrap;
+        }
+    }
+    t := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+component Secao inherits HorizontalLayout {
+    in property <image> icone;
+    in property <string> titulo;
+    in property <FxCor> cor;
+    spacing: 8px;
+    alignment: start;
+    VerticalLayout { alignment: center; Icon { source: root.icone; color: FxCores.de(root.cor); size: 15px; } }
+    FxLabel { text: root.titulo; vertical-alignment: center; }
+}
+
+// Selo SEFAZ com o painel de detalhes ao clicar
+export component SefazBadge inherits Rectangle {
+    property <FxCor> cor: FiscalStore.sefaz.carregando ? FxCor.neutro : FiscalStore.sefaz.online ? FxCor.verde : FxCor.vermelho;
+    width: selo.preferred-width + 26px;
+    height: 32px;
+    border-radius: 12px;
+    background: FxCores.de(root.cor).with-alpha(t.has-hover ? 0.2 : 0.1);
+    border-width: 1px;
+    border-color: FxCores.de(root.cor).with-alpha(0.3);
+    selo := HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 7px;
+        alignment: center;
+        Rectangle {
+            width: 8px;
+            height: 8px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 4px;
+            background: FxCores.de(root.cor);
+        }
+        Text { text: FiscalStore.sefaz.rotulo; color: FxCores.de(root.cor); font-size: 12px; font-weight: 800; vertical-alignment: center; }
+    }
+    t := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { FiscalStore.sefaz-detalhes = !FiscalStore.sefaz-detalhes; }
+    }
+}
+
+export component SefazDetalhes inherits Rectangle {
+    width: 300px;
+    height: det.preferred-height;
+    background: Theme.surface;
+    border-radius: 18px;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: 18px;
+    drop-shadow-color: #00000040;
+    det := VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout { alignment: center; Icon { source: FiscalIcons.wifi; color: Theme.text-muted; size: 14px; } }
+            Text { text: FiscalStore.sefaz.autorizador; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+            Rectangle {
+                width: 28px;
+                height: 28px;
+                border-radius: 8px;
+                background: r.has-hover ? Theme.surface-2 : transparent;
+                Icon { source: FiscalIcons.refresh-cw; color: Theme.text-muted; size: 15px; }
+                r := TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.sefaz-atualizar(); } }
+            }
+        }
+        FxLabel { text: "STATUS DA CONEXÃO"; }
+        HorizontalLayout {
+            spacing: 6px;
+            VerticalLayout { alignment: center; Icon { source: FiscalStore.sefaz.online ? FiscalIcons.circle-check : FiscalIcons.circle-x; color: FiscalStore.sefaz.online ? Theme.available : Theme.danger; size: 15px; } }
+            Text { text: FiscalStore.sefaz.motivo; color: FiscalStore.sefaz.online ? Theme.available : Theme.danger; font-size: 13px; font-weight: 700; wrap: word-wrap; horizontal-stretch: 1; }
+        }
+        if FiscalStore.sefaz.detalhe != "": FxAviso { text: FiscalStore.sefaz.detalhe; cor: FxCor.ambar; }
+        if FiscalStore.sefaz.codigo != "": HorizontalLayout {
+            Text { text: "Código SEFAZ: " + FiscalStore.sefaz.codigo; color: Theme.text-muted; font-size: 11px; horizontal-stretch: 1; }
+            if FiscalStore.sefaz.latencia != "": Text { text: "Latência: " + FiscalStore.sefaz.latencia; color: Theme.text-muted; font-size: 11px; }
+        }
+        Text { text: FiscalStore.sefaz.dica; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+    }
+}
+
+export component FiscalHub inherits Rectangle {
+    // Cartões lado a lado com a mesma largura (padding 24 px de cada lado e 16 px entre eles)
+    property <length> metade: (root.width - 48px - 16px) / 2;
+    Flickable {
+        content-height: conteudo.preferred-height;
+        conteudo := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 80px;
+            spacing: 22px;
+            HorizontalLayout {
+                spacing: 16px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text { text: "Módulo Fiscal Central"; color: Theme.text; font-size: 26px; font-weight: 900; }
+                    Text { text: "Gestão fiscal integrada com SEFAZ e Focus NFe"; color: Theme.text-muted; font-size: 14px; }
+                }
+                VerticalLayout { alignment: center; SefazBadge { } }
+            }
+
+            // Recebimento fiscal
+            VerticalLayout {
+                spacing: 12px;
+                Secao { icone: FiscalIcons.scan; titulo: "RECEBIMENTO FISCAL"; cor: FxCor.ambar; }
+                HubCard {
+                    grande: true; destaque: true; cor: FxCor.ambar; icone: FiscalIcons.scan; selo: "1º BIP";
+                    titulo: "1º BIP — Receber NF do Fornecedor";
+                    descricao: "Bipe a nota recebida para registrar a Ciência da Operação na SEFAZ e fazer o download do XML. O estoque não é alterado nesta etapa.";
+                    clicked => { FiscalStore.abrir("receber"); }
+                }
+                HubCard {
+                    grande: true; destaque: true; cor: FxCor.verde; icone: FiscalIcons.file-text; selo: "2º BIP";
+                    titulo: "2º BIP — Entrada no Estoque";
+                    descricao: "Bipe a DANFE impressa ou selecione o arquivo .xml para conferir os itens recebidos e dar entrada definitiva no estoque.";
+                    clicked => { FiscalStore.abrir("importar"); }
+                }
+                HubCard {
+                    grande: true; destaque: true; cor: FxCor.ambar; icone: FiscalIcons.package; selo: "DF-e SEFAZ";
+                    titulo: "Notas Fiscais Pendentes SEFAZ";
+                    descricao: "Consulte todas as notas emitidas contra o CNPJ da sua empresa. Acompanhe o ciclo de status (Pendente → Recebida → Finalizada) e veja quais já têm o XML baixado.";
+                    clicked => { FiscalStore.abrir("pendentes"); }
+                    HorizontalLayout {
+                        alignment: end;
+                        horizontal-stretch: 1;
+                        spacing: 12px;
+                        HorizontalLayout { spacing: 5px; Rectangle { width: 9px; height: 9px; y: (parent.height - 9px) / 2; border-radius: 5px; background: Theme.available; } Text { text: "XML Baixado"; color: Theme.text-muted; font-size: 11px; font-weight: 700; vertical-alignment: center; } }
+                        HorizontalLayout { spacing: 5px; Rectangle { width: 9px; height: 9px; y: (parent.height - 9px) / 2; border-radius: 5px; background: Theme.closing; } Text { text: "XML Pendente"; color: Theme.text-muted; font-size: 11px; font-weight: 700; vertical-alignment: center; } }
+                    }
+                }
+            }
+
+            // Emissão
+            VerticalLayout {
+                spacing: 12px;
+                Secao { icone: FiscalIcons.receipt; titulo: "EMISSÃO DE NOTAS"; cor: FxCor.azul; }
+                HorizontalLayout {
+                    spacing: 16px;
+                    HubCard {
+                        width: root.metade;
+                        cor: FxCor.azul; icone: FiscalIcons.receipt; selo: "MODELO 55"; titulo: "Emitir NF-e";
+                        descricao: "Emissão avulsa de notas fiscais eletrônicas de saída usando a integração Focus NFe.";
+                        clicked => { FiscalStore.abrir("nfe"); }
+                    }
+                    HubCard {
+                        width: root.metade;
+                        cor: FxCor.roxo; icone: FiscalIcons.receipt; selo: "MODELO 65"; titulo: "Emitir NFC-e";
+                        descricao: "Emissão de cupons fiscais NFC-e para vendas rápidas via Focus NFe.";
+                        clicked => { FiscalStore.abrir("nfce"); }
+                    }
+                }
+            }
+
+            // Reimpressão
+            VerticalLayout {
+                spacing: 12px;
+                Secao { icone: FiscalIcons.printer; titulo: "REIMPRESSÃO DE DANFE"; cor: FxCor.azul; }
+                HorizontalLayout {
+                    spacing: 16px;
+                    HubCard {
+                        width: root.metade;
+                        cor: FxCor.azul; icone: FiscalIcons.printer; selo: "CUPOM"; titulo: "Reimprimir NFC-e";
+                        descricao: "Reimprime o DANFE de cupons fiscais NFC-e já emitidos na SEFAZ por número ou referência.";
+                        clicked => { FiscalStore.abrir("reimprimir-nfce"); }
+                    }
+                    HubCard {
+                        width: root.metade;
+                        cor: FxCor.roxo; icone: FiscalIcons.printer; selo: "NOTA"; titulo: "Reimprimir NF-e";
+                        descricao: "Reimprime o DANFE de notas fiscais NF-e (saída) já autorizadas na SEFAZ por número da nota.";
+                        clicked => { FiscalStore.abrir("reimprimir-nfe"); }
+                    }
+                }
+            }
+
+            // Cancelamento
+            VerticalLayout {
+                spacing: 12px;
+                Secao { icone: FiscalIcons.circle-x; titulo: "CANCELAMENTO DE NOTA FISCAL"; cor: FxCor.vermelho; }
+                HorizontalLayout {
+                    spacing: 16px;
+                    HubCard {
+                        width: root.metade;
+                        cor: FxCor.vermelho; icone: FiscalIcons.circle-x; titulo: "Cancelar NFC-e";
+                        descricao: "Cancela cupons fiscais NFC-e na SEFAZ. Prazo máximo de 30 minutos após a emissão.";
+                        clicked => { FiscalStore.abrir("cancelar-nfce"); }
+                        VerticalLayout { alignment: center; FxBadge { text: "30 MIN"; cor: FxCor.ambar; } }
+                    }
+                    HubCard {
+                        width: root.metade;
+                        cor: FxCor.vermelho; icone: FiscalIcons.circle-x; selo: "24H"; titulo: "Cancelar NF-e";
+                        descricao: "Cancela notas fiscais NF-e na SEFAZ. Prazo máximo de 24 horas após autorização.";
+                        clicked => { FiscalStore.abrir("cancelar-nfe"); }
+                    }
+                }
+            }
+
+            // Inutilização
+            VerticalLayout {
+                spacing: 12px;
+                Secao { icone: FiscalIcons.shield-alert; titulo: "INUTILIZAÇÃO DE NUMERAÇÃO"; cor: FxCor.ambar; }
+                HorizontalLayout {
+                    spacing: 16px;
+                    HubCard {
+                        width: root.metade;
+                        cor: FxCor.ambar; icone: FiscalIcons.shield-alert; selo: "MODELO 65"; titulo: "Inutilizar NFC-e";
+                        descricao: "Comunique à SEFAZ saltos de numeração em cupons fiscais NFC-e. Endpoint: POST /v2/nfce/inutilizacao";
+                        clicked => { FiscalStore.inut-abrir("nfce"); }
+                    }
+                    HubCard {
+                        width: root.metade;
+                        cor: FxCor.ambar; icone: FiscalIcons.shield-alert; selo: "MODELO 55"; titulo: "Inutilizar NF-e";
+                        descricao: "Comunique à SEFAZ saltos de numeração em notas fiscais NF-e (saída). Endpoint: POST /v2/nfe/inutilizacao";
+                        clicked => { FiscalStore.inut-abrir("nfe"); }
+                    }
+                }
+            }
+
+            HubCard {
+                grande: true; cor: FxCor.azul; icone: FiscalIcons.book-open; selo: "IBPT"; titulo: "Tabela NCM & Alíquotas";
+                descricao: "Consulte códigos NCM na base oficial da Receita Federal com atalhos para bebidas, alimentos e alíquotas IBPT.";
+                clicked => { FiscalStore.abrir-ncm(); }
+            }
+            HubCard {
+                grande: true; cor: FxCor.azul; sigla: "ZIP"; selo: "CONTABILIDADE";
+                titulo: "Painel do Contador (SPED/XMLs e Backups em Nuvem)";
+                descricao: "Fechamento do mês: Baixe os pacotes oficiais compactados da Focus NFe na nuvem ou exporte todos os XMLs de notas fiscais de Entrada e Saída em .ZIP para enviar ao contador.";
+                clicked => { FiscalStore.abrir("contador"); }
+            }
+            HubCard {
+                cor: FxCor.neutro; icone: FiscalIcons.settings; titulo: "Configurações Fiscais";
+                descricao: "Token API Focus NFe, Certificado Digital A1 e dados do emitente.";
+                clicked => { FiscalStore.abrir("config"); }
+            }
+        }
+    }
+    if FiscalStore.sefaz-detalhes: TouchArea { clicked => { FiscalStore.sefaz-detalhes = false; } }
+    if FiscalStore.sefaz-detalhes: SefazDetalhes { x: parent.width - self.width - 24px; y: 78px; }
+}
+
+// Inutilização de numeração (NFC-e ou NF-e)
+export component InutilizacaoSheet inherits FxSheet {
+    property <bool> nfe: FiscalStore.inut-modelo == "nfe";
+    property <int> qtd: FiscalStore.inut-inicial.is-float() && FiscalStore.inut-final.is-float()
+        ? max(0, FiscalStore.inut-final.to-float() - FiscalStore.inut-inicial.to-float() + 1) : 0;
+    property <int> letras: FiscalStore.inut-justificativa.character-count;
+    titulo: root.nfe ? "Inutilizar Numeração — NF-e" : "Inutilizar Numeração — NFC-e";
+    subtitulo: root.nfe ? "Comunique à SEFAZ o salto de sequência em NF-e" : "Comunique à SEFAZ a quebra de sequência de cupons fiscais";
+    icone: FiscalIcons.shield-alert;
+    cor: FxCor.ambar;
+    largura: 600px;
+    fechar => { FiscalStore.inut-modelo = ""; }
+
+    if root.nfe: FxAviso {
+        cor: FxCor.azul;
+        icone: FiscalIcons.info;
+        text: "Esta tela é exclusiva para NF-e (notas de saída, modelo 55). Para inutilizar numeração de NFC-e (cupom fiscal, modelo 65), use a opção \"Inutilizar NFC-e\" ao lado. A SEFAZ exige justificativa com no mínimo 15 caracteres.";
+    }
+    FxAviso {
+        cor: FxCor.ambar;
+        text: root.nfe
+            ? "Utilize quando houver salto de números não emitidos (falha técnica, reinicialização do terminal ou testes). O endpoint utilizado é POST /v2/nfe/inutilizacao da Focus NFe."
+            : "Use quando houver salto de números de NFC-e (modelo 65) não emitidos (queda de energia, falhas ou testes). A SEFAZ exige justificativa com no mínimo 15 caracteres.";
+    }
+    if FiscalStore.inut-resultado != "": FxAviso {
+        text: FiscalStore.inut-resultado;
+        icone: FiscalStore.inut-resultado-ok ? FiscalIcons.circle-check : FiscalIcons.triangle-alert;
+        cor: FiscalStore.inut-resultado-ok ? FxCor.verde : FxCor.vermelho;
+    }
+    HorizontalLayout {
+        spacing: 12px;
+        FxField { label: root.nfe ? "SÉRIE NF-E" : "SÉRIE"; FxInput { text <=> FiscalStore.inut-serie; mono: true; } }
+        FxField {
+            label: "Nº INICIAL";
+            FxInput {
+                text <=> FiscalStore.inut-inicial;
+                placeholder: "Ex: 10";
+                mono: true;
+                edited(t) => { if FiscalStore.inut-final == "" { FiscalStore.inut-final = t; } }
+            }
+        }
+        FxField { label: "Nº FINAL"; FxInput { text <=> FiscalStore.inut-final; placeholder: "Ex: 10"; mono: true; } }
+    }
+    if root.nfe && root.qtd > 0: FxAviso {
+        cor: FxCor.neutro;
+        text: "Serão inutilizadas " + root.qtd + (root.qtd > 1 ? " notas" : " nota") + " (NF-e Série " + FiscalStore.inut-serie + ": " + FiscalStore.inut-inicial + " → " + FiscalStore.inut-final + ")";
+    }
+    VerticalLayout {
+        spacing: 6px;
+        HorizontalLayout {
+            FxLabel { text: root.nfe ? "JUSTIFICATIVA LEGAL (MÍN. 15 CARACTERES)" : "JUSTIFICATIVA LEGAL (MIN. 15 LETRAS)"; horizontal-stretch: 1; }
+            Text {
+                text: root.letras + "/15 min";
+                color: root.letras >= 15 ? Theme.available : Theme.closing;
+                font-size: 11px;
+                font-weight: 800;
+            }
+        }
+        FxTextArea {
+            text <=> FiscalStore.inut-justificativa;
+            placeholder: root.nfe
+                ? "Ex: Quebra de sequencia numerica decorrente de falha tecnica no terminal emissor de NF-e"
+                : "Ex: Quebra de sequencia numerica decorrente de falha tecnica ou reinicializacao do terminal emissor";
+        }
+    }
+    HorizontalLayout {
+        spacing: 12px;
+        alignment: end;
+        FxButton { text: "Cancelar"; clicked => { FiscalStore.inut-modelo = ""; } }
+        FxButton {
+            text: root.nfe ? "Homologar NF-e na SEFAZ" : "Homologar na SEFAZ";
+            tipo: FxBotao.primario;
+            busy: FiscalStore.inut-enviando;
+            enabled: root.letras >= 15;
+            clicked => { FiscalStore.inut-enviar(); }
+        }
+    }
+}

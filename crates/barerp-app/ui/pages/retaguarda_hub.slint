@@ -1,0 +1,683 @@
+// Hub da Retaguarda: port do SettingsView.tsx, com o BackupSettingsCard.tsx e o DigitalMenuCard.tsx.
+
+import { Theme } from "../theme.slint";
+import { RetaguardaStore, RtDevice, RtMenuCategory, RtMenuRow } from "retaguarda_store.slint";
+import {
+    RtIcons, RtColors, RIcon, Spinner, RButton, PrimaryButton, GhostButton, RInput, Toggle, ToggleRow, Card, Badge,
+    IconBubble, NavCard, FieldLabel, Feedback, AlertBox
+} from "retaguarda_widgets.slint";
+
+// Cartão grande com gradiente suave e borda colorida (Assinatura, Métricas)
+component HeroCard inherits Rectangle {
+    in property <image> icon;
+    in property <color> tone;
+    in property <string> title;
+    in property <string> badge;
+    in property <color> badge-tone: root.tone;
+    in property <string> subtitle;
+    callback clicked;
+    min-height: 92px;
+    border-radius: 24px;
+    border-width: 2px;
+    border-color: touch.has-hover ? root.tone : root.tone.with-alpha(0.35);
+    background: @linear-gradient(90deg, root.tone.with-alpha(touch.has-hover ? 0.16 : 0.1) 0%, Theme.surface 45%, Theme.surface 100%);
+    HorizontalLayout {
+        padding: 20px;
+        spacing: 16px;
+        VerticalLayout { alignment: center; IconBubble { icon: root.icon; tone: root.tone; square: true; outlined: true; } }
+        VerticalLayout {
+            alignment: center;
+            spacing: 3px;
+            horizontal-stretch: 1;
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                Text { text: root.title; color: touch.has-hover ? root.tone : Theme.text; font-size: 16px; font-weight: 800; vertical-alignment: center; wrap: word-wrap; }
+                VerticalLayout { alignment: center; Badge { text: root.badge; tone: root.badge-tone; pill: true; } }
+            }
+            Text { text: root.subtitle; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+        }
+        VerticalLayout { alignment: center; RIcon { source: RtIcons.chevron-right; tint: touch.has-hover ? root.tone : Theme.text-muted; size: 20px; } }
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+component InfoTile inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <string> sub;
+    border-radius: 16px;
+    background: Theme.bg;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    VerticalLayout {
+        padding: 12px;
+        padding-left: 16px;
+        spacing: 3px;
+        Text { text: root.label; color: Theme.text-muted; font-size: 10px; font-weight: 800; }
+        Text { text: root.value; color: Theme.text; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
+        Text { text: root.sub; color: Theme.text-muted; font-size: 12px; }
+    }
+}
+
+component BackupCard inherits Card {
+    VerticalLayout {
+        padding: 20px;
+        spacing: 16px;
+        HorizontalLayout {
+            spacing: 16px;
+            VerticalLayout { alignment: center; IconBubble { icon: RtIcons.shield-check; tone: RtColors.indigo; } }
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                horizontal-stretch: 1;
+                Text { text: "Backup Automático do Banco"; color: Theme.text; font-size: 15px; font-weight: 700; }
+                Text {
+                    text: "Ao abrir o sistema, a cada 6 horas e ao fechar o caixa. Use a pasta do Google Drive ou OneDrive para o backup sair do computador.";
+                    color: Theme.text-muted;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+            }
+            VerticalLayout { alignment: center; Badge { text: RetaguardaStore.b-alert-on ? "ATENÇÃO" : "PROTEGIDO"; tone: RetaguardaStore.b-alert-on ? Theme.danger : RtColors.indigo; } }
+        }
+        if RetaguardaStore.b-alert-on: AlertBox { text: RetaguardaStore.b-alert; }
+        HorizontalLayout {
+            spacing: 12px;
+            InfoTile { label: "ÚLTIMO BACKUP NO COMPUTADOR"; value: RetaguardaStore.b-last-local; sub: RetaguardaStore.b-local-count; horizontal-stretch: 1; }
+            InfoTile { label: "ÚLTIMO BACKUP EXTERNO"; value: RetaguardaStore.b-last-external; sub: RetaguardaStore.b-external-sub; horizontal-stretch: 1; }
+        }
+        VerticalLayout {
+            spacing: 8px;
+            FieldLabel { text: "Pasta do backup externo"; }
+            HorizontalLayout {
+                spacing: 8px;
+                RInput {
+                    horizontal-stretch: 1;
+                    text <=> RetaguardaStore.b-folder;
+                    mono: true;
+                    font-size: 12px;
+                    focus-color: RtColors.indigo;
+                    placeholder: "Ex.: C:\\Users\\Bar\\Google Drive\\Backups BarERP";
+                }
+                GhostButton { icon: RtIcons.folder-open; text: "Escolher pasta"; clicked => { RetaguardaStore.b-choose-folder(); } }
+            }
+        }
+        HorizontalLayout {
+            spacing: 12px;
+            ToggleRow {
+                horizontal-stretch: 1;
+                on: RetaguardaStore.b-enabled;
+                tone: RtColors.indigo-solid;
+                text: "Copiar para a pasta externa";
+                toggled => { RetaguardaStore.b-enabled = !RetaguardaStore.b-enabled; }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                horizontal-stretch: 0;
+                Text { text: "Guardar"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                RInput { width: 80px; text <=> RetaguardaStore.b-keep; mono: true; font-size: 14px; weight: 700; focus-color: RtColors.indigo; }
+                Text { text: "dias de histórico"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+            }
+        }
+        if RetaguardaStore.b-message != "": Feedback { text: RetaguardaStore.b-message; ok: RetaguardaStore.b-message-ok; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            GhostButton {
+                spin: RetaguardaStore.b-running;
+                text: RetaguardaStore.b-running ? "Fazendo backup..." : "Fazer backup agora";
+                weight: 900;
+                enabled: !RetaguardaStore.b-running && !RetaguardaStore.b-saving;
+                clicked => { RetaguardaStore.b-run-now(); }
+            }
+            RButton {
+                text: RetaguardaStore.b-saving ? "Salvando..." : "Salvar";
+                bg: #6366f1;
+                hover-bg: #818cf8;
+                fg: #ffffff;
+                weight: 900;
+                enabled: !RetaguardaStore.b-running && !RetaguardaStore.b-saving;
+                clicked => { RetaguardaStore.b-save(); }
+            }
+        }
+    }
+}
+
+component CategoryChip inherits Rectangle {
+    in property <RtMenuCategory> cat;
+    height: 30px;
+    width: ct.preferred-width + 26px;
+    border-radius: 15px;
+    border-width: 1px;
+    border-color: root.cat.hidden ? Theme.border : Theme.primary.with-alpha(0.4);
+    background: root.cat.hidden ? transparent : Theme.primary.with-alpha(0.1);
+    ct := Text { text: root.cat.name; color: root.cat.hidden ? Theme.text-muted : (Theme.dark ? #fcd34d : #b45309); font-size: 12px; font-weight: 700; }
+    if root.cat.hidden: Rectangle { x: 12px; width: parent.width - 24px; height: 1px; background: Theme.text-muted; }
+    TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.m-toggle-category(root.cat.id); } }
+}
+
+component DigitalMenuCard inherits Card {
+    VerticalLayout {
+        padding: 20px;
+        spacing: 16px;
+        HorizontalLayout {
+            spacing: 16px;
+            VerticalLayout { alignment: center; IconBubble { icon: RtIcons.qr-code; tone: Theme.primary; } }
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                horizontal-stretch: 1;
+                Text { text: "Cardápio Digital (QR na mesa)"; color: Theme.text; font-size: 15px; font-weight: 700; }
+                Text {
+                    text: "O cliente aponta a câmera para o QR da mesa e vê o cardápio com preços, adicionais e as promoções do momento. Atualiza sozinho quando você altera os produtos.";
+                    color: Theme.text-muted;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+            }
+            VerticalLayout {
+                alignment: center;
+                Badge {
+                    text: RetaguardaStore.m-badge;
+                    tone: RetaguardaStore.m-badge-tone == 2 ? Theme.danger : RetaguardaStore.m-badge-tone == 1 ? Theme.available : Theme.text-muted;
+                }
+            }
+        }
+        if RetaguardaStore.m-error != "": AlertBox { text: RetaguardaStore.m-error; }
+
+        if RetaguardaStore.m-published: Rectangle {
+            border-radius: 16px;
+            background: Theme.bg;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            HorizontalLayout {
+                padding: 16px;
+                spacing: 16px;
+                if RetaguardaStore.m-has-qr: VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 112px;
+                        height: 112px;
+                        border-radius: 12px;
+                        background: #ffffff;
+                        Image { width: 96px; height: 96px; source: RetaguardaStore.m-qr; image-rendering: pixelated; }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 8px;
+                    horizontal-stretch: 1;
+                    Text { text: "LINK DO CARDÁPIO"; color: Theme.text-muted; font-size: 10px; font-weight: 800; }
+                    Text { text: RetaguardaStore.m-url; color: Theme.text; font-size: 12px; font-weight: 800; font-family: "Menlo"; wrap: word-wrap; }
+                    Text {
+                        text: "Última publicação: " + RetaguardaStore.m-last + ". No QR de cada mesa o link leva o número dela (ex.: ?mesa=5).";
+                        color: Theme.text-muted;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        RButton {
+                            icon: RtIcons.external-link; text: "Abrir cardápio"; bg: Theme.surface; outline: Theme.border; hover-bg: Theme.surface-2;
+                            clicked => { RetaguardaStore.m-open-menu(); }
+                        }
+                        RButton {
+                            icon: RtIcons.copy; text: "Copiar link"; bg: Theme.surface; outline: Theme.border; hover-bg: Theme.surface-2;
+                            clicked => { RetaguardaStore.m-copy-link(); }
+                        }
+                        PrimaryButton {
+                            icon: RtIcons.printer;
+                            spin: RetaguardaStore.m-busy == "qr";
+                            text: "QR Codes das mesas (PDF)";
+                            enabled: RetaguardaStore.m-busy == "";
+                            clicked => { RetaguardaStore.m-qr-sheet(); }
+                        }
+                    }
+                }
+            }
+        }
+
+        ToggleRow {
+            on: RetaguardaStore.m-enabled;
+            text: "Publicar o cardápio na internet";
+            toggled => { RetaguardaStore.m-enabled = !RetaguardaStore.m-enabled; }
+        }
+
+        // Escolher itens, fotos e descrições
+        Rectangle {
+            height: 64px;
+            border-radius: 16px;
+            border-width: 1px;
+            border-color: items-touch.has-hover ? Theme.primary : Theme.surface-2;
+            background: Theme.bg;
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 12px;
+                VerticalLayout { alignment: center; RIcon { source: RtIcons.list-checks; tint: Theme.primary; size: 20px; } }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Text { text: "Escolher itens, fotos e descrições"; color: Theme.text; font-size: 14px; font-weight: 700; }
+                    Text { text: "Marque o que aparece no cardápio e adicione foto e descrição a cada produto."; color: Theme.text-muted; font-size: 11px; }
+                }
+                Text { text: "Abrir"; color: Theme.dark ? #fbbf24 : #b45309; font-size: 12px; font-weight: 900; vertical-alignment: center; }
+            }
+            items-touch := TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.m-open-items(); } }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            VerticalLayout {
+                spacing: 4px;
+                horizontal-stretch: 1;
+                FieldLabel { text: "Nome no cardápio"; }
+                RInput { text <=> RetaguardaStore.m-title; placeholder: RetaguardaStore.m-title-placeholder; }
+            }
+            VerticalLayout {
+                spacing: 4px;
+                horizontal-stretch: 1;
+                FieldLabel { text: "Recado no topo (opcional)"; }
+                RInput { text <=> RetaguardaStore.m-message; placeholder: "Ex.: Wi-Fi BarDoZe · senha 12345678"; }
+            }
+        }
+
+        if RetaguardaStore.m-category-rows.length > 0: VerticalLayout {
+            spacing: 6px;
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+                FieldLabel { text: "Categorias no cardápio"; }
+                Text { text: "(clique para esconder ou mostrar)"; color: Theme.text-muted; font-size: 12px; }
+            }
+            VerticalLayout {
+                spacing: 8px;
+                for row in RetaguardaStore.m-category-rows: HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    for c in row.cats: CategoryChip { cat: c; }
+                }
+            }
+        }
+
+        ToggleRow {
+            on: RetaguardaStore.m-ignore-stock;
+            text: "Ignorar o estoque (nada aparece como \"Esgotado\"; use se o estoque não é controlado)";
+            toggled => { RetaguardaStore.m-ignore-stock = !RetaguardaStore.m-ignore-stock; }
+        }
+        if !RetaguardaStore.m-ignore-stock: ToggleRow {
+            on: RetaguardaStore.m-hide-sold-out;
+            text: "Esconder produtos sem estoque (desligado: aparecem como \"Esgotado\")";
+            toggled => { RetaguardaStore.m-hide-sold-out = !RetaguardaStore.m-hide-sold-out; }
+        }
+        Text { text: "Itens da cozinha nunca aparecem como esgotados."; color: Theme.text-muted; font-size: 11px; }
+
+        // Avançado (details/summary)
+        VerticalLayout {
+            spacing: 8px;
+            HorizontalLayout {
+                alignment: start;
+                Rectangle {
+                    HorizontalLayout {
+                        spacing: 4px;
+                        VerticalLayout { alignment: center; RIcon { source: RetaguardaStore.m-advanced ? RtIcons.chevron-down : RtIcons.chevron-right; tint: Theme.text-muted; size: 14px; } }
+                        Text { text: "Avançado"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                    }
+                    TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.m-advanced = !RetaguardaStore.m-advanced; } }
+                }
+            }
+            if RetaguardaStore.m-advanced: VerticalLayout {
+                spacing: 4px;
+                FieldLabel { text: "Endereço do site do cardápio"; }
+                RInput { text <=> RetaguardaStore.m-site; placeholder: RetaguardaStore.m-site-placeholder; mono: true; font-size: 12px; }
+                Text {
+                    text: "Deixe vazio para usar o site padrão. Ao trocar, os QR Codes impressos precisam ser refeitos.";
+                    color: Theme.text-muted;
+                    font-size: 11px;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        if RetaguardaStore.m-feedback != "": Feedback { text: RetaguardaStore.m-feedback; ok: RetaguardaStore.m-feedback-ok; }
+
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            if RetaguardaStore.m-status-enabled: GhostButton {
+                icon: RtIcons.send;
+                spin: RetaguardaStore.m-busy == "publish";
+                weight: 900;
+                text: RetaguardaStore.m-busy == "publish" ? "Publicando..." : "Publicar agora";
+                enabled: RetaguardaStore.m-busy == "";
+                clicked => { RetaguardaStore.m-publish(); }
+            }
+            PrimaryButton {
+                spin: RetaguardaStore.m-busy == "save";
+                text: RetaguardaStore.m-busy == "save" ? "Salvando..." : "Salvar";
+                enabled: RetaguardaStore.m-busy == "";
+                clicked => { RetaguardaStore.m-save(); }
+            }
+        }
+    }
+}
+
+component DeviceRow inherits Rectangle {
+    in property <RtDevice> device;
+    property <color> dot: root.device.kind == "GARCOM_MOBILE" ? Theme.primary : root.device.kind == "COZINHA_KDS" ? Theme.orange : Theme.available;
+    min-height: 56px;
+    border-radius: 16px;
+    background: Theme.bg.with-alpha(0.6);
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    HorizontalLayout {
+        padding: 12px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: root.dot;
+                opacity: mod(animation-tick() / 1ms, 2000) < 1000 ? 1 : 0.45;
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+                Text { text: root.device.label; color: Theme.text; font-size: 14px; font-weight: 700; }
+                if root.device.waiter != "": Text { text: "(" + root.device.waiter + ")"; color: Theme.dark ? #fbbf24 : #d97706; font-size: 14px; font-weight: 700; }
+            }
+            Text { text: root.device.agent; color: Theme.text-muted; font-size: 12px; overflow: elide; max-width: 320px; }
+        }
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 30px;
+                width: ip-row.preferred-width + 20px;
+                border-radius: 8px;
+                background: Theme.surface;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                ip-row := HorizontalLayout {
+                    alignment: center;
+                    spacing: 6px;
+                    VerticalLayout { alignment: center; RIcon { source: RtIcons.wifi; tint: RtColors.cyan; size: 14px; } }
+                    Text { text: root.device.ip; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; vertical-alignment: center; }
+                }
+            }
+        }
+    }
+}
+
+// Tema claro/escuro e tamanho da fonte
+component AppearanceControls inherits Rectangle {
+    border-radius: 16px;
+    background: Theme.bg.with-alpha(0.8);
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    HorizontalLayout {
+        padding: 6px;
+        spacing: 8px;
+        RButton {
+            icon: Theme.dark ? RtIcons.sun : RtIcons.moon;
+            text: Theme.dark ? "Modo Claro" : "Modo Escuro";
+            bg: Theme.surface; outline: Theme.border; hover-bg: Theme.surface-2; weight: 700; pad: 12px;
+            clicked => { RetaguardaStore.toggle-theme(); }
+        }
+        Rectangle {
+            min-height: 38px;
+            width: font-row.preferred-width + 24px;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Theme.border;
+            background: font-touch.has-hover ? Theme.surface-2 : Theme.surface;
+            font-row := HorizontalLayout {
+                alignment: center;
+                spacing: 6px;
+                VerticalLayout { alignment: center; RIcon { source: RtIcons.type; tint: Theme.primary; } }
+                Text { text: "Aumentar Tamanho"; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 900; vertical-alignment: center; }
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 18px;
+                        width: fl.preferred-width + 10px;
+                        border-radius: 4px;
+                        background: Theme.bg;
+                        fl := Text { text: RetaguardaStore.font-label; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
+                    }
+                }
+            }
+            font-touch := TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.cycle-font(); } }
+        }
+    }
+}
+
+export component RetaguardaHub inherits Rectangle {
+    property <length> content-w: min(896px, root.width - 40px);
+    // Duas colunas de largura igual (o texto de cada cartão não decide a largura dele)
+    property <length> half: (root.content-w - 16px) / 2;
+    property <bool> narrow: root.content-w < 820px;
+
+    // Os chips de categoria do cardápio digital quebram linha pela largura real do cartão
+    init => { RetaguardaStore.m-chips-width = root.content-w - 40px; RetaguardaStore.m-chips-relayout(); }
+    changed content-w => { RetaguardaStore.m-chips-width = root.content-w - 40px; RetaguardaStore.m-chips-relayout(); }
+
+    Flickable {
+        content-height: col.preferred-height + 72px;
+        col := VerticalLayout {
+            x: (root.width - root.content-w) / 2;
+            y: 20px;
+            width: root.content-w;
+            spacing: 16px;
+
+            // Cabeçalho com tema e tamanho da fonte
+            Card {
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 14px;
+                    HorizontalLayout {
+                        spacing: 14px;
+                        VerticalLayout { alignment: center; IconBubble { icon: RtIcons.settings; tone: Theme.primary; square: true; outlined: true; } }
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            horizontal-stretch: 1;
+                            Text { text: "Retaguarda & Gestão do Sistema"; color: Theme.text; font-size: 20px; font-weight: 900; wrap: word-wrap; }
+                            Text { text: "Métricas operacionais, colaboradores, fornecedores, conexões e aparência."; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        }
+                        if !root.narrow: VerticalLayout { alignment: center; AppearanceControls { } }
+                    }
+                    if root.narrow: HorizontalLayout { alignment: end; AppearanceControls { } }
+                }
+            }
+
+            HeroCard {
+                icon: RtIcons.key;
+                tone: Theme.available;
+                title: "Assinatura & Licença";
+                badge: RetaguardaStore.license-badge;
+                badge-tone: RetaguardaStore.license-badge-warn ? Theme.primary : Theme.available;
+                subtitle: "Terminal: " + RetaguardaStore.machine-short + " • Renovações antecipadas, PIX e sincronização.";
+                clicked => { RetaguardaStore.open-subscription(); }
+            }
+            HeroCard {
+                icon: RtIcons.chart;
+                tone: Theme.purple;
+                title: "Métricas & Gestão";
+                badge: "FATURAMENTO & RELATÓRIOS";
+                subtitle: "Acompanhe vendas do dia, produtos mais vendidos, auditoria de pedidos e faturamento.";
+                clicked => { RetaguardaStore.open-dashboard(); }
+            }
+
+            // Margem de lucro padrão
+            Card {
+                HorizontalLayout {
+                    padding: 20px;
+                    spacing: 16px;
+                    VerticalLayout { alignment: center; IconBubble { icon: RtIcons.trending-up; tone: Theme.primary; square: true; outlined: true; } }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 3px;
+                        horizontal-stretch: 1;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            Text { text: "Margem de Lucro Padrão do Sistema"; color: Theme.text; font-size: 16px; font-weight: 800; vertical-alignment: center; wrap: word-wrap; }
+                            VerticalLayout { alignment: center; Badge { text: "ENTRADAS DE NF-E"; tone: Theme.primary; pill: true; } }
+                        }
+                        Text { text: "Margem comercial sugerida para novos produtos e cálculos automáticos na importação de XMLs."; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            RInput { width: 112px; text <=> RetaguardaStore.margin-input; mono: true; weight: 700; font-size: 14px; suffix: "%"; accepted => { RetaguardaStore.save-margin(); } }
+                            PrimaryButton { text: RetaguardaStore.margin-saving ? "Salvando..." : "Salvar"; enabled: !RetaguardaStore.margin-saving; clicked => { RetaguardaStore.save-margin(); } }
+                        }
+                    }
+                }
+            }
+
+            BackupCard { }
+            DigitalMenuCard { }
+
+            // Atalhos (grade de 2 colunas)
+            HorizontalLayout {
+                spacing: 16px;
+                alignment: start;
+                NavCard { width: root.half; icon: RtIcons.shield-check; tone: Theme.primary; title: "Equipe & Colaboradores"; subtitle: "Cadastrar funcionários, senhas e liberar funções"; clicked => { RetaguardaStore.open-staff(); } }
+                NavCard { width: root.half; icon: RtIcons.users; tone: Theme.available; title: "Clientes (Fiado)"; subtitle: "Banco de dados e saldos devedores"; clicked => { RetaguardaStore.open-customers(); } }
+            }
+            HorizontalLayout {
+                spacing: 16px;
+                alignment: start;
+                NavCard { width: root.half; icon: RtIcons.truck; tone: Theme.primary; title: "Fornecedores & Distribuidoras"; subtitle: "Cadastro de CNPJ, contatos e compras"; clicked => { RetaguardaStore.open-suppliers(); } }
+                NavCard { width: root.half; icon: RtIcons.users; tone: Theme.primary; title: "Cadastro de Garçons"; subtitle: "Adicionar, remover e gerenciar comissões"; clicked => { RetaguardaStore.open-waiters(); } }
+            }
+            HorizontalLayout {
+                spacing: 16px;
+                alignment: start;
+                NavCard { width: root.half; icon: RtIcons.smartphone; tone: Theme.occupied; title: "Conectar Celular"; subtitle: "Ver QRCode e IP para conectar garçons"; clicked => { RetaguardaStore.open-connect(); } }
+                NavCard { width: root.half; icon: RtIcons.printer; tone: Theme.primary; title: "Configurar Impressoras & Bobina"; subtitle: "Bobina 80mm / 58mm, margens, escala e teste de calibração"; clicked => { RetaguardaStore.open-printers(); } }
+            }
+            HorizontalLayout {
+                spacing: 16px;
+                alignment: start;
+                // Impressão automática da cozinha
+                Rectangle {
+                    width: root.half;
+                    min-height: 88px;
+                    border-radius: 24px;
+                    border-width: 1px;
+                    border-color: RetaguardaStore.auto-print-kitchen ? Theme.available.with-alpha(0.4) : Theme.surface-2;
+                    background: RetaguardaStore.auto-print-kitchen
+                        ? Theme.available.with-alpha(auto-touch.has-hover ? 0.16 : 0.1)
+                        : (auto-touch.has-hover ? (Theme.dark ? #1e293b : #f8fafc) : Theme.surface);
+                    HorizontalLayout {
+                        padding: 20px;
+                        spacing: 16px;
+                        VerticalLayout {
+                            alignment: center;
+                            IconBubble { icon: RtIcons.printer; tone: RetaguardaStore.auto-print-kitchen ? Theme.available : Theme.text-muted; }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            horizontal-stretch: 1;
+                            Text { text: "Auto-Impressão de Cozinha"; color: RetaguardaStore.auto-print-kitchen ? Theme.available : Theme.text; font-size: 15px; font-weight: 700; }
+                            Text {
+                                text: RetaguardaStore.auto-print-kitchen ? "Ligada: Imprime pedidos KDS automaticamente." : "Desligada: Envia apenas para o KDS.";
+                                color: Theme.text-muted;
+                                font-size: 12px;
+                                wrap: word-wrap;
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Toggle { on: RetaguardaStore.auto-print-kitchen; tone: Theme.available; width: 40px; toggled => { RetaguardaStore.toggle-auto-print(); } }
+                        }
+                    }
+                    auto-touch := TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.toggle-auto-print(); } }
+                }
+            }
+
+            // Sobre o Bar ERP & atualizador
+            Card {
+                HorizontalLayout {
+                    padding: 24px;
+                    spacing: 16px;
+                    VerticalLayout { alignment: center; IconBubble { icon: RtIcons.arrow-up-circle; tone: Theme.primary; square: true; outlined: true; } }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        horizontal-stretch: 1;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            Text { text: "Bar ERP Pro Desktop"; color: Theme.text; font-size: 16px; font-weight: 900; vertical-alignment: center; }
+                            VerticalLayout { alignment: center; Badge { text: "V" + RetaguardaStore.version; tone: Theme.text-muted; } }
+                            if RetaguardaStore.has-update: VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    height: 20px;
+                                    width: up.preferred-width + 14px;
+                                    border-radius: 5px;
+                                    background: Theme.primary;
+                                    opacity: mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.6;
+                                    up := Text { text: "ATUALIZAÇÃO DISPONÍVEL"; color: #020617; font-size: 10px; font-weight: 900; }
+                                }
+                            }
+                        }
+                        Text { text: RetaguardaStore.update-text; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        if RetaguardaStore.has-update: PrimaryButton { icon: RtIcons.sparkles; text: "ATUALIZAR AGORA"; clicked => { RetaguardaStore.open-update(); } }
+                        if !RetaguardaStore.has-update: GhostButton {
+                            icon: RtIcons.refresh;
+                            spin: RetaguardaStore.checking-update;
+                            text: RetaguardaStore.checking-update ? "VERIFICANDO..." : "VERIFICAR ATUALIZAÇÕES";
+                            enabled: !RetaguardaStore.checking-update;
+                            clicked => { RetaguardaStore.check-updates(); }
+                        }
+                    }
+                }
+            }
+
+            // Dispositivos conectados
+            Card {
+                VerticalLayout {
+                    padding: 20px;
+                    spacing: 16px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout { alignment: center; IconBubble { icon: RtIcons.monitor-smartphone; tone: RtColors.cyan; size: 40px; } }
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            horizontal-stretch: 1;
+                            Text { text: "Dispositivos Conectados (" + RetaguardaStore.devices.length + ")"; color: Theme.text; font-size: 17px; font-weight: 700; }
+                            Text { text: "Tempo real dos celulares e painéis KDS conectados na rede."; color: Theme.text-muted; font-size: 12px; }
+                        }
+                    }
+                    if RetaguardaStore.devices.length == 0: Text {
+                        text: "Nenhum dispositivo móvel conectado no momento.";
+                        color: Theme.text-muted;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        height: 56px;
+                        vertical-alignment: center;
+                    }
+                    for d in RetaguardaStore.devices: DeviceRow { device: d; }
+                }
+            }
+        }
+    }
+}

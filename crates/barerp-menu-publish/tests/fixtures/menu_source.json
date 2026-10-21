@@ -1,0 +1,51 @@
+{
+  "settings": {
+    "storeId": "a1b2c3d4e5f60718293a",
+    "title": "  ",
+    "message": "  Wi-Fi: BarDoZe / senha \"cerveja\"  ",
+    "hiddenCategoryIds": "[\"cat-oculta\"]",
+    "hideSoldOut": false,
+    "ignoreStock": false
+  },
+  "fiscal": { "nomeFantasia": "  Bar do Zé  " },
+  "system": { "restaurantName": "Restaurante" },
+  "categories": [
+    { "id": "cat-bebidas", "name": "Bebidas", "icon": "Beer", "sortOrder": 0 },
+    { "id": "cat-porcoes", "name": "Porções", "icon": "", "sortOrder": 1 },
+    { "id": "cat-lanches", "name": "Lanches", "icon": null, "sortOrder": 1 },
+    { "id": "cat-vazia", "name": "Vazia", "icon": "Star", "sortOrder": 2 },
+    { "id": "cat-oculta", "name": "Oculta", "icon": "X", "sortOrder": 3 },
+    { "id": "cat-drinks", "name": "Drinks", "icon": "Wine", "sortOrder": 4 }
+  ],
+  "products": [
+    { "id": "p-cerveja", "categoryId": "cat-bebidas", "name": "Cerveja Pilsen 600ml", "description": null, "price": 12, "isActive": true, "showInMenu": true, "kdsStation": "BAR", "trackStock": true, "stock": 0, "costPrice": 5, "hasBoxPrice": true, "boxPrice": 60, "boxQuantity": 12, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-agua", "categoryId": "cat-bebidas", "name": "Água sem gás", "description": "  Garrafa 500ml  ", "price": 4.5, "isActive": true, "showInMenu": true, "kdsStation": "BAR", "trackStock": true, "stock": 30, "costPrice": 1.2, "hasBoxPrice": true, "boxPrice": 40, "boxQuantity": 12, "boxCostPrice": 18.5, "modifierGroups": [] },
+    { "id": "p-refri", "categoryId": "cat-bebidas", "name": "Refrigerante lata", "description": "Coca, Guaraná \"Antarctica\"\nou Sprite\t🍋", "price": 0.30000000000000004, "isActive": true, "showInMenu": true, "kdsStation": "NONE", "trackStock": false, "stock": -3, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": 24, "boxCostPrice": null, "modifierGroups": [
+      { "sortOrder": 2, "group": { "name": "Gelo", "isActive": true, "minSelect": 0, "maxSelect": 1, "options": [ { "name": "Com gelo", "price": 0, "isActive": true, "sortOrder": 0 } ] } },
+      { "sortOrder": 1, "group": { "name": "Copo", "isActive": true, "minSelect": 1, "maxSelect": 0, "options": [ { "name": "Copo de vidro", "price": 0, "isActive": true, "sortOrder": 2 }, { "name": "Copo descartável", "price": 0.5, "isActive": true, "sortOrder": 1 }, { "name": "Taça", "price": 3, "isActive": false, "sortOrder": 0 } ] } },
+      { "sortOrder": 0, "group": { "name": "Inativo", "isActive": false, "minSelect": 0, "maxSelect": 1, "options": [ { "name": "X", "price": 1, "isActive": true, "sortOrder": 0 } ] } },
+      { "sortOrder": 3, "group": { "name": "Sem opções ativas", "isActive": true, "minSelect": 0, "maxSelect": 1, "options": [ { "name": "Y", "price": 1, "isActive": false, "sortOrder": 0 } ] } }
+    ] },
+    { "id": "p-fritas", "categoryId": "cat-porcoes", "name": "Fritas", "description": "", "price": 29.9, "isActive": true, "showInMenu": true, "kdsStation": "KITCHEN", "trackStock": true, "stock": 0, "costPrice": 8, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [
+      { "sortOrder": 0, "group": { "name": "Adicionais", "isActive": true, "minSelect": 0, "maxSelect": 3, "options": [ { "name": "Cheddar", "price": 6.5, "isActive": true, "sortOrder": 0 }, { "name": "Bacon", "price": 7.123456789, "isActive": true, "sortOrder": 1 } ] } }
+    ] },
+    { "id": "p-calabresa", "categoryId": "cat-porcoes", "name": "Calabresa acebolada", "description": null, "price": 45, "isActive": true, "showInMenu": true, "kdsStation": "KITCHEN", "trackStock": false, "stock": 0, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-amendoim", "categoryId": "cat-porcoes", "name": "Amendoim", "description": null, "price": 8, "isActive": true, "showInMenu": true, "kdsStation": "BAR", "trackStock": true, "stock": 5, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-xburguer", "categoryId": "cat-lanches", "name": "X-Burguer", "description": "Pão, carne 150g e queijo", "price": 32, "isActive": true, "showInMenu": true, "kdsStation": "KITCHEN", "trackStock": true, "stock": 10, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-xsalada", "categoryId": "cat-lanches", "name": "X-Salada", "description": null, "price": 34, "isActive": true, "showInMenu": true, "kdsStation": "BAR", "trackStock": true, "stock": 10, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-caipi", "categoryId": "cat-drinks", "name": "Caipirinha", "description": null, "price": 18, "isActive": true, "showInMenu": true, "kdsStation": "KITCHEN", "trackStock": true, "stock": 0, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-inativo", "categoryId": "cat-bebidas", "name": "Inativo", "description": null, "price": 10, "isActive": false, "showInMenu": true, "kdsStation": "BAR", "trackStock": true, "stock": 10, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-fora", "categoryId": "cat-bebidas", "name": "Fora do cardápio", "description": null, "price": 10, "isActive": true, "showInMenu": false, "kdsStation": "BAR", "trackStock": true, "stock": 10, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-gratis", "categoryId": "cat-bebidas", "name": "Grátis", "description": null, "price": 0, "isActive": true, "showInMenu": true, "kdsStation": "BAR", "trackStock": true, "stock": 10, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] },
+    { "id": "p-oculto", "categoryId": "cat-oculta", "name": "Oculto", "description": null, "price": 10, "isActive": true, "showInMenu": true, "kdsStation": "BAR", "trackStock": true, "stock": 10, "costPrice": null, "hasBoxPrice": false, "boxPrice": null, "boxQuantity": null, "boxCostPrice": null, "modifierGroups": [] }
+  ],
+  "promotions": [
+    { "id": "promo-2", "name": "Happy Hour", "isActive": true, "daysOfWeek": "1,2,3,4,5", "startTime": "17:00", "endTime": "20:00", "discountType": "PERCENT", "value": 20, "productIds": "[\"p-cerveja\"]", "categoryIds": "[]" },
+    { "id": "promo-1", "name": "Combo da casa", "isActive": true, "daysOfWeek": "5,6", "startTime": "22:00", "endTime": "02:00", "discountType": "FIXED_PRICE", "value": 9.99, "productIds": "[]", "categoryIds": "[\"cat-porcoes\"]" },
+    { "id": "promo-3", "name": "Desligada", "isActive": false, "daysOfWeek": "0", "startTime": "00:00", "endTime": "23:59", "discountType": "PERCENT", "value": 10, "productIds": "[]", "categoryIds": "[]" }
+  ],
+  "images": [
+    { "productId": "p-fritas", "hash": "0123456789abcdef0123456789abcdef" },
+    { "productId": "p-caipi", "hash": "fedcba9876543210fedcba9876543210" }
+  ]
+}

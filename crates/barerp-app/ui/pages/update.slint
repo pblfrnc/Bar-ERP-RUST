@@ -1,0 +1,340 @@
+// Atualização do app (UpdateNotificationModal.tsx): aviso flutuante no canto e a janela com novidades, progresso
+// do download e "Reiniciar e Atualizar Agora". Ligado em `src/pages/update.rs` com `ui.global::<UpdateStore>()`.
+
+import { Theme } from "../theme.slint";
+import { RtIcons, RIcon, Spinner, RButton, GhostButton } from "retaguarda_widgets.slint";
+
+export global UpdateStore {
+    in property <bool> has-update;
+    in-out property <bool> modal-open;
+    in-out property <bool> banner-dismissed;
+    in property <string> latest-version;
+    in property <string> current-version;
+    in property <string> release-date: "Recentemente";
+    in property <string> notes;
+    in property <bool> downloading;
+    in property <int> percent;
+    in property <string> progress-text;
+    in property <string> speed-text;
+    in property <bool> complete;
+    in property <string> error;
+    callback start-download();
+    callback install();
+}
+
+export component UpdateBanner inherits Rectangle {
+    width: 448px;
+    height: col.preferred-height;
+    border-radius: 16px;
+    background: #0f172af2;
+    border-width: 1px;
+    border-color: #f59e0b66;
+    drop-shadow-blur: 24px;
+    drop-shadow-color: #00000080;
+    TouchArea { }
+    col := HorizontalLayout {
+        padding: 16px;
+        spacing: 12px;
+        VerticalLayout {
+            alignment: start;
+            Rectangle {
+                width: 40px;
+                height: 40px;
+                border-radius: 12px;
+                background: #f59e0b33;
+                border-width: 1px;
+                border-color: #f59e0b4d;
+                RIcon { source: RtIcons.sparkles; tint: #fbbf24; size: 20px; opacity: mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.6; }
+            }
+        }
+        VerticalLayout {
+            spacing: 4px;
+            horizontal-stretch: 1;
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                Rectangle {
+                    height: 18px;
+                    width: nv.preferred-width + 12px;
+                    border-radius: 5px;
+                    background: #f59e0b;
+                    nv := Text { text: "NOVA VERSÃO"; color: #020617; font-size: 10px; font-weight: 900; }
+                }
+                Text { text: UpdateStore.latest-version; color: #94a3b8; font-size: 12px; font-family: "Menlo"; vertical-alignment: center; }
+            }
+            Text { text: "Atualização do Bar ERP Disponível!"; color: #ffffff; font-size: 14px; font-weight: 900; overflow: elide; }
+            Text {
+                text: UpdateStore.complete
+                    ? "Download pronto! Clique para reiniciar e atualizar."
+                    : UpdateStore.downloading ? "Baixando: " + UpdateStore.percent + "%..." : "Novos recursos e melhorias fiscais prontos para instalar.";
+                color: #94a3b8;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+                padding-top: 8px;
+                RButton {
+                    text: UpdateStore.complete ? "REINICIAR AGORA" : "VER DETALHES";
+                    bg: #f59e0b; hover-bg: #fbbf24; fg: #020617; weight: 900; min-height: 32px;
+                    clicked => { UpdateStore.modal-open = true; }
+                }
+                RButton {
+                    text: "Lembrar mais tarde";
+                    bg: transparent; hover-bg: #ffffff14; fg: #94a3b8; weight: 600; min-height: 32px;
+                    clicked => { UpdateStore.banner-dismissed = true; }
+                }
+            }
+        }
+        VerticalLayout {
+            alignment: start;
+            Rectangle {
+                width: 24px;
+                height: 24px;
+                border-radius: 8px;
+                background: x-touch.has-hover ? #ffffff14 : transparent;
+                RIcon { source: RtIcons.x; tint: #64748b; }
+                x-touch := TouchArea { mouse-cursor: pointer; clicked => { UpdateStore.banner-dismissed = true; } }
+            }
+        }
+    }
+}
+
+export component UpdateModal inherits Rectangle {
+    background: #000000b3;
+    TouchArea { }
+    Rectangle {
+        width: min(512px, root.width - 32px);
+        height: col.preferred-height;
+        border-radius: 24px;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.surface-2;
+        clip: true;
+        drop-shadow-blur: 40px;
+        drop-shadow-color: #00000080;
+        col := VerticalLayout {
+            // Cabeçalho
+            Rectangle {
+                background: @linear-gradient(135deg, #f59e0b26 0%, Theme.surface-2.with-alpha(0.4) 50%, transparent 100%);
+                HorizontalLayout {
+                    padding: 24px;
+                    spacing: 14px;
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 48px;
+                            height: 48px;
+                            border-radius: 16px;
+                            background: #f59e0b33;
+                            border-width: 1px;
+                            border-color: #f59e0b4d;
+                            RIcon { source: RtIcons.arrow-up-circle; tint: Theme.primary; size: 24px; }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        horizontal-stretch: 1;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            Rectangle {
+                                height: 18px;
+                                width: at.preferred-width + 12px;
+                                border-radius: 5px;
+                                background: Theme.primary;
+                                at := Text { text: "ATUALIZAÇÃO DO SISTEMA"; color: #020617; font-size: 10px; font-weight: 900; }
+                            }
+                            Text { text: UpdateStore.latest-version; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
+                        }
+                        Text { text: "Nova Versão do Bar ERP Pronta!"; color: Theme.text; font-size: 18px; font-weight: 900; }
+                    }
+                    VerticalLayout {
+                        alignment: start;
+                        Rectangle {
+                            width: 36px;
+                            height: 36px;
+                            border-radius: 12px;
+                            background: close-touch.has-hover ? Theme.border : Theme.surface-2;
+                            RIcon { source: RtIcons.x; tint: Theme.text-muted; size: 18px; }
+                            close-touch := TouchArea { mouse-cursor: pointer; clicked => { UpdateStore.modal-open = false; } }
+                        }
+                    }
+                }
+            }
+            Rectangle { height: 1px; background: Theme.surface-2; }
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 20px;
+                Rectangle {
+                    border-radius: 16px;
+                    background: Theme.bg;
+                    border-width: 1px;
+                    border-color: Theme.surface-2;
+                    HorizontalLayout {
+                        padding: 14px;
+                        spacing: 12px;
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            Text { text: "VERSÃO ATUAL:"; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
+                            Text { text: UpdateStore.current-version; color: Theme.text; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+                        }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            Text { text: "LANÇAMENTO NO GITHUB:"; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: start;
+                                VerticalLayout { alignment: center; RIcon { source: RtIcons.clock; tint: Theme.available; size: 12px; } }
+                                Text { text: UpdateStore.release-date; color: Theme.available; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+                            }
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 6px;
+                    Text { text: "NOVIDADES & MELHORIAS DESTA VERSÃO:"; color: Theme.text; font-size: 12px; font-weight: 700; }
+                    Rectangle {
+                        height: min(144px, notes.preferred-height + 28px);
+                        border-radius: 12px;
+                        background: Theme.bg;
+                        border-width: 1px;
+                        border-color: Theme.surface-2;
+                        clip: true;
+                        Flickable {
+                            content-height: notes.preferred-height + 28px;
+                            notes := Text {
+                                x: 14px;
+                                y: 14px;
+                                width: parent.width - 28px;
+                                text: UpdateStore.notes;
+                                color: Theme.text-muted;
+                                font-size: 12px;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+                if UpdateStore.downloading: Rectangle {
+                    border-radius: 16px;
+                    background: #f59e0b1a;
+                    border-width: 1px;
+                    border-color: #f59e0b33;
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 8px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            VerticalLayout { alignment: center; Spinner { tint: Theme.primary; size: 14px; } }
+                            Text { text: "Baixando atualização do GitHub..."; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
+                            Text { text: UpdateStore.percent + "%"; color: Theme.primary; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+                        }
+                        Rectangle {
+                            height: 12px;
+                            border-radius: 6px;
+                            background: Theme.surface-2;
+                            Rectangle {
+                                x: 2px;
+                                y: 2px;
+                                height: 8px;
+                                width: (parent.width - 4px) * clamp(UpdateStore.percent, 0, 100) / 100;
+                                border-radius: 4px;
+                                background: @linear-gradient(90deg, #f59e0b 0%, #10b981 100%);
+                            }
+                        }
+                        HorizontalLayout {
+                            Text { text: UpdateStore.progress-text; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; horizontal-stretch: 1; }
+                            Text { text: UpdateStore.speed-text; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; }
+                        }
+                    }
+                }
+                if UpdateStore.complete: Rectangle {
+                    border-radius: 16px;
+                    background: Theme.available.with-alpha(0.1);
+                    border-width: 1px;
+                    border-color: Theme.available.with-alpha(0.3);
+                    HorizontalLayout {
+                        padding: 16px;
+                        spacing: 12px;
+                        VerticalLayout { alignment: start; RIcon { source: RtIcons.circle-check; tint: Theme.available; size: 20px; } }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 2px;
+                            Text { text: "Download Concluído com Sucesso!"; color: Theme.available; font-size: 14px; font-weight: 900; }
+                            Text {
+                                text: "O instalador já foi verificado e está pronto. Ao clicar abaixo, o Bar ERP fechará de forma limpa, aplicará a atualização e reiniciará em segundos.";
+                                color: Theme.text;
+                                font-size: 12px;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+                if UpdateStore.error != "": Rectangle {
+                    border-radius: 16px;
+                    background: Theme.danger.with-alpha(0.1);
+                    border-width: 1px;
+                    border-color: Theme.danger.with-alpha(0.3);
+                    HorizontalLayout {
+                        padding: 16px;
+                        spacing: 12px;
+                        VerticalLayout { alignment: start; RIcon { source: RtIcons.circle-alert; tint: Theme.danger; size: 20px; } }
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            Text { text: "Falha no Download"; color: Theme.danger; font-size: 12px; font-weight: 900; }
+                            Text { text: UpdateStore.error; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                        }
+                    }
+                }
+                Rectangle {
+                    border-radius: 12px;
+                    background: Theme.surface-2.with-alpha(0.4);
+                    HorizontalLayout {
+                        padding: 10px;
+                        spacing: 8px;
+                        VerticalLayout { alignment: center; RIcon { source: RtIcons.shield-check; tint: Theme.available; } }
+                        Text {
+                            text: "Seus dados estão 100% seguros: Vendas, comandas, mesas abertas e configurações fiscais são preservadas intactas.";
+                            color: Theme.text-muted;
+                            font-size: 11px;
+                            wrap: word-wrap;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                }
+            }
+
+            // Rodapé
+            Rectangle {
+                background: Theme.bg.with-alpha(0.6);
+                Rectangle { y: 0; height: 1px; background: Theme.surface-2; }
+                HorizontalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+                    GhostButton { text: "Lembrar Mais Tarde"; weight: 700; clicked => { UpdateStore.modal-open = false; } }
+                    Rectangle { horizontal-stretch: 1; }
+                    if UpdateStore.complete: RButton {
+                        icon: RtIcons.sparkles;
+                        text: "REINICIAR E ATUALIZAR AGORA";
+                        bg: #10b981; hover-bg: #34d399; fg: #020617; weight: 900;
+                        clicked => { UpdateStore.install(); }
+                    }
+                    if !UpdateStore.complete: RButton {
+                        icon: RtIcons.download;
+                        spin: UpdateStore.downloading;
+                        text: UpdateStore.downloading ? "BAIXANDO (" + UpdateStore.percent + "%)..." : "BAIXAR E ATUALIZAR AGORA";
+                        bg: UpdateStore.downloading ? Theme.surface-2 : Theme.primary;
+                        hover-bg: UpdateStore.downloading ? Theme.surface-2 : #fbbf24;
+                        fg: UpdateStore.downloading ? Theme.text-muted : #020617;
+                        weight: 900;
+                        enabled: !UpdateStore.downloading;
+                        clicked => { UpdateStore.start-download(); }
+                    }
+                }
+            }
+        }
+    }
+}

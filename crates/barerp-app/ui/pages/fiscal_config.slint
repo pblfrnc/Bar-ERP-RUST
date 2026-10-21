@@ -1,0 +1,334 @@
+// Configurações Fiscais (FiscalSettingsView): token da Focus, dados da empresa, CSC, ambiente, numeração de
+// NF-e e NFC-e, endereço, certificado A1, testar conexão e diagnóstico.
+
+import { Theme } from "../theme.slint";
+import { FiscalStore } from "fiscal_store.slint";
+import { FxCor, FxCores, FxCard, FxBadge, FxLabel, FxButton, FxBotao, FxInput, FxField, FxAviso, FxOpcao, Icon } from "fiscal_ui.slint";
+import { FiscalIcons } from "fiscal_icons.slint";
+
+component Bloco inherits FxCard {
+    in property <image> icone;
+    in property <string> titulo;
+    in property <FxCor> cor: FxCor.azul;
+    in property <string> selo;
+    height: b.preferred-height;
+    b := VerticalLayout {
+        padding: 24px;
+        spacing: 16px;
+        HorizontalLayout {
+            spacing: 10px;
+            VerticalLayout { alignment: center; Icon { source: root.icone; color: FxCores.de(root.cor); size: 20px; } }
+            Text { text: root.titulo; color: Theme.text; font-size: 17px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+            if root.selo != "": VerticalLayout { alignment: center; FxBadge { text: root.selo; cor: root.cor; } }
+        }
+        @children
+    }
+}
+
+component Dica inherits Text {
+    color: Theme.text-muted;
+    font-size: 11px;
+    wrap: word-wrap;
+}
+
+component Passo inherits HorizontalLayout {
+    in property <string> n;
+    in property <string> texto;
+    spacing: 10px;
+    Rectangle {
+        width: 22px;
+        height: 22px;
+        border-radius: 11px;
+        background: Theme.closing.with-alpha(0.2);
+        Text { text: root.n; color: Theme.closing; font-size: 11px; font-weight: 900; }
+    }
+    Text { text: root.texto; color: Theme.text; font-size: 12px; wrap: word-wrap; horizontal-stretch: 1; }
+}
+
+export component ConfiguracoesFiscais inherits Rectangle {
+    property <bool> cnpj-invalido: FiscalStore.cfg-cnpj-valido == 0;
+    if FiscalStore.cfg-carregando: Text { text: "Carregando..."; color: Theme.text-muted; font-size: 15px; }
+    if !FiscalStore.cfg-carregando: Flickable {
+        content-height: corpo.preferred-height;
+        corpo := VerticalLayout {
+            padding: 24px;
+            padding-bottom: 80px;
+            spacing: 18px;
+            HorizontalLayout {
+                spacing: 12px;
+                FxButton { text: "Voltar ao Painel"; icone: FiscalIcons.arrow-left; tipo: FxBotao.fantasma; clicked => { FiscalStore.abrir("hub"); } }
+                Rectangle { horizontal-stretch: 1; }
+                FxButton {
+                    text: FiscalStore.cfg-validando ? "Testando..." : "Testar Conexão";
+                    icone: FiscalIcons.wifi;
+                    enabled: !FiscalStore.cfg-validando;
+                    clicked => { FiscalStore.cfg-testar(); }
+                }
+                FxButton {
+                    text: FiscalStore.cfg-salvando ? "Salvando..." : "Cadastrar Dados da Empresa";
+                    icone: FiscalIcons.save;
+                    tipo: root.cnpj-invalido ? FxBotao.perigo : FxBotao.primario;
+                    enabled: !FiscalStore.cfg-salvando && !root.cnpj-invalido;
+                    clicked => { FiscalStore.cfg-salvar(); }
+                }
+            }
+            if FiscalStore.cfg-mensagem != "": FxAviso {
+                text: FiscalStore.cfg-mensagem;
+                cor: FiscalStore.cfg-mensagem-ok ? FxCor.verde : FxCor.vermelho;
+            }
+
+            // Resultado do teste de conexão
+            if FiscalStore.cfg-validacao.visivel: Rectangle {
+                border-radius: 18px;
+                background: (FiscalStore.cfg-validacao.ok ? Theme.available : Theme.danger).with-alpha(0.08);
+                border-width: 1px;
+                border-color: (FiscalStore.cfg-validacao.ok ? Theme.available : Theme.danger).with-alpha(0.35);
+                height: val.preferred-height;
+                val := VerticalLayout {
+                    padding: 18px;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Text {
+                            text: FiscalStore.cfg-validacao.ok ? "Conexão com a Focus NFe: OK" : "Falha na Conexão";
+                            color: FiscalStore.cfg-validacao.ok ? Theme.available : Theme.danger;
+                            font-size: 15px;
+                            font-weight: 900;
+                            horizontal-stretch: 1;
+                        }
+                        if FiscalStore.cfg-validacao.ambiente != "": Text { text: FiscalStore.cfg-validacao.ambiente; color: Theme.text-muted; font-size: 12px; font-weight: 700; }
+                    }
+                    if FiscalStore.cfg-validacao.ok: HorizontalLayout {
+                        spacing: 16px;
+                        VerticalLayout { spacing: 2px; FxLabel { text: "EMPRESAS NA CONTA"; } Text { text: FiscalStore.cfg-validacao.total + " empresa(s)"; color: Theme.text; font-size: 14px; font-weight: 800; } }
+                        VerticalLayout { horizontal-stretch: 1; spacing: 2px; FxLabel { text: "STATUS DO CNPJ"; } Text { text: FiscalStore.cfg-validacao.status-cnpj; color: Theme.text; font-size: 13px; wrap: word-wrap; } }
+                    }
+                    if FiscalStore.cfg-validacao.ok && FiscalStore.cfg-validacao.nao-localizado: Rectangle {
+                        border-radius: 14px;
+                        background: Theme.closing.with-alpha(0.08);
+                        border-width: 1px;
+                        border-color: Theme.closing.with-alpha(0.35);
+                        height: passos.preferred-height;
+                        passos := VerticalLayout {
+                            padding: 16px;
+                            spacing: 10px;
+                            HorizontalLayout { spacing: 8px; VerticalLayout { alignment: center; Icon { source: FiscalIcons.triangle-alert; color: Theme.closing; size: 16px; } } Text { text: "CNPJ não localizado — siga os passos abaixo"; color: Theme.closing; font-size: 13px; font-weight: 900; horizontal-stretch: 1; } }
+                            Passo { n: "1"; texto: "Cadastre a empresa no painel da Focus NFe: acesse app.focusnfe.com.br → Empresas → Nova Empresa e preencha os dados do seu CNPJ lá."; }
+                            Passo { n: "2"; texto: "Preencha os campos abaixo (Razão Social, endereço, CSC e ID Token NFC-e) e clique em \"Cadastrar Dados da Empresa\" para sincronizar com a API."; }
+                            Passo { n: "3"; texto: "Após concluir, clique em \"Testar Conexão\" novamente para confirmar."; }
+                            HorizontalLayout {
+                                spacing: 10px;
+                                alignment: start;
+                                FxButton { text: "Abrir app.focusnfe.com.br"; clicked => { FiscalStore.cfg-abrir-focus(); } }
+                                FxButton {
+                                    text: FiscalStore.cfg-salvando ? "Cadastrando empresa na Focus NFe..." : "Cadastrar Empresa Agora na Focus NFe";
+                                    icone: FiscalIcons.save;
+                                    tipo: FxBotao.primario;
+                                    enabled: !FiscalStore.cfg-salvando;
+                                    clicked => { FiscalStore.cfg-salvar(); }
+                                }
+                                FxButton {
+                                    text: FiscalStore.cfg-diagnosticando ? "Diagnosticando..." : "Diagnóstico Focus NFe";
+                                    icone: FiscalIcons.search;
+                                    enabled: !FiscalStore.cfg-diagnosticando;
+                                    clicked => { FiscalStore.cfg-diagnosticar(); }
+                                }
+                            }
+                        }
+                    }
+                    if !FiscalStore.cfg-validacao.ok: VerticalLayout {
+                        spacing: 8px;
+                        Text { text: FiscalStore.cfg-validacao.erro; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
+                        if FiscalStore.cfg-validacao.erro-token: VerticalLayout {
+                            spacing: 4px;
+                            Text { text: "Verifique:"; color: Theme.text; font-size: 12px; font-weight: 800; }
+                            Dica { text: "• O token deve ser do mesmo ambiente (Homologação ou Produção) configurado acima"; }
+                            Dica { text: "• Copie o token da sua conta em app.focusnfe.com.br → API → Token"; }
+                            Dica { text: "• Não adicione espaços ou caracteres extras no token"; }
+                        }
+                    }
+                }
+            }
+            if FiscalStore.cfg-diagnostico != "": FxCard {
+                height: diag.preferred-height;
+                diag := VerticalLayout {
+                    padding: 18px;
+                    spacing: 8px;
+                    Text { text: FiscalStore.cfg-diagnostico; color: Theme.text; font-size: 11px; font-family: "Menlo"; wrap: word-wrap; }
+                }
+            }
+
+            Bloco {
+                icone: FiscalIcons.key; titulo: "Token da API de Emissão"; cor: FxCor.azul;
+                FxField {
+                    label: "TOKEN DA API (FOCUS NFE)";
+                    FxInput { text <=> FiscalStore.cfg-token; placeholder: "Cole o token da Focus NFe aqui..."; mono: true; senha: true; }
+                }
+            }
+
+            Bloco {
+                icone: FiscalIcons.building-2; titulo: "Dados da Empresa (Cliente)"; cor: FxCor.azul;
+                FxField { label: "RAZÃO SOCIAL"; FxInput { text <=> FiscalStore.cfg-razao; placeholder: "Razão Social exata do CNPJ"; } }
+                VerticalLayout {
+                    spacing: 6px;
+                    HorizontalLayout {
+                        FxLabel { text: "NOME FANTASIA (COMERCIAL)"; horizontal-stretch: 1; }
+                        FxBadge { text: "DESTAQUE NO CUPOM NFC-E E NF-E"; cor: FxCor.ambar; }
+                    }
+                    FxInput { text <=> FiscalStore.cfg-fantasia; placeholder: "Ex: Bar & Restaurante Seu Nome (Nome visível para o cliente)"; }
+                    Dica { text: "Aparece em letras grandes no topo do Cupom Fiscal e no cabeçalho da NF-e, acompanhado da Razão Social."; }
+                }
+                HorizontalLayout {
+                    spacing: 14px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            FxLabel { text: "CNPJ"; horizontal-stretch: 1; }
+                            if FiscalStore.cfg-buscando-cnpj: Text { text: "Buscando dados..."; color: Theme.occupied; font-size: 11px; font-weight: 700; }
+                            if FiscalStore.cfg-cnpj-valido == 1: Text { text: "CNPJ Válido"; color: Theme.available; font-size: 11px; font-weight: 800; }
+                            if FiscalStore.cfg-cnpj-valido == 0: Text { text: "CNPJ Inválido"; color: Theme.danger; font-size: 11px; font-weight: 800; }
+                        }
+                        FxInput {
+                            text <=> FiscalStore.cfg-cnpj;
+                            placeholder: "00.000.000/0000-00";
+                            mono: true;
+                            error: root.cnpj-invalido;
+                            edited(t) => { FiscalStore.cfg-cnpj-editado(t); }
+                        }
+                        if root.cnpj-invalido: Text { text: "⚠ Dígitos verificadores incorretos. Verifique o CNPJ."; color: Theme.danger; font-size: 11px; }
+                    }
+                    FxField { horizontal-stretch: 1; label: "INSCRIÇÃO ESTADUAL (IE)"; FxInput { text <=> FiscalStore.cfg-ie; placeholder: "Ex: ISENTO ou Número"; } }
+                }
+                FxField {
+                    label: "REGIME TRIBUTÁRIO (CRT)";
+                    HorizontalLayout {
+                        spacing: 10px;
+                        FxOpcao { text: "Simples Nacional"; cor: FxCor.azul; ativo: FiscalStore.cfg-crt == "1"; clicked => { FiscalStore.cfg-crt = "1"; } }
+                        FxOpcao { text: "Simples Nac. Excesso"; cor: FxCor.azul; ativo: FiscalStore.cfg-crt == "2"; clicked => { FiscalStore.cfg-crt = "2"; } }
+                        FxOpcao { text: "Regime Normal"; cor: FxCor.azul; ativo: FiscalStore.cfg-crt == "3"; clicked => { FiscalStore.cfg-crt = "3"; } }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 14px;
+                    FxField { horizontal-stretch: 1; label: "ID DO CSC"; FxInput { text <=> FiscalStore.cfg-csc-id; placeholder: "Ex: 000001"; mono: true; } }
+                    FxField { horizontal-stretch: 2; label: "CÓDIGO CSC (SEFAZ)"; FxInput { text <=> FiscalStore.cfg-csc; placeholder: "Alfanumérico..."; mono: true; } }
+                }
+                FxField {
+                    label: "AMBIENTE SEFAZ";
+                    HorizontalLayout {
+                        spacing: 10px;
+                        FxOpcao {
+                            text: "Homologação (Testes)";
+                            cor: FxCor.ambar;
+                            ativo: FiscalStore.cfg-ambiente != "producao";
+                            clicked => { FiscalStore.cfg-ambiente = "homologacao"; }
+                        }
+                        FxOpcao {
+                            text: "Produção (Valendo)";
+                            cor: FxCor.verde;
+                            ativo: FiscalStore.cfg-ambiente == "producao";
+                            clicked => { FiscalStore.cfg-ambiente = "producao"; }
+                        }
+                    }
+                }
+            }
+
+            Bloco {
+                icone: FiscalIcons.file-text; titulo: "Sequência & Numeração da NF-e (Modelo 55 — DANFE Saída)"; selo: "MODELO 55"; cor: FxCor.azul;
+                Dica { text: "Configure a série e o próximo número para emissão de NF-e padrão na Focus NFe e SEFAZ."; }
+                HorizontalLayout {
+                    spacing: 14px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        FxLabel { text: "SÉRIE DA NF-E"; }
+                        FxInput { text <=> FiscalStore.cfg-serie-nfe; placeholder: "Ex: 1"; mono: true; }
+                        Dica { text: "Padrão: 1. Caso já emita NF-e em outro emissor, consulte sua contabilidade."; }
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        FxLabel { text: "PRÓXIMO NÚMERO DA NF-E"; }
+                        FxInput { text <=> FiscalStore.cfg-proximo-nfe; placeholder: "Ex: 1"; mono: true; }
+                        Dica { text: "Ex: Se a última NF-e autorizada foi a 150, informe 151 para sequência contínua."; }
+                    }
+                }
+            }
+
+            Bloco {
+                icone: FiscalIcons.receipt; titulo: "Sequência & Numeração da NFC-e (Modelo 65 — Cupom Fiscal)"; selo: "MODELO 65"; cor: FxCor.roxo;
+                Dica { text: "Configure aqui a numeração para não quebrar a sequência da SEFAZ ou inicie uma nova série recomendada para transição de software."; }
+                HorizontalLayout {
+                    spacing: 14px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        FxLabel { text: "SÉRIE DA NFC-E"; }
+                        FxInput { text <=> FiscalStore.cfg-serie-nfce; placeholder: "Ex: 1 ou 2"; mono: true; }
+                        Dica { text: "Padrão: 1. (Contadores recomendam iniciar na Série 2 ao trocar de emissor para evitar conflitos)."; }
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        FxLabel { text: "PRÓXIMO NÚMERO DA NFC-E"; }
+                        FxInput { text <=> FiscalStore.cfg-proximo-nfce; placeholder: "Ex: 1543"; mono: true; }
+                        Dica { text: "Ex: Se a última nota no sistema anterior foi a 1542, digite 1543 para continuar sem pular números."; }
+                    }
+                }
+            }
+
+            Bloco {
+                icone: FiscalIcons.map-pin; titulo: "Endereço do Cliente (Obrigatório)"; cor: FxCor.vermelho;
+                HorizontalLayout {
+                    spacing: 14px;
+                    FxField { horizontal-stretch: 1; label: "CEP"; FxInput { text <=> FiscalStore.cfg-cep; placeholder: "00000000"; mono: true; } }
+                    FxField { horizontal-stretch: 3; label: "LOGRADOURO"; FxInput { text <=> FiscalStore.cfg-logradouro; placeholder: "Rua, Avenida..."; } }
+                    FxField { horizontal-stretch: 1; label: "NÚMERO"; FxInput { text <=> FiscalStore.cfg-numero; placeholder: "Ex: 123"; } }
+                }
+                HorizontalLayout {
+                    spacing: 14px;
+                    FxField { horizontal-stretch: 2; label: "BAIRRO"; FxInput { text <=> FiscalStore.cfg-bairro; placeholder: "Centro"; } }
+                    FxField { horizontal-stretch: 2; label: "MUNICÍPIO"; FxInput { text <=> FiscalStore.cfg-municipio; placeholder: "Tailândia"; } }
+                    FxField { horizontal-stretch: 1; label: "UF"; FxInput { text <=> FiscalStore.cfg-uf; placeholder: "PA"; } }
+                }
+            }
+
+            Bloco {
+                icone: FiscalIcons.cloud-upload; titulo: "Certificado Digital (A1)"; cor: FxCor.verde;
+                Dica { text: "O certificado é enviado diretamente para a Focus NFe de forma independente das outras configurações. A empresa já deve estar cadastrada em app.focusnfe.com.br antes de enviar."; }
+                HorizontalLayout {
+                    spacing: 14px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        FxLabel { text: "ARQUIVO .PFX / .P12"; }
+                        FxButton { text: FiscalStore.cfg-cert-arquivo == "" ? "Escolher arquivo..." : "Trocar arquivo"; icone: FiscalIcons.upload; clicked => { FiscalStore.cfg-escolher-cert(); } }
+                        if FiscalStore.cfg-cert-arquivo != "": Text { text: FiscalStore.cfg-cert-arquivo; color: Theme.available; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+                    }
+                    FxField {
+                        horizontal-stretch: 1;
+                        label: "SENHA DO CERTIFICADO";
+                        FxInput { text <=> FiscalStore.cfg-cert-senha; placeholder: "Senha do arquivo A1"; senha: true; }
+                    }
+                }
+                if FiscalStore.cfg-cert-resultado != "": FxAviso {
+                    text: FiscalStore.cfg-cert-resultado;
+                    cor: FiscalStore.cfg-cert-ok ? FxCor.verde : FxCor.vermelho;
+                }
+                HorizontalLayout {
+                    alignment: start;
+                    FxButton {
+                        text: FiscalStore.cfg-enviando-cert ? "Enviando para Focus NFe..." : "Enviar Certificado para Focus NFe";
+                        icone: FiscalIcons.cloud-upload;
+                        tipo: FxBotao.sucesso;
+                        enabled: !FiscalStore.cfg-enviando-cert && FiscalStore.cfg-cert-arquivo != "" && FiscalStore.cfg-cert-senha != "";
+                        clicked => { FiscalStore.cfg-enviar-cert(); }
+                    }
+                }
+                if FiscalStore.cfg-cert-arquivo == "" || FiscalStore.cfg-cert-senha == "": Dica { text: "Selecione o arquivo .PFX e informe a senha para habilitar o envio."; }
+            }
+        }
+    }
+}

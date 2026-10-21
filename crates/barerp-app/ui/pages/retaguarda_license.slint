@@ -1,0 +1,818 @@
+// Licença: SubscriptionView.tsx (Minha Assinatura), LicenseModal.tsx (tela de ativação que trava o sistema) e o
+// aviso de mensalidade vencendo do App.tsx.
+
+import { Theme } from "../theme.slint";
+import { RetaguardaStore } from "retaguarda_store.slint";
+import {
+    RtIcons, RtColors, RIcon, Spinner, RButton, PrimaryButton, GhostButton, RInput, Card, Badge, IconBubble, BackButton,
+    Feedback
+} from "retaguarda_widgets.slint";
+
+// O ID da máquina não tem espaços: quebra por caractere
+component Mono inherits Text {
+    font-family: "Menlo";
+    wrap: char-wrap;
+}
+
+component LinkButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> done;
+    in property <color> tone: RtColors.indigo;
+    callback clicked;
+    HorizontalLayout {
+        spacing: 4px;
+        alignment: end;
+        VerticalLayout { alignment: center; RIcon { source: root.done ? RtIcons.check : RtIcons.copy; tint: root.done ? Theme.available : root.tone; size: 13px; } }
+        Text { text: root.text; color: root.tone; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+    }
+    TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+component PlanButton inherits Rectangle {
+    in property <int> months;
+    in property <string> title;
+    in property <string> sub;
+    in property <bool> highlight;
+    property <bool> selected: RetaguardaStore.s-months == root.months;
+    min-height: 68px;
+    border-radius: 16px;
+    border-width: root.selected ? 2px : 1px;
+    border-color: root.selected ? Theme.primary : (touch.has-hover ? Theme.text-muted : Theme.surface-2);
+    background: root.selected ? Theme.primary.with-alpha(0.1) : Theme.bg.with-alpha(0.6);
+    VerticalLayout {
+        padding: 14px;
+        spacing: 4px;
+        HorizontalLayout {
+            Text { text: root.title; color: Theme.text; font-size: 14px; font-weight: 900; horizontal-stretch: 1; }
+            if root.selected: RIcon { source: RtIcons.check; tint: Theme.primary; }
+        }
+        Text { text: root.sub; color: Theme.text-muted; font-size: 10px; }
+    }
+    if root.highlight: Rectangle {
+        x: parent.width - self.width - 8px;
+        y: -9px;
+        height: 18px;
+        width: pop.preferred-width + 12px;
+        border-radius: 9px;
+        background: Theme.primary;
+        pop := Text { text: "POPULAR"; color: #020617; font-size: 9px; font-weight: 900; }
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.s-set-months(root.months); } }
+}
+
+export component RetaguardaSubscription inherits Rectangle {
+    property <length> content-w: min(896px, root.width - 40px);
+
+    Flickable {
+        content-height: col.preferred-height + 40px;
+        col := VerticalLayout {
+            x: (root.width - root.content-w) / 2;
+            y: 20px;
+            width: root.content-w;
+            spacing: 24px;
+
+            // 1. Cabeçalho
+            Card {
+                HorizontalLayout {
+                    padding: 20px;
+                    spacing: 14px;
+                    VerticalLayout { alignment: center; BackButton { clicked => { RetaguardaStore.back(); } } }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+                        horizontal-stretch: 1;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            Text { text: "Minha Assinatura & Licença"; color: Theme.text; font-size: 20px; font-weight: 900; vertical-alignment: center; }
+                            VerticalLayout { alignment: center; Badge { text: "REGULARIZADA"; tone: Theme.available; } }
+                        }
+                        Text { text: "Identificador do computador, dias restantes e solicitação de renovação antecipada."; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        RButton {
+                            icon: RtIcons.refresh;
+                            spin: RetaguardaStore.s-syncing;
+                            text: RetaguardaStore.s-syncing ? "Sincronizando..." : "Sincronizar com Servidor";
+                            bg: RtColors.indigo.with-alpha(0.15);
+                            hover-bg: RtColors.indigo.with-alpha(0.25);
+                            fg: RtColors.indigo;
+                            outline: RtColors.indigo.with-alpha(0.4);
+                            weight: 700;
+                            enabled: !RetaguardaStore.s-syncing;
+                            clicked => { RetaguardaStore.s-sync(); }
+                        }
+                    }
+                }
+            }
+
+            if RetaguardaStore.s-sync-message != "": Rectangle {
+                border-radius: 16px;
+                background: RetaguardaStore.s-sync-ok ? Theme.available.with-alpha(0.1) : Theme.primary.with-alpha(0.1);
+                border-width: 1px;
+                border-color: RetaguardaStore.s-sync-ok ? Theme.available.with-alpha(0.35) : Theme.primary.with-alpha(0.35);
+                HorizontalLayout {
+                    padding: 16px;
+                    spacing: 12px;
+                    VerticalLayout { alignment: center; RIcon { source: RetaguardaStore.s-sync-ok ? RtIcons.circle-check : RtIcons.alert; tint: RetaguardaStore.s-sync-ok ? Theme.available : Theme.primary; size: 20px; } }
+                    Text {
+                        text: RetaguardaStore.s-sync-message;
+                        color: RetaguardaStore.s-sync-ok ? (Theme.dark ? #a7f3d0 : #065f46) : (Theme.dark ? #fde68a : #92400e);
+                        font-size: 12px;
+                        font-weight: 500;
+                        wrap: word-wrap;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 2. Validade + ID da máquina
+            HorizontalLayout {
+                spacing: 16px;
+                Rectangle {
+                    horizontal-stretch: 1;
+                    width: (parent.width - 16px) / 2;
+                    clip: true;
+                    border-radius: 24px;
+                    border-width: 1px;
+                    border-color: Theme.available.with-alpha(0.3);
+                    background: @linear-gradient(135deg, Theme.available.with-alpha(0.12) 0%, Theme.surface 45%, Theme.surface 100%);
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 16px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            VerticalLayout { alignment: center; IconBubble { icon: RtIcons.shield-check; tone: Theme.available; size: 36px; square: true; outlined: true; } }
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text { text: "STATUS DA LICENÇA"; color: Theme.text-muted; font-size: 10px; font-weight: 900; }
+                                Text { text: RetaguardaStore.s-status-label; color: Theme.available; font-size: 12px; font-weight: 700; }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    height: 26px;
+                                    width: st.preferred-width + 20px;
+                                    border-radius: 13px;
+                                    property <color> tone: RetaguardaStore.s-soon ? Theme.primary : Theme.available;
+                                    background: self.tone.with-alpha(0.15);
+                                    border-width: 1px;
+                                    border-color: self.tone.with-alpha(0.4);
+                                    opacity: RetaguardaStore.s-soon ? (mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.6) : 1;
+                                    st := HorizontalLayout {
+                                        alignment: center;
+                                        spacing: 6px;
+                                        VerticalLayout { alignment: center; Rectangle { width: 8px; height: 8px; border-radius: 4px; background: RetaguardaStore.s-soon ? Theme.primary : Theme.available; } }
+                                        Text {
+                                            text: RetaguardaStore.s-soon ? "EXPIRA EM BREVE" : "OPERAÇÃO LIBERADA";
+                                            color: RetaguardaStore.s-soon ? (Theme.dark ? #fcd34d : #b45309) : (Theme.dark ? #6ee7b7 : #047857);
+                                            font-size: 11px;
+                                            font-weight: 900;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            spacing: 2px;
+                            Text { text: "TEMPO RESTANTE:"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                Text { text: RetaguardaStore.s-days; color: Theme.text; font-size: 46px; font-weight: 900; vertical-alignment: bottom; }
+                                Text { text: RetaguardaStore.s-days == 1 ? "dia restante" : "dias restantes"; color: Theme.text-muted; font-size: 17px; font-weight: 700; vertical-alignment: bottom; }
+                            }
+                        }
+                        Rectangle { vertical-stretch: 1; }
+                        Rectangle { height: 1px; background: Theme.surface-2; }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; RIcon { source: RtIcons.calendar; tint: Theme.text-muted; size: 14px; } }
+                            Text { text: "Vencimento:"; color: Theme.text-muted; font-size: 12px; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: RetaguardaStore.s-expiration; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                        }
+                        if RetaguardaStore.s-client != "": HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; RIcon { source: RtIcons.building; tint: Theme.text-muted; size: 14px; } }
+                            Text { text: "Estabelecimento:"; color: Theme.text-muted; font-size: 12px; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: RetaguardaStore.s-client; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                        }
+                    }
+                }
+                Card {
+                    horizontal-stretch: 1;
+                    width: (parent.width - 16px) / 2;
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 12px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            VerticalLayout { alignment: center; IconBubble { icon: RtIcons.laptop; tone: RtColors.indigo; size: 36px; square: true; outlined: true; } }
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text { text: "TERMINAL ATUAL"; color: Theme.text-muted; font-size: 10px; font-weight: 900; }
+                                Text { text: "Identificador de Hardware"; color: Theme.text; font-size: 12px; font-weight: 700; }
+                            }
+                            VerticalLayout { alignment: center; Badge { text: "Hash Único"; tone: Theme.text-muted; } }
+                        }
+                        Text { text: "Este identificador vincula este computador à sua licença no servidor da Software House."; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        Rectangle {
+                            border-radius: 16px;
+                            background: Theme.bg;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            VerticalLayout {
+                                padding: 14px;
+                                spacing: 4px;
+                                HorizontalLayout {
+                                    Text { text: "MACHINE ID:"; color: Theme.text-muted; font-size: 10px; font-weight: 700; horizontal-stretch: 1; }
+                                    Text { text: "Clique para copiar"; color: RtColors.indigo; font-size: 9px; }
+                                }
+                                Mono { text: RetaguardaStore.s-machine; color: RtColors.indigo; font-size: 12px; font-weight: 900; }
+                            }
+                            TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.s-copy-id(); } }
+                        }
+                        Rectangle { vertical-stretch: 1; }
+                        RButton {
+                            icon: RetaguardaStore.s-copied-id ? RtIcons.check : RtIcons.copy;
+                            text: RetaguardaStore.s-copied-id ? "ID da Máquina Copiado com Sucesso!" : "Copiar ID da Máquina";
+                            bg: Theme.surface-2;
+                            hover-bg: Theme.border;
+                            fg: RetaguardaStore.s-copied-id ? Theme.available : Theme.text;
+                            outline: Theme.border;
+                            weight: 700;
+                            clicked => { RetaguardaStore.s-copy-id(); }
+                        }
+                    }
+                }
+            }
+
+            // 3. Renovação antecipada
+            Card {
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 24px;
+                    HorizontalLayout {
+                        spacing: 12px;
+                        VerticalLayout { alignment: center; IconBubble { icon: RtIcons.sparkles; tone: Theme.primary; size: 40px; square: true; outlined: true; } }
+                        VerticalLayout {
+                            alignment: center;
+                            horizontal-stretch: 1;
+                            Text { text: "Renovação & Pagamento Antecipado"; color: Theme.text; font-size: 15px; font-weight: 900; }
+                            Text { text: "Pague meses com antecedência e garanta a operação contínua do seu bar sem bloqueios."; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        }
+                        VerticalLayout { alignment: center; Badge { text: "💡 Os dias são cumulativos"; tone: Theme.primary; pill: true; } }
+                    }
+                    Rectangle {
+                        border-radius: 16px;
+                        background: @linear-gradient(90deg, Theme.primary.with-alpha(0.08) 0%, Theme.orange.with-alpha(0.08) 100%);
+                        border-width: 1px;
+                        border-color: Theme.primary.with-alpha(0.3);
+                        HorizontalLayout {
+                            padding: 16px;
+                            spacing: 12px;
+                            Text { text: "🛡️"; font-size: 20px; }
+                            VerticalLayout {
+                                spacing: 4px;
+                                horizontal-stretch: 1;
+                                Text { text: "Garantia de Acúmulo de Dias:"; color: Theme.text; font-size: 12px; font-weight: 700; }
+                                Text {
+                                    text: "Ao pagar 1 ou mais meses antecipadamente, os novos dias são somados ao final da sua validade atual. Você nunca perde os " + RetaguardaStore.s-days + " dias que já possui!";
+                                    color: Theme.text-muted;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        spacing: 12px;
+                        Text { text: "SELECIONE QUANTOS MESES DESEJA RENOVAR ADIANTADO:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; }
+                        HorizontalLayout {
+                            spacing: 12px;
+                            PlanButton { horizontal-stretch: 1; months: 1; title: "+1 Mês"; sub: "30 dias adicionais"; }
+                            PlanButton { horizontal-stretch: 1; months: 3; title: "+3 Meses"; sub: "90 dias (Trimestral)"; }
+                            PlanButton { horizontal-stretch: 1; months: 6; title: "+6 Meses"; sub: "180 dias (Semestral)"; highlight: true; }
+                            PlanButton { horizontal-stretch: 1; months: 12; title: "+12 Meses"; sub: "365 dias (1 Ano)"; }
+                        }
+                    }
+                    Rectangle {
+                        border-radius: 16px;
+                        background: Theme.bg;
+                        border-width: 1px;
+                        border-color: Theme.surface-2;
+                        HorizontalLayout {
+                            padding: 16px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                spacing: 2px;
+                                horizontal-stretch: 1;
+                                Text { text: "PROJEÇÃO DA NOVA VALIDADE:"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    VerticalLayout { alignment: center; RIcon { source: RtIcons.calendar; tint: Theme.available; } }
+                                    Text { text: RetaguardaStore.s-projection; color: Theme.available; font-size: 14px; font-weight: 700; wrap: word-wrap; }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    height: 28px;
+                                    width: ma.preferred-width + 24px;
+                                    border-radius: 12px;
+                                    background: Theme.surface;
+                                    border-width: 1px;
+                                    border-color: Theme.surface-2;
+                                    ma := Text { text: RetaguardaStore.s-months + (RetaguardaStore.s-months == 1 ? " mês adicionado" : " meses adicionados"); color: Theme.text-muted; font-size: 11px; }
+                                }
+                            }
+                        }
+                    }
+                    // PIX
+                    Rectangle {
+                        border-radius: 16px;
+                        background: RtColors.indigo.with-alpha(0.06);
+                        border-width: 1px;
+                        border-color: RtColors.indigo.with-alpha(0.3);
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                VerticalLayout { alignment: center; RIcon { source: RtIcons.credit-card; tint: RtColors.indigo; } }
+                                Text { text: "CHAVE PIX PARA RENOVAÇÃO:"; color: Theme.text; font-size: 12px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                                Text { text: "Titular: " + RetaguardaStore.s-dev-name; color: Theme.text-muted; font-size: 10px; font-weight: 700; vertical-alignment: center; }
+                            }
+                            Rectangle {
+                                border-radius: 12px;
+                                background: Theme.surface;
+                                border-width: 1px;
+                                border-color: RtColors.indigo.with-alpha(0.2);
+                                HorizontalLayout {
+                                    padding: 10px;
+                                    spacing: 8px;
+                                    Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 12px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                                    RButton {
+                                        icon: RetaguardaStore.s-copied-pix ? RtIcons.check : RtIcons.copy;
+                                        text: RetaguardaStore.s-copied-pix ? "Copiada!" : "Copiar Chave PIX";
+                                        bg: RtColors.indigo-solid;
+                                        hover-bg: #6366f1;
+                                        fg: #ffffff;
+                                        weight: 700;
+                                        min-height: 32px;
+                                        clicked => { RetaguardaStore.s-copy-pix(); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    RButton {
+                        icon: RtIcons.message;
+                        text: "SOLICITAR RENOVAÇÃO ANTECIPADA NO WHATSAPP";
+                        bg: RtColors.emerald-solid;
+                        hover-bg: #10b981;
+                        fg: #ffffff;
+                        font-size: 14px;
+                        weight: 900;
+                        min-height: 56px;
+                        border-radius: 16px;
+                        clicked => { RetaguardaStore.s-request-renewal(); }
+                    }
+                }
+            }
+
+            // 4. Ativação offline (sanfona)
+            Card {
+                clip: true;
+                VerticalLayout {
+                    Rectangle {
+                        background: off-touch.has-hover ? Theme.surface-2.with-alpha(0.4) : transparent;
+                        HorizontalLayout {
+                            padding: 20px;
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 32px;
+                                    height: 32px;
+                                    border-radius: 10px;
+                                    background: Theme.surface-2;
+                                    RIcon { source: RtIcons.key; tint: Theme.text-muted; }
+                                }
+                            }
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text { text: "ATIVAÇÃO OFFLINE (SEM INTERNET)"; color: Theme.text; font-size: 12px; font-weight: 900; }
+                                Text { text: "Recebeu uma chave de ativação offline do desenvolvedor? Clique para inserir."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                            }
+                            VerticalLayout { alignment: center; RIcon { source: RetaguardaStore.s-offline-open ? RtIcons.chevron-up : RtIcons.chevron-down; tint: Theme.text-muted; } }
+                        }
+                        off-touch := TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.s-offline-open = !RetaguardaStore.s-offline-open; } }
+                    }
+                    if RetaguardaStore.s-offline-open: Rectangle {
+                        background: Theme.bg.with-alpha(0.5);
+                        Rectangle { y: 0; height: 1px; background: Theme.surface-2; }
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
+                            Text { text: "Cole a Chave de Ativação Offline:"; color: Theme.text; font-size: 12px; font-weight: 700; }
+                            RInput {
+                                text <=> RetaguardaStore.s-offline-key;
+                                mono: true;
+                                font-size: 12px;
+                                placeholder: "Ex: EXP-20261231-XXXXXXXX-YYYYYYYY";
+                                accepted => { RetaguardaStore.s-activate-offline(); }
+                            }
+                            if RetaguardaStore.s-offline-message != "": Rectangle {
+                                border-radius: 12px;
+                                background: RetaguardaStore.s-offline-ok ? Theme.available.with-alpha(0.1) : Theme.danger.with-alpha(0.1);
+                                border-width: 1px;
+                                border-color: RetaguardaStore.s-offline-ok ? Theme.available.with-alpha(0.3) : Theme.danger.with-alpha(0.3);
+                                HorizontalLayout {
+                                    padding: 12px;
+                                    Text {
+                                        text: RetaguardaStore.s-offline-message;
+                                        color: RetaguardaStore.s-offline-ok ? Theme.available : Theme.danger;
+                                        font-size: 12px;
+                                        font-weight: 700;
+                                        wrap: word-wrap;
+                                    }
+                                }
+                            }
+                            HorizontalLayout {
+                                alignment: start;
+                                RButton {
+                                    text: RetaguardaStore.s-offline-busy ? "VALIDANDO CHAVE..." : "VALIDAR CHAVE OFFLINE";
+                                    bg: Theme.dark ? #ffffff : #0f172a;
+                                    hover-bg: Theme.dark ? #f1f5f9 : #1e293b;
+                                    fg: Theme.dark ? #0f172a : #ffffff;
+                                    weight: 700;
+                                    enabled: !RetaguardaStore.s-offline-busy && RetaguardaStore.s-offline-key != "";
+                                    clicked => { RetaguardaStore.s-activate-offline(); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 5. Contato do desenvolvedor
+            Rectangle {
+                border-radius: 24px;
+                background: Theme.surface.with-alpha(0.5);
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                HorizontalLayout {
+                    padding: 20px;
+                    spacing: 16px;
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        spacing: 2px;
+                        Text { text: "SOFTWARE HOUSE & DESENVOLVEDOR"; color: Theme.text-muted; font-size: 10px; font-weight: 900; }
+                        Text { text: RetaguardaStore.s-dev-name; color: Theme.text; font-size: 14px; font-weight: 700; }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            alignment: start;
+                            Text { text: "WhatsApp:"; color: Theme.text-muted; font-size: 11px; }
+                            Text { text: "(47) 97400-2560"; color: Theme.available; font-size: 11px; font-weight: 600; }
+                            Text { text: "• Suporte técnico, renovações e customizações."; color: Theme.text-muted; font-size: 11px; }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        RButton {
+                            icon: RtIcons.message;
+                            text: "Falar no WhatsApp (47 97400-2560)";
+                            bg: RtColors.emerald-solid;
+                            hover-bg: #10b981;
+                            fg: #ffffff;
+                            weight: 700;
+                            clicked => { RetaguardaStore.s-support(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Tela de ativação: trava o sistema inteiro (inclusive o login) quando a licença não está ativa
+export component LicenseGate inherits Rectangle {
+    property <bool> bad: RetaguardaStore.g-status == "EXPIRED" || RetaguardaStore.g-status == "BLOCKED";
+    background: #020617d9;
+    TouchArea { }
+    Flickable {
+        content-height: max(root.height, box.height + 40px);
+        box := Rectangle {
+            x: (root.width - self.width) / 2;
+            y: max(20px, (root.height - self.height) / 2);
+            width: min(512px, root.width - 32px);
+            height: box-col.preferred-height;
+            border-radius: 24px;
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            clip: true;
+            drop-shadow-blur: 40px;
+            drop-shadow-color: #00000080;
+            box-col := VerticalLayout {
+                // Faixa do topo
+                Rectangle {
+                    background: root.bad
+                        ? @linear-gradient(90deg, #e11d48 0%, #dc2626 100%)
+                        : @linear-gradient(90deg, #f59e0b 0%, #ea580c 100%);
+                    VerticalLayout {
+                        padding: 24px;
+                        spacing: 6px;
+                        alignment: center;
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 56px;
+                                height: 56px;
+                                border-radius: 16px;
+                                background: #ffffff26;
+                                RIcon { source: root.bad ? RtIcons.shield-alert : RtIcons.lock; tint: #ffffff; size: 32px; }
+                            }
+                        }
+                        Text {
+                            text: RetaguardaStore.g-status == "EXPIRED" ? "Mensalidade Expirada" : RetaguardaStore.g-status == "BLOCKED" ? "Licença Bloqueada" : "Ativação do Bar ERP";
+                            color: #ffffff;
+                            font-size: 24px;
+                            font-weight: 800;
+                            horizontal-alignment: center;
+                        }
+                        Text {
+                            text: RetaguardaStore.g-status == "EXPIRED"
+                                ? "Sua mensalidade venceu. Efetue o pagamento e informe o ID abaixo para reativação remota imediata."
+                                : RetaguardaStore.g-status == "BLOCKED"
+                                    ? "Este terminal está temporariamente suspenso pelo desenvolvedor."
+                                    : "Este computador precisa de ativação para liberar o uso do sistema.";
+                            color: #ffffffe6;
+                            font-size: 13px;
+                            font-weight: 500;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 20px;
+                    if RetaguardaStore.g-success != "": Rectangle {
+                        border-radius: 16px;
+                        background: Theme.available.with-alpha(0.1);
+                        border-width: 1px;
+                        border-color: Theme.available.with-alpha(0.3);
+                        HorizontalLayout {
+                            padding: 16px;
+                            spacing: 12px;
+                            VerticalLayout { alignment: center; RIcon { source: RtIcons.circle-check; tint: Theme.available; size: 24px; } }
+                            Text { text: RetaguardaStore.g-success; color: Theme.available; font-size: 13px; font-weight: 700; wrap: word-wrap; horizontal-stretch: 1; vertical-alignment: center; }
+                        }
+                    }
+                    if RetaguardaStore.g-error != "": Rectangle {
+                        border-radius: 16px;
+                        background: RtColors.rose.with-alpha(0.1);
+                        border-width: 1px;
+                        border-color: RtColors.rose.with-alpha(0.25);
+                        HorizontalLayout {
+                            padding: 14px;
+                            spacing: 10px;
+                            VerticalLayout { alignment: start; RIcon { source: RtIcons.alert; tint: RtColors.rose; size: 18px; } }
+                            Text { text: RetaguardaStore.g-error; color: RtColors.rose; font-size: 12px; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
+                        }
+                    }
+                    // ID da máquina
+                    Rectangle {
+                        border-radius: 16px;
+                        background: Theme.bg.with-alpha(0.8);
+                        border-width: 1px;
+                        border-color: Theme.surface-2;
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 6px;
+                            HorizontalLayout {
+                                Text { text: "ID DA SUA MÁQUINA (HARDWARE)"; color: Theme.text-muted; font-size: 11px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
+                                LinkButton { text: RetaguardaStore.g-copied-id ? "Copiado!" : "Copiar ID"; done: RetaguardaStore.g-copied-id; clicked => { RetaguardaStore.g-copy-id(); } }
+                            }
+                            Rectangle {
+                                border-radius: 12px;
+                                background: Theme.surface;
+                                border-width: 1px;
+                                border-color: Theme.border;
+                                VerticalLayout {
+                                    padding: 12px;
+                                    Mono {
+                                        text: RetaguardaStore.s-machine == "" ? "Carregando ID..." : RetaguardaStore.s-machine;
+                                        color: Theme.dark ? #a5b4fc : Theme.text;
+                                        font-size: 14px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                    }
+                                }
+                            }
+                            Text { text: "Envie este ID junto com o comprovante no WhatsApp do desenvolvedor."; color: Theme.text-muted; font-size: 11px; horizontal-alignment: center; wrap: word-wrap; }
+                        }
+                    }
+                    // PIX
+                    Rectangle {
+                        border-radius: 16px;
+                        background: RtColors.indigo.with-alpha(0.08);
+                        border-width: 1px;
+                        border-color: RtColors.indigo.with-alpha(0.25);
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 4px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                VerticalLayout { alignment: center; RIcon { source: RtIcons.qr-code; tint: RtColors.indigo; size: 18px; } }
+                                Text { text: "Chave PIX para Renovação:"; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
+                                LinkButton { text: RetaguardaStore.g-copied-pix ? "Copiado!" : "Copiar PIX"; done: RetaguardaStore.g-copied-pix; clicked => { RetaguardaStore.g-copy-pix(); } }
+                            }
+                            Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 12px; font-weight: 700; }
+                        }
+                    }
+                    VerticalLayout {
+                        spacing: 10px;
+                        RButton {
+                            icon: RtIcons.message;
+                            text: "Enviar Comprovante e ID no WhatsApp (47 97400-2560)";
+                            bg: RtColors.emerald-solid;
+                            hover-bg: #10b981;
+                            fg: #ffffff;
+                            font-size: 13px;
+                            weight: 700;
+                            min-height: 50px;
+                            border-radius: 16px;
+                            clicked => { RetaguardaStore.g-whatsapp(); }
+                        }
+                        RButton {
+                            icon: RtIcons.refresh;
+                            spin: RetaguardaStore.g-syncing;
+                            text: RetaguardaStore.g-syncing ? "Verificando com o Servidor..." : "Verificar Ativação Online Agora";
+                            bg: RtColors.indigo-solid;
+                            hover-bg: #6366f1;
+                            fg: #ffffff;
+                            font-size: 13px;
+                            weight: 700;
+                            min-height: 50px;
+                            border-radius: 16px;
+                            enabled: !RetaguardaStore.g-syncing;
+                            clicked => { RetaguardaStore.g-check-online(); }
+                        }
+                    }
+                    // Chave offline
+                    VerticalLayout {
+                        spacing: 10px;
+                        Rectangle { height: 1px; background: Theme.surface-2; }
+                        Rectangle {
+                        HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; RIcon { source: RtIcons.key; tint: Theme.text-muted; size: 14px; } }
+                            Text { text: "Recebeu uma chave de ativação offline?"; color: Theme.text-muted; font-size: 12px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
+                            VerticalLayout { alignment: center; RIcon { source: RetaguardaStore.g-offline-open ? RtIcons.chevron-up : RtIcons.chevron-down; tint: Theme.text-muted; } }
+                        }
+                            TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.g-offline-open = !RetaguardaStore.g-offline-open; } }
+                        }
+                        if RetaguardaStore.g-offline-open: VerticalLayout {
+                            spacing: 10px;
+                            RInput {
+                                text <=> RetaguardaStore.g-offline-key;
+                                mono: true;
+                                font-size: 12px;
+                                focus-color: RtColors.indigo;
+                                placeholder: "Cole a chave offline aqui (Ex: EXP-2026...)";
+                                accepted => { RetaguardaStore.g-activate-offline(); }
+                            }
+                            RButton {
+                                icon: RtIcons.zap;
+                                text: RetaguardaStore.g-offline-busy ? "Validando..." : "Ativar Chave Offline";
+                                bg: #1e293b;
+                                hover-bg: #334155;
+                                fg: #ffffff;
+                                weight: 700;
+                                enabled: !RetaguardaStore.g-offline-busy;
+                                clicked => { RetaguardaStore.g-activate-offline(); }
+                            }
+                        }
+                    }
+                    // Endereço do servidor
+                    VerticalLayout {
+                        spacing: 8px;
+                        Rectangle { height: 1px; background: Theme.surface-2; }
+                        Rectangle {
+                        HorizontalLayout {
+                            spacing: 6px;
+                            VerticalLayout { alignment: center; RIcon { source: RtIcons.globe; tint: Theme.text-muted; size: 13px; } }
+                            Text { text: "Endereço do Servidor de Ativação"; color: Theme.text-muted; font-size: 11px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
+                            VerticalLayout { alignment: center; RIcon { source: RetaguardaStore.g-server-open ? RtIcons.chevron-up : RtIcons.chevron-down; tint: Theme.text-muted; size: 14px; } }
+                        }
+                            TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.g-server-open = !RetaguardaStore.g-server-open; } }
+                        }
+                        if RetaguardaStore.g-server-open: VerticalLayout {
+                            spacing: 6px;
+                            RInput { text <=> RetaguardaStore.g-server-url; mono: true; font-size: 12px; focus-color: RtColors.indigo; placeholder: "https://seu-painel.onrender.com"; }
+                            Text { text: "URL da nuvem (Render) da Software House."; color: Theme.text-muted; font-size: 10px; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Aviso de mensalidade (abre pelo selo da barra superior)
+export component LicenseInfoModal inherits Rectangle {
+    background: Theme.overlay;
+    TouchArea { clicked => { RetaguardaStore.i-visible = false; } }
+    Rectangle {
+        width: min(448px, root.width - 32px);
+        height: col.preferred-height;
+        border-radius: 24px;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.surface-2;
+        drop-shadow-blur: 40px;
+        drop-shadow-color: #00000080;
+        TouchArea { }
+        col := VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+            HorizontalLayout {
+                spacing: 10px;
+                Text { text: "⚠️"; font-size: 24px; vertical-alignment: center; }
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Text { text: "Aviso de Mensalidade"; color: Theme.text; font-size: 17px; font-weight: 700; }
+                    Text { text: "Vence em " + RetaguardaStore.i-days + (RetaguardaStore.i-days == 1 ? " dia" : " dias"); color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 600; }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 10px;
+                        background: x-touch.has-hover ? Theme.surface-2 : transparent;
+                        RIcon { source: RtIcons.x; tint: Theme.text-muted; }
+                        x-touch := TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.i-visible = false; } }
+                    }
+                }
+            }
+            Rectangle { height: 1px; background: Theme.surface-2; }
+            Text {
+                text: "Para evitar interrupções no funcionamento do Bar ERP, efetue o pagamento da sua mensalidade via PIX e envie o comprovante.";
+                color: Theme.text-muted;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+            Rectangle {
+                border-radius: 16px;
+                background: RtColors.indigo.with-alpha(0.08);
+                border-width: 1px;
+                border-color: RtColors.indigo.with-alpha(0.25);
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 4px;
+                    Text { text: "CHAVE PIX DO DESENVOLVEDOR:"; color: Theme.text; font-size: 11px; font-weight: 700; }
+                    Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 12px; font-weight: 700; }
+                }
+            }
+            Rectangle {
+                border-radius: 16px;
+                background: Theme.bg;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 4px;
+                    Text { text: "ID DESTE COMPUTADOR:"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+                    Mono { text: RetaguardaStore.s-machine; color: Theme.text; font-size: 12px; font-weight: 700; }
+                }
+            }
+            RButton {
+                text: "Enviar Comprovante no WhatsApp (47 97400-2560)";
+                bg: RtColors.emerald-solid;
+                hover-bg: #10b981;
+                fg: #ffffff;
+                weight: 700;
+                min-height: 44px;
+                clicked => { RetaguardaStore.i-whatsapp(); }
+            }
+            GhostButton {
+                text: "Acessar Painel de Assinatura & Renovações";
+                weight: 700;
+                clicked => { RetaguardaStore.i-visible = false; RetaguardaStore.i-open-subscription(); }
+            }
+        }
+    }
+}

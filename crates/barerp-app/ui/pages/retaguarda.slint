@@ -1,0 +1,147 @@
+// Página "retaguarda" (port completo da área correspondente do app original): SettingsView, DashboardView com
+// AuditView, PrinterSettingsView e SubscriptionView. O estado e os callbacks ficam no global `RetaguardaStore`
+// (`retaguarda_store.slint`), ligado em `src/pages/retaguarda.rs`. A tela de ativação (`LicenseGate`) e o aviso de
+// mensalidade (`LicenseInfoModal`) ficam por cima do app inteiro, no app.slint.
+
+import { Theme } from "../theme.slint";
+import { RetaguardaStore, RtView } from "retaguarda_store.slint";
+import { RtIcons, RIcon, PrimaryButton, GhostButton } from "retaguarda_widgets.slint";
+import { RetaguardaHub } from "retaguarda_hub.slint";
+import { RetaguardaDashboard } from "retaguarda_dash.slint";
+import { RetaguardaPrinters } from "retaguarda_printers.slint";
+import { RetaguardaSubscription, LicenseGate, LicenseInfoModal } from "retaguarda_license.slint";
+import { CustomersScreen, SuppliersScreen } from "cardapio_people.slint";
+import { CardapioModals } from "cardapio_modals.slint";
+import { TeamModals } from "mesas_modals.slint";
+
+export { RetaguardaStore, LicenseGate, LicenseInfoModal }
+
+component MessageBox inherits Rectangle {
+    in property <string> text;
+    in property <bool> confirm;
+    callback ok;
+    callback cancel;
+    background: Theme.overlay;
+    TouchArea { }
+    Rectangle {
+        width: min(440px, root.width - 40px);
+        height: col.preferred-height;
+        border-radius: 20px;
+        background: Theme.surface;
+        border-width: 1px;
+        border-color: Theme.border;
+        col := VerticalLayout {
+            padding: 20px;
+            spacing: 16px;
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout { alignment: start; RIcon { source: root.confirm ? RtIcons.circle-alert : RtIcons.info; tint: root.confirm ? Theme.primary : Theme.text-muted; size: 22px; } }
+                Text { text: root.text; color: Theme.text; font-size: 14px; wrap: word-wrap; horizontal-stretch: 1; }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                if root.confirm: GhostButton { text: "Cancelar"; clicked => { root.cancel(); } }
+                PrimaryButton { text: "OK"; clicked => { root.ok(); } }
+            }
+        }
+    }
+}
+
+// Item do submenu da Retaguarda (acesso direto a cada parte, sem passar pela tela inicial)
+component SubTab inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <bool> active;
+    in property <bool> icon-only;
+    callback clicked;
+    height: 36px;
+    width: row.preferred-width + (root.icon-only && !root.active ? 22px : 26px);
+    border-radius: 12px;
+    background: root.active ? Theme.primary : (touch.has-hover ? Theme.surface-2 : transparent);
+    row := HorizontalLayout {
+        alignment: center;
+        spacing: 7px;
+        VerticalLayout { alignment: center; RIcon { source: root.icon; tint: root.active ? #020617 : (touch.has-hover ? Theme.text : Theme.text-muted); size: 15px; } }
+        if !root.icon-only || root.active: Text {
+            text: root.text;
+            color: root.active ? #020617 : (touch.has-hover ? Theme.text : Theme.text-muted);
+            font-size: 12px;
+            font-weight: root.active ? 900 : 700;
+            vertical-alignment: center;
+        }
+    }
+    touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+export component RetaguardaAreaPage inherits Rectangle {
+    background: Theme.bg;
+    // Sem espaço para todos os nomes: só o ícone, menos no item aberto
+    property <bool> icons-only: root.width < 1120px;
+    property <RtView> view: RetaguardaStore.view;
+
+    VerticalLayout {
+        Rectangle {
+            height: 52px;
+            background: Theme.surface;
+            Rectangle { y: parent.height - 1px; height: 1px; background: Theme.surface-2; }
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 4px;
+                alignment: start;
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.settings; text: "Visão Geral"; icon-only: root.icons-only; active: root.view == RtView.hub; clicked => { RetaguardaStore.back(); } } }
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.chart; text: "Métricas"; icon-only: root.icons-only; active: root.view == RtView.dashboard; clicked => { RetaguardaStore.open-dashboard(); } } }
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.shield-check; text: "Equipe"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-staff(); } } }
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.users; text: "Garçons"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-waiters(); } } }
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.credit-card; text: "Clientes (Fiado)"; icon-only: root.icons-only; active: root.view == RtView.customers; clicked => { RetaguardaStore.open-customers(); } } }
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.truck; text: "Fornecedores"; icon-only: root.icons-only; active: root.view == RtView.suppliers; clicked => { RetaguardaStore.open-suppliers(); } } }
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.printer; text: "Impressoras"; icon-only: root.icons-only; active: root.view == RtView.printers; clicked => { RetaguardaStore.open-printers(); } } }
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.smartphone; text: "Conectar Celular"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-connect(); } } }
+                VerticalLayout { alignment: center; SubTab { icon: RtIcons.key; text: "Assinatura"; icon-only: root.icons-only; active: root.view == RtView.subscription; clicked => { RetaguardaStore.open-subscription(); } } }
+            }
+        }
+        Rectangle {
+            vertical-stretch: 1;
+            if root.view == RtView.hub: RetaguardaHub { width: 100%; height: 100%; }
+            if root.view == RtView.dashboard: RetaguardaDashboard { width: 100%; height: 100%; }
+            if root.view == RtView.printers: RetaguardaPrinters { width: 100%; height: 100%; }
+            if root.view == RtView.subscription: RetaguardaSubscription { width: 100%; height: 100%; }
+            if root.view == RtView.customers: VerticalLayout {
+                width: 100%;
+                height: 100%;
+                padding-top: 12px;
+                CustomersScreen { show-back: true; back => { RetaguardaStore.back(); } }
+            }
+            if root.view == RtView.suppliers: VerticalLayout {
+                width: 100%;
+                height: 100%;
+                padding-top: 12px;
+                SuppliersScreen { show-back: true; back => { RetaguardaStore.back(); } }
+            }
+        }
+    }
+
+    // Cadastro de cliente, pagamento do fiado e cadastro de fornecedor (os mesmos modais da área Cardápio)
+    if root.view == RtView.customers || root.view == RtView.suppliers: CardapioModals { width: 100%; height: 100%; }
+    // Garçons, funcionários e conectar celular (os mesmos modais da área Mesas)
+    TeamModals { width: 100%; height: 100%; }
+
+    if RetaguardaStore.confirm-text != "": MessageBox {
+        width: 100%;
+        height: 100%;
+        text: RetaguardaStore.confirm-text;
+        confirm: true;
+        ok => {
+            RetaguardaStore.confirm-text = "";
+            RetaguardaStore.confirm-accepted(RetaguardaStore.confirm-action);
+        }
+        cancel => { RetaguardaStore.confirm-text = ""; }
+    }
+    if RetaguardaStore.alert-text != "": MessageBox {
+        width: 100%;
+        height: 100%;
+        text: RetaguardaStore.alert-text;
+        ok => { RetaguardaStore.alert-text = ""; }
+    }
+}

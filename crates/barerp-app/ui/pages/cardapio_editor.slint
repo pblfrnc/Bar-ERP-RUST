@@ -1,0 +1,1056 @@
+// Cadastro / edição de produto em tela inteira (a parte `showProductModal` do ProductsView.tsx).
+
+import { LineEdit, ComboBox, ScrollView, TextEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons, Icon } from "../icons.slint";
+import { CardapioIcons } from "cardapio_icons.slint";
+import { CardapioStore, CdComponent, CdGroupPick } from "cardapio_store.slint";
+import { Pill, Btn, FieldLabel, Hint, Toggle, MiniChip, Notice, Field, Check } from "cardapio_widgets.slint";
+
+component Tile inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <color> tone: Theme.text;
+    horizontal-stretch: 1;
+    height: 62px;
+    background: Theme.surface;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    VerticalLayout {
+        padding: 10px;
+        spacing: 2px;
+        Text { text: root.label; color: Theme.text-muted; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; }
+        Text { text: root.value; color: root.tone; font-size: 15px; font-weight: 900; font-family: "Menlo"; }
+    }
+}
+
+component ComponentRow inherits Rectangle {
+    in property <CdComponent> data;
+    in property <int> slot;
+    height: 54px;
+    background: Theme.surface;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    HorizontalLayout {
+        padding: 8px;
+        spacing: 8px;
+        ComboBox {
+            horizontal-stretch: 1;
+            model: CardapioStore.f-component-labels;
+            current-index: root.data.index;
+            selected => { CardapioStore.comp-pick(root.slot, self.current-index); }
+        }
+        Rectangle {
+            width: 150px;
+            border-radius: 10px;
+            border-width: 2px;
+            border-color: Theme.purple.with-alpha(0.35);
+            background: Theme.bg;
+            HorizontalLayout {
+                padding: 3px;
+                spacing: 2px;
+                Rectangle {
+                    width: 26px;
+                    border-radius: 7px;
+                    background: minus.has-hover ? Theme.border : Theme.surface-2;
+                    Text { text: "-"; color: Theme.text; font-weight: 900; }
+                    minus := TouchArea { clicked => { CardapioStore.comp-step(root.slot, -1); } }
+                }
+                LineEdit {
+                    horizontal-stretch: 1;
+                    text: root.data.quantity;
+                    horizontal-alignment: center;
+                    edited(t) => { CardapioStore.comp-qty(root.slot, t); }
+                }
+                Rectangle {
+                    width: 26px;
+                    border-radius: 7px;
+                    background: plus.has-hover ? Theme.border : Theme.surface-2;
+                    Text { text: "+"; color: Theme.text; font-weight: 900; }
+                    plus := TouchArea { clicked => { CardapioStore.comp-step(root.slot, 1); } }
+                }
+                Text { text: root.data.unit; color: Theme.text-muted; font-size: 10px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
+            }
+        }
+        Text {
+            width: 72px;
+            text: root.data.subtotal;
+            color: Theme.available;
+            font-size: 11px;
+            font-weight: 800;
+            font-family: "Menlo";
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+        Rectangle {
+            width: 34px;
+            border-radius: 10px;
+            background: rm.has-hover ? Theme.danger.with-alpha(0.15) : transparent;
+            Icon { source: Icons.trash-2; color: Theme.danger; size: 16px; }
+            rm := TouchArea { clicked => { CardapioStore.comp-remove(root.slot); } }
+        }
+    }
+}
+
+component GroupPickView inherits Rectangle {
+    in property <CdGroupPick> data;
+    horizontal-stretch: 1;
+    height: 56px;
+    border-radius: 12px;
+    opacity: root.data.active ? 1 : 0.6;
+    background: root.data.position > 0 ? Theme.primary.with-alpha(0.1) : transparent;
+    border-width: 1px;
+    border-color: root.data.position > 0 ? Theme.primary : (t.has-hover ? Theme.primary.with-alpha(0.5) : Theme.surface-2);
+    t := TouchArea { clicked => { CardapioStore.group-toggle(root.data.id); } }
+    HorizontalLayout {
+        padding: 10px;
+        spacing: 10px;
+        Check { y: 2px; checked: root.data.position > 0; size: 18px; clicked => { CardapioStore.group-toggle(root.data.id); } }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+                if root.data.position > 0: Text { text: root.data.position + "."; color: Theme.primary; font-size: 13px; font-weight: 900; }
+                Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 800; overflow: elide; }
+            }
+            Text { text: root.data.detail; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+        }
+    }
+}
+
+export component ProductEditor inherits Rectangle {
+    background: Theme.bg;
+    property <color> margin-color: CardapioStore.margin-tone == 0 ? Theme.available : CardapioStore.margin-tone == 1 ? Theme.closing
+        : CardapioStore.margin-tone == 2 ? Theme.orange : Theme.danger;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        // ---------- Topo ----------
+        Rectangle {
+            background: Theme.surface;
+            border-radius: 22px;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            height: top.preferred-height;
+            top := HorizontalLayout {
+                padding: 16px;
+                spacing: 12px;
+                Rectangle {
+                    width: 44px;
+                    height: 44px;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: 14px;
+                    background: back.has-hover ? Theme.border : Theme.surface-2;
+                    Icon { source: CardapioIcons.arrow-left; color: Theme.text; size: 20px; }
+                    back := TouchArea { clicked => { CardapioStore.back(); } }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    spacing: 2px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        Text { text: CardapioStore.f-title; color: Theme.text; font-size: 19px; font-weight: 900; overflow: elide; }
+                        Pill {
+                            y: (parent.height - self.height) / 2;
+                            text: CardapioStore.f-badge;
+                            mono: CardapioStore.f-editing;
+                            tone: CardapioStore.f-editing ? Theme.closing : Theme.available;
+                        }
+                    }
+                    Text {
+                        text: CardapioStore.f-editing ? "Atualize preços, custos, estoque, fornecedor e regras tributárias"
+                            : "Preencha o cadastro completo com automação de código de barras, tributação e custos";
+                        color: Theme.text-muted;
+                        font-size: 12px;
+                    }
+                }
+                if CardapioStore.f-editing: Btn {
+                    y: (parent.height - self.height) / 2;
+                    text: "Excluir";
+                    icon: Icons.trash-2;
+                    has-icon: true;
+                    fill: Theme.danger.with-alpha(0.12);
+                    tone: Theme.danger;
+                    clicked => { CardapioStore.delete-current(); }
+                }
+                Btn { y: (parent.height - self.height) / 2; text: "Cancelar"; clicked => { CardapioStore.back(); } }
+                Btn {
+                    y: (parent.height - self.height) / 2;
+                    text: "Salvar Produto";
+                    icon: Icons.check;
+                    has-icon: true;
+                    fill: Theme.primary;
+                    tone: Theme.primary-text;
+                    weight: 900;
+                    clicked => { CardapioStore.save(); }
+                }
+            }
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 14px;
+                padding-bottom: 8px;
+
+                // ---------- Busca por código de barras ----------
+                Rectangle {
+                    background: Theme.primary.with-alpha(0.07);
+                    border-radius: 22px;
+                    border-width: 1px;
+                    border-color: Theme.primary.with-alpha(0.35);
+                    height: ean.preferred-height;
+                    ean := VerticalLayout {
+                        padding: 18px;
+                        spacing: 10px;
+                        HorizontalLayout {
+                            spacing: 12px;
+                            Rectangle {
+                                width: 40px;
+                                height: 40px;
+                                y: (parent.height - self.height) / 2;
+                                border-radius: 12px;
+                                background: Theme.primary.with-alpha(0.18);
+                                Icon { source: Icons.sparkles; color: Theme.primary; size: 20px; }
+                            }
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                alignment: center;
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    Text { text: "Preenchimento Automático por Código de Barras"; color: Theme.text; font-size: 14px; font-weight: 900; }
+                                    Pill { y: (parent.height - self.height) / 2; text: "EAN / GTIN / SEFAZ"; tone: Theme.primary; mono: true; }
+                                }
+                                Text {
+                                    text: "Bipe com leitor USB ou digite o EAN para cruzar com notas recebidas na SEFAZ e catálogo nacional (nome, marca, fornecedor, NCM, CEST e custo).";
+                                    color: Theme.text-muted;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Icon { source: CardapioIcons.barcode; color: Theme.text-muted; size: 20px; y: (parent.height - self.height) / 2; }
+                            LineEdit {
+                                height: 46px;
+                                horizontal-stretch: 1;
+                                font-size: 15px;
+                                placeholder-text: "Bipe com o leitor ou digite o código de barras EAN (ex: 7896045506040)...";
+                                text <=> CardapioStore.f-ean;
+                                accepted => { CardapioStore.lookup("all"); }
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Btn {
+                                horizontal-stretch: 1;
+                                h: 42px;
+                                text: "Puxar das Notas (XML)";
+                                icon: Icons.file-text;
+                                has-icon: true;
+                                fill: Theme.available;
+                                tone: #ffffff;
+                                font-size: 13px;
+                                enabled: CardapioStore.lookup-busy == "" && CardapioStore.f-ean != "";
+                                busy: CardapioStore.lookup-busy == "xml";
+                                clicked => { CardapioStore.lookup("xml"); }
+                            }
+                            Btn {
+                                horizontal-stretch: 1;
+                                h: 42px;
+                                text: "Puxar Catálogo Global";
+                                icon: CardapioIcons.globe;
+                                has-icon: true;
+                                fill: Theme.occupied;
+                                tone: #ffffff;
+                                font-size: 13px;
+                                enabled: CardapioStore.lookup-busy == "" && CardapioStore.f-ean != "";
+                                busy: CardapioStore.lookup-busy == "global";
+                                clicked => { CardapioStore.lookup("global"); }
+                            }
+                            Btn {
+                                h: 42px;
+                                text: "Busca Geral";
+                                icon: Icons.sparkles;
+                                has-icon: true;
+                                fill: Theme.primary;
+                                tone: Theme.primary-text;
+                                weight: 900;
+                                font-size: 13px;
+                                enabled: CardapioStore.lookup-busy == "" && CardapioStore.f-ean != "";
+                                busy: CardapioStore.lookup-busy == "all";
+                                clicked => { CardapioStore.lookup("all"); }
+                            }
+                        }
+                        Notice {
+                            text: CardapioStore.lookup-message;
+                            tone: CardapioStore.lookup-tone == 1 ? Theme.available : CardapioStore.lookup-tone == 2 ? Theme.danger : Theme.closing;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 14px;
+
+                    // ================= COLUNA ESQUERDA =================
+                    VerticalLayout {
+                        horizontal-stretch: 7;
+                        spacing: 14px;
+                        alignment: start;
+
+                        // Identificação & Básico
+                        Rectangle {
+                            height: ident.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            ident := VerticalLayout {
+                                padding: 18px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: Icons.tag; color: Theme.primary; size: 20px; y: (parent.height - self.height) / 2; }
+                                    Text { text: "Identificação & Básico"; color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; }
+                                }
+                                FieldLabel { text: "NOME DO ITEM / PRODUTO *"; }
+                                LineEdit {
+                                    height: 46px;
+                                    font-size: 16px;
+                                    placeholder-text: "Ex: Cerveja Heineken Long Neck 330ml";
+                                    text <=> CardapioStore.f-name;
+                                    edited => { CardapioStore.name-edited(); }
+                                }
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        FieldLabel { text: "CÓDIGO INTERNO (#)"; }
+                                        LineEdit { height: 40px; placeholder-text: "Ex: 5001 ou BEB-01"; text <=> CardapioStore.f-code; }
+                                        Hint { text: "Sequencial por categoria ou código de referência interno."; }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        HorizontalLayout {
+                                            FieldLabel { text: "CATEGORIA *"; horizontal-stretch: 1; vertical-alignment: center; }
+                                            Text {
+                                                text: "+ Nova";
+                                                color: Theme.purple;
+                                                font-size: 12px;
+                                                font-weight: 800;
+                                                TouchArea { clicked => { CardapioStore.open-category-from-form(); } }
+                                            }
+                                        }
+                                        ComboBox {
+                                            height: 40px;
+                                            model: CardapioStore.f-category-labels;
+                                            current-index <=> CardapioStore.f-category-index;
+                                            selected => { CardapioStore.category-changed(); }
+                                        }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        FieldLabel { text: "MARCA / FABRICANTE"; }
+                                        LineEdit { height: 40px; placeholder-text: "Ex: Heineken, Ambev, Coca-Cola"; text <=> CardapioStore.f-brand; }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        FieldLabel { text: "UNIDADE DE MEDIDA"; }
+                                        LineEdit { height: 40px; placeholder-text: "un, lata, garrafa, dose..."; text <=> CardapioStore.f-unit; }
+                                        HorizontalLayout {
+                                            spacing: 4px;
+                                            alignment: start;
+                                            Text { text: "SUGESTÕES:"; color: Theme.text-muted; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+                                            for u in ["un", "lata", "garrafa", "dose", "copo", "torre", "porção", "kg", "l"]: MiniChip {
+                                                text: u;
+                                                active: CardapioStore.f-unit == u;
+                                                clicked => { CardapioStore.f-unit = u; }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Preços, custos & rentabilidade
+                        Rectangle {
+                            height: prices.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            prices := VerticalLayout {
+                                padding: 18px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: Icons.dollar-sign; color: Theme.available; size: 20px; y: (parent.height - self.height) / 2; }
+                                    Text { text: "Preços, Custos & Rentabilidade"; color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; }
+                                }
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        FieldLabel { text: "PREÇO DE CUSTO (R$)"; }
+                                        Field { big: true; prefix: "R$"; placeholder: "4,50"; text <=> CardapioStore.f-cost; edited => { CardapioStore.cost-edited(); } }
+                                        Hint { text: "Custo pago ao fornecedor ou insumos."; }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        HorizontalLayout {
+                                            FieldLabel { text: "MARGEM ALVO (%)"; horizontal-stretch: 1; }
+                                            Text { text: "auto-cálculo"; color: Theme.primary; font-size: 10px; font-weight: 800; }
+                                        }
+                                        Field { big: true; suffix: "%"; placeholder: "50"; text <=> CardapioStore.f-margin; edited => { CardapioStore.margin-edited(); } }
+                                        Hint { text: "Calcula o preço de venda automaticamente."; }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        FieldLabel { text: "PREÇO DE VENDA (R$) *"; }
+                                        Field { big: true; prefix: "R$"; placeholder: "14,00"; text <=> CardapioStore.f-price; edited => { CardapioStore.price-edited(); } }
+                                        Hint { text: "Valor cobrado do cliente na comanda / mesa."; }
+                                    }
+                                }
+                                Rectangle {
+                                    height: sim.preferred-height;
+                                    background: Theme.bg;
+                                    border-radius: 16px;
+                                    border-width: 1px;
+                                    border-color: Theme.surface-2;
+                                    sim := VerticalLayout {
+                                        padding: 12px;
+                                        spacing: 10px;
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            Icon { source: CardapioIcons.trending-up; color: Theme.available; size: 15px; y: (parent.height - self.height) / 2; }
+                                            Text { text: "Simulador de Margem Comercial em Tempo Real"; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+                                            if CardapioStore.f-composed && CardapioStore.recipe-cost != "": Text {
+                                                text: "✦ Usar Custo da Receita (" + CardapioStore.recipe-cost + ")";
+                                                color: Theme.primary;
+                                                font-size: 11px;
+                                                font-weight: 800;
+                                                vertical-alignment: center;
+                                                TouchArea { clicked => { CardapioStore.use-recipe-cost(); } }
+                                            }
+                                        }
+                                        HorizontalLayout {
+                                            spacing: 10px;
+                                            Tile { label: "LUCRO BRUTO"; value: CardapioStore.profit; tone: CardapioStore.profit-negative ? Theme.danger : Theme.available; }
+                                            Tile { label: "MARGEM DE LUCRO"; value: CardapioStore.margin-label; tone: root.margin-color; }
+                                            Tile { label: "MARKUP S/ CUSTO"; value: CardapioStore.markup; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Venda por caixa / fardo fechado
+                        Rectangle {
+                            height: boxcard.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            boxcard := VerticalLayout {
+                                padding: 18px;
+                                spacing: 12px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: Icons.package; color: Theme.primary; size: 20px; y: (parent.height - self.height) / 2; }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        Text { text: "Venda por Caixa / Fardo Fechado"; color: Theme.text; font-size: 15px; font-weight: 900; }
+                                        Text { text: "Permite alternar entre preço avulso e preço de caixa no Caixa (PDV) e Mesas"; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                                    }
+                                    Toggle { y: (parent.height - self.height) / 2; checked <=> CardapioStore.f-has-box; }
+                                }
+                                if CardapioStore.f-has-box: Rectangle {
+                                    height: boxin.preferred-height;
+                                    background: Theme.bg;
+                                    border-radius: 16px;
+                                    border-width: 1px;
+                                    border-color: Theme.surface-2;
+                                    boxin := VerticalLayout {
+                                        padding: 14px;
+                                        spacing: 10px;
+                                        HorizontalLayout {
+                                            spacing: 12px;
+                                            VerticalLayout {
+                                                horizontal-stretch: 1;
+                                                spacing: 4px;
+                                                FieldLabel { text: "QTD DE UNIDADES POR CAIXA *"; }
+                                                LineEdit { height: 40px; input-type: number; placeholder-text: "Ex: 6, 12, 15, 24"; text <=> CardapioStore.f-box-qty; edited => { CardapioStore.price-edited(); } }
+                                                HorizontalLayout {
+                                                    spacing: 4px;
+                                                    alignment: start;
+                                                    Text { text: "COMUNS:"; color: Theme.text-muted; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+                                                    for q in ["6", "12", "15", "24", "30"]: MiniChip {
+                                                        text: q + " un";
+                                                        active: CardapioStore.f-box-qty == q;
+                                                        clicked => { CardapioStore.f-box-qty = q; CardapioStore.price-edited(); }
+                                                    }
+                                                }
+                                            }
+                                            VerticalLayout {
+                                                horizontal-stretch: 1;
+                                                spacing: 4px;
+                                                FieldLabel { text: "PREÇO TOTAL DA CAIXA (R$) *"; }
+                                                Field { prefix: "R$"; placeholder: "216,00"; text <=> CardapioStore.f-box-price; edited => { CardapioStore.price-edited(); } }
+                                                if CardapioStore.box-unit-label != "": Text { text: CardapioStore.box-unit-label; color: Theme.available; font-size: 11px; font-weight: 600; wrap: word-wrap; }
+                                            }
+                                        }
+                                        FieldLabel { text: "CÓDIGO DE BARRAS DA CAIXA (DUN-14 / EAN DA CAIXA FECHADA)"; }
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            Icon { source: CardapioIcons.barcode; color: Theme.text-muted; size: 16px; y: (parent.height - self.height) / 2; }
+                                            LineEdit {
+                                                height: 38px;
+                                                horizontal-stretch: 1;
+                                                placeholder-text: "Opcional: bipe a caixa fechada para adicionar no caixa direto como caixa";
+                                                text <=> CardapioStore.f-box-ean;
+                                            }
+                                        }
+                                        Hint {
+                                            text: "Ao bipar este código no Caixa, o sistema seleciona automaticamente a Caixa Fechada e desconta as "
+                                                + (CardapioStore.f-box-qty != "" ? CardapioStore.f-box-qty : "24") + " unidades do estoque avulso.";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Fator de conversão & fracionamento
+                        Rectangle {
+                            height: conv.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.purple.with-alpha(0.3);
+                            conv := VerticalLayout {
+                                padding: 18px;
+                                spacing: 12px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Rectangle {
+                                        width: 32px;
+                                        height: 32px;
+                                        y: (parent.height - self.height) / 2;
+                                        border-radius: 10px;
+                                        background: Theme.purple.with-alpha(0.12);
+                                        Icon { source: CardapioIcons.scissors; color: Theme.purple; size: 16px; }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        HorizontalLayout {
+                                            spacing: 8px;
+                                            alignment: start;
+                                            Text { text: "Fator de Conversão & Fracionamento"; color: Theme.text; font-size: 15px; font-weight: 900; }
+                                            Pill { y: (parent.height - self.height) / 2; text: "Correção de Entrada"; tone: Theme.purple; }
+                                        }
+                                        Text {
+                                            text: "Corrija produtos que receberam nota com valor e quantidade integral de caixa, fardo ou peso";
+                                            color: Theme.text-muted;
+                                            font-size: 11px;
+                                            wrap: word-wrap;
+                                        }
+                                    }
+                                }
+                                Rectangle {
+                                    height: convin.preferred-height;
+                                    background: Theme.purple.with-alpha(0.05);
+                                    border-radius: 16px;
+                                    border-width: 1px;
+                                    border-color: Theme.purple.with-alpha(0.18);
+                                    convin := VerticalLayout {
+                                        padding: 14px;
+                                        spacing: 10px;
+                                        Text {
+                                            text: "Se você deu entrada na nota fiscal e o produto assumiu o custo total da embalagem (ex: caixa de cerveja, maços de cigarro ou 5kg de batata), selecione a quantidade fracionada abaixo e clique em Aplicar Conversão. O estoque será multiplicado e o custo unitário será recalculado automaticamente.";
+                                            color: Theme.text;
+                                            font-size: 12px;
+                                            wrap: word-wrap;
+                                        }
+                                        HorizontalLayout {
+                                            spacing: 5px;
+                                            alignment: start;
+                                            Text { text: "Atalhos rápidos:"; color: Theme.text-muted; font-size: 11px; font-weight: 700; vertical-alignment: center; }
+                                            MiniChip { text: "10 un (Cigarro)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "10" && !CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("10", false); } }
+                                            MiniChip { text: "12 un (Caixa)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "12" && !CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("12", false); } }
+                                            MiniChip { text: "6 un (Pack)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "6" && !CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("6", false); } }
+                                            MiniChip { text: "24 un (Fardo)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "24" && !CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("24", false); } }
+                                            MiniChip { text: "12 porções (5kg)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "12" && CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("12", true); } }
+                                            MiniChip { text: "6 porções (2kg)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "6" && CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("6", true); } }
+                                        }
+                                        HorizontalLayout {
+                                            spacing: 12px;
+                                            VerticalLayout {
+                                                horizontal-stretch: 1;
+                                                spacing: 4px;
+                                                FieldLabel { text: CardapioStore.f-conv-portion ? "QTD. DE PORÇÕES NO PESO/EMBALAGEM:" : "UNIDADES POR CAIXA / PACOTE:"; }
+                                                HorizontalLayout {
+                                                    spacing: 6px;
+                                                    alignment: start;
+                                                    LineEdit { width: 96px; height: 38px; input-type: number; text <=> CardapioStore.f-conv-factor; }
+                                                    Text { text: CardapioStore.f-conv-portion ? "porções" : "unidades"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                                                }
+                                            }
+                                            HorizontalLayout {
+                                                horizontal-stretch: 1;
+                                                spacing: 6px;
+                                                alignment: end;
+                                                Btn {
+                                                    horizontal-stretch: 1;
+                                                    y: parent.height - self.height;
+                                                    text: "Aplicar Conversão (" + CardapioStore.f-conv-factor + "x)";
+                                                    icon: CardapioIcons.scissors;
+                                                    has-icon: true;
+                                                    fill: Theme.purple;
+                                                    tone: #ffffff;
+                                                    weight: 900;
+                                                    clicked => { CardapioStore.conv-apply(); }
+                                                }
+                                                if CardapioStore.conv-message != "": Btn {
+                                                    y: parent.height - self.height;
+                                                    text: "Desfazer";
+                                                    icon: CardapioIcons.undo-2;
+                                                    has-icon: true;
+                                                    clicked => { CardapioStore.conv-undo(); }
+                                                }
+                                            }
+                                        }
+                                        Notice { text: CardapioStore.conv-message; tone: Theme.available; }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Ficha técnica & composição
+                        Rectangle {
+                            height: recipe.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            recipe := VerticalLayout {
+                                padding: 18px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: CardapioIcons.layers; color: Theme.purple; size: 20px; y: (parent.height - self.height) / 2; }
+                                    Text { text: "Ficha Técnica & Composição (Receita)"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
+                                    Toggle { y: (parent.height - self.height) / 2; checked <=> CardapioStore.f-composed; toggled => { CardapioStore.price-edited(); } }
+                                }
+                                Text {
+                                    text: "Ative caso este item seja produzido no estabelecimento (ex: Torre de Chopp descontando litros do barril, Cocktails & Drinks descontando doses, Pizzas, Pratos e Porções descontando insumos).";
+                                    color: Theme.text-muted;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                }
+                                if CardapioStore.f-composed: Rectangle {
+                                    height: compin.preferred-height;
+                                    background: Theme.bg;
+                                    border-radius: 16px;
+                                    border-width: 1px;
+                                    border-color: Theme.surface-2;
+                                    compin := VerticalLayout {
+                                        padding: 12px;
+                                        spacing: 8px;
+                                        HorizontalLayout {
+                                            Text { text: "INGREDIENTES / INSUMOS QUE COMPÕEM ESTE ITEM:"; color: Theme.text; font-size: 11px; font-weight: 800; horizontal-stretch: 1; }
+                                            if CardapioStore.recipe-cost != "": Text { text: "Custo Somado: " + CardapioStore.recipe-cost; color: Theme.available; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
+                                        }
+                                        for c[i] in CardapioStore.f-components: ComponentRow { data: c; slot: i; }
+                                        Rectangle {
+                                            height: 40px;
+                                            border-radius: 12px;
+                                            border-width: 1px;
+                                            border-color: add.has-hover ? Theme.primary : Theme.border;
+                                            background: add.has-hover ? Theme.surface-2 : transparent;
+                                            HorizontalLayout {
+                                                alignment: center;
+                                                spacing: 6px;
+                                                Icon { source: Icons.plus; color: add.has-hover ? Theme.primary : Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
+                                                Text { text: "Adicionar Insumo / Ingrediente"; color: add.has-hover ? Theme.primary : Theme.text-muted; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                                            }
+                                            add := TouchArea { clicked => { CardapioStore.comp-add(); } }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Adicionais e perguntas
+                        Rectangle {
+                            height: groups.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            groups := VerticalLayout {
+                                padding: 18px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: Icons.list-checks; color: Theme.primary; size: 20px; y: (parent.height - self.height) / 2; }
+                                    Text { text: "Adicionais e perguntas"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
+                                    Text {
+                                        text: "Gerenciar grupos";
+                                        color: Theme.primary;
+                                        font-size: 12px;
+                                        font-weight: 800;
+                                        vertical-alignment: center;
+                                        TouchArea { clicked => { CardapioStore.open-modifiers(); } }
+                                    }
+                                }
+                                if CardapioStore.f-groups.length == 0: Text {
+                                    text: "Nenhum grupo cadastrado. Crie grupos como \"Ponto da carne\" ou \"Adicionais\" em Gerenciar grupos.";
+                                    color: Theme.text-muted;
+                                    font-size: 12px;
+                                    wrap: word-wrap;
+                                }
+                                for row in (CardapioStore.f-groups.length + 1) / 2: HorizontalLayout {
+                                    spacing: 8px;
+                                    GroupPickView { data: CardapioStore.f-groups[row * 2]; }
+                                    if row * 2 + 1 < CardapioStore.f-groups.length: GroupPickView { data: CardapioStore.f-groups[row * 2 + 1]; }
+                                    if row * 2 + 1 >= CardapioStore.f-groups.length: Rectangle { horizontal-stretch: 1; }
+                                }
+                                if CardapioStore.f-groups.length > 1: Text {
+                                    text: "Os grupos aparecem para o garçom na ordem em que foram marcados.";
+                                    color: Theme.text-muted;
+                                    font-size: 11px;
+                                }
+                            }
+                        }
+                    }
+
+                    // ================= COLUNA DIREITA =================
+                    VerticalLayout {
+                        horizontal-stretch: 5;
+                        spacing: 14px;
+                        alignment: start;
+
+                        // Cardápio digital
+                        Rectangle {
+                            height: menu.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            menu := VerticalLayout {
+                                padding: 18px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: Icons.qr-code; color: Theme.primary; size: 20px; y: (parent.height - self.height) / 2; }
+                                    Text { text: "Cardápio Digital"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
+                                    Text { text: "Mostrar no cardápio"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                                    Toggle { y: (parent.height - self.height) / 2; checked <=> CardapioStore.f-show-in-menu; }
+                                }
+                                FieldLabel { text: "FOTO"; }
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    Rectangle {
+                                        width: 112px;
+                                        height: 112px;
+                                        border-radius: 18px;
+                                        border-width: 1px;
+                                        border-color: pick.has-hover ? Theme.primary : Theme.border;
+                                        background: Theme.bg;
+                                        clip: true;
+                                        if CardapioStore.f-has-photo: Image { width: 100%; height: 100%; source: CardapioStore.f-photo; image-fit: cover; }
+                                        if !CardapioStore.f-has-photo: Icon { source: Icons.utensils-crossed; color: Theme.text-muted; size: 28px; }
+                                        pick := TouchArea { clicked => { CardapioStore.pick-photo(); } }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        alignment: center;
+                                        spacing: 6px;
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: start;
+                                            Btn {
+                                                text: CardapioStore.f-has-photo ? "Trocar foto" : "Adicionar foto";
+                                                icon: CardapioIcons.image-plus;
+                                                has-icon: true;
+                                                clicked => { CardapioStore.pick-photo(); }
+                                            }
+                                            if CardapioStore.f-has-photo: Btn {
+                                                text: "Remover";
+                                                icon: Icons.trash-2;
+                                                has-icon: true;
+                                                tone: Theme.danger;
+                                                clicked => { CardapioStore.remove-photo(); }
+                                            }
+                                        }
+                                        Hint { text: "JPEG, PNG ou WebP. A foto é reduzida automaticamente antes de enviar."; }
+                                    }
+                                }
+                                FieldLabel { text: "DESCRIÇÃO / INGREDIENTES"; }
+                                TextEdit {
+                                    height: 78px;
+                                    wrap: word-wrap;
+                                    placeholder-text: "Ex: Picanha fatiada com fritas, farofa e vinagrete. Serve 2 pessoas.";
+                                    text <=> CardapioStore.f-description;
+                                }
+                                Hint { text: "Aparece para o cliente no cardápio digital, abaixo do nome."; }
+                            }
+                        }
+
+                        // Fornecedor & compras
+                        Rectangle {
+                            height: sup.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            sup := VerticalLayout {
+                                padding: 18px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: CardapioIcons.truck; color: Theme.available; size: 20px; y: (parent.height - self.height) / 2; }
+                                    Text { text: "Fornecedor & Compras"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
+                                    Text {
+                                        text: "+ Novo";
+                                        color: Theme.primary;
+                                        font-size: 12px;
+                                        font-weight: 800;
+                                        vertical-alignment: center;
+                                        TouchArea { clicked => { CardapioStore.open-quick-supplier(); } }
+                                    }
+                                }
+                                FieldLabel { text: "SELECIONAR FORNECEDOR CADASTRADO"; }
+                                ComboBox {
+                                    height: 40px;
+                                    model: CardapioStore.f-supplier-labels;
+                                    current-index <=> CardapioStore.f-supplier-index;
+                                    selected => { CardapioStore.supplier-changed(); }
+                                }
+                                if CardapioStore.f-supplier-index > 0: Rectangle {
+                                    height: supcard.preferred-height;
+                                    background: Theme.bg;
+                                    border-radius: 16px;
+                                    border-width: 1px;
+                                    border-color: Theme.surface-2;
+                                    supcard := VerticalLayout {
+                                        padding: 12px;
+                                        spacing: 4px;
+                                        HorizontalLayout {
+                                            Text { text: CardapioStore.sup-card-title; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; }
+                                            if CardapioStore.sup-card-doc != "": Pill { text: CardapioStore.sup-card-doc; tone: Theme.available; mono: true; }
+                                        }
+                                        if CardapioStore.sup-card-contact != "": Text { text: "Contato: " + CardapioStore.sup-card-contact; color: Theme.text-muted; font-size: 11px; }
+                                        if CardapioStore.sup-card-phone != "": HorizontalLayout {
+                                            spacing: 5px;
+                                            alignment: start;
+                                            Icon { source: CardapioIcons.phone; color: Theme.available; size: 13px; y: (parent.height - self.height) / 2; }
+                                            Text {
+                                                text: "Falar no WhatsApp (" + CardapioStore.sup-card-phone + ")";
+                                                color: Theme.available;
+                                                font-size: 12px;
+                                                font-weight: 800;
+                                                TouchArea { clicked => { CardapioStore.open-whatsapp(); } }
+                                            }
+                                        }
+                                    }
+                                }
+                                if CardapioStore.f-supplier-index == 0: FieldLabel { text: "OU NOME AVULSO DO FORNECEDOR"; }
+                                if CardapioStore.f-supplier-index == 0: LineEdit {
+                                    height: 38px;
+                                    placeholder-text: "Ex: Distribuidora Central, Padaria São Paulo...";
+                                    text <=> CardapioStore.f-supplier-name;
+                                }
+                            }
+                        }
+
+                        // Estoque & destino KDS
+                        Rectangle {
+                            height: stock.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            stock := VerticalLayout {
+                                padding: 18px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: Icons.package; color: Theme.primary; size: 20px; y: (parent.height - self.height) / 2; }
+                                    Text { text: "Estoque & Destino KDS"; color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; }
+                                }
+                                FieldLabel { text: "DESTINO DA COMANDA NO KDS"; }
+                                ComboBox {
+                                    height: 40px;
+                                    model: ["🍺 Barman / Balcão (Bebidas, Chopp, Doses)", "🍳 Cozinha (Pratos, Petiscos, Pizzas, Lanches)", "📦 Direto / Sem KDS (Entrega imediata)"];
+                                    current-index <=> CardapioStore.f-kds-index;
+                                }
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        FieldLabel { text: "ESTOQUE ATUAL"; }
+                                        LineEdit { height: 42px; font-size: 15px; text <=> CardapioStore.f-stock; }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        FieldLabel { text: "ESTOQUE MÍNIMO"; }
+                                        LineEdit { height: 42px; font-size: 15px; text <=> CardapioStore.f-min-stock; }
+                                        Hint { text: "Alerta de reposição."; }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Tributação fiscal
+                        Rectangle {
+                            height: fiscal.preferred-height;
+                            background: Theme.surface;
+                            border-radius: 22px;
+                            border-width: 1px;
+                            border-color: Theme.surface-2;
+                            fiscal := VerticalLayout {
+                                padding: 18px;
+                                spacing: 10px;
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    Icon { source: Icons.shield-check; color: Theme.occupied; size: 20px; y: (parent.height - self.height) / 2; }
+                                    Text { text: "Tributação Fiscal (NFC-e / SAT)"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
+                                    Pill { y: (parent.height - self.height) / 2; text: "SEFAZ"; tone: Theme.occupied; }
+                                }
+                                Text {
+                                    text: "Estes códigos fiscais são transmitidos à SEFAZ em cada venda na NFC-e para evitar bitributação e rejeições.";
+                                    color: Theme.text-muted;
+                                    font-size: 11px;
+                                    wrap: word-wrap;
+                                }
+                                HorizontalLayout {
+                                    spacing: 12px;
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        HorizontalLayout {
+                                            FieldLabel { text: "NCM (8 DÍGITOS)"; horizontal-stretch: 1; }
+                                            Text {
+                                                text: "Buscar NCM";
+                                                color: Theme.occupied;
+                                                font-size: 11px;
+                                                font-weight: 800;
+                                                TouchArea { clicked => { CardapioStore.open-ncm(); } }
+                                            }
+                                        }
+                                        LineEdit { height: 38px; placeholder-text: "Ex: 22030000"; text <=> CardapioStore.f-ncm; edited => { CardapioStore.ncm-edited(); } }
+                                        if CardapioStore.ncm-state == 1: Text { text: "Verificando na Receita..."; color: Theme.text-muted; font-size: 10px; }
+                                        if CardapioStore.ncm-state == 2: Notice { text: "✓ " + CardapioStore.ncm-detail; tone: Theme.available; }
+                                        if CardapioStore.ncm-state == 3: Text { text: "⚠ NCM não localizado"; color: Theme.closing; font-size: 10px; font-weight: 700; }
+                                    }
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 4px;
+                                        FieldLabel { text: "CEST (SUBST. TRIBUTÁRIA)"; }
+                                        LineEdit { height: 38px; placeholder-text: "Ex: 03.001.00"; text <=> CardapioStore.f-cest; }
+                                    }
+                                }
+                                FieldLabel { text: "CFOP"; }
+                                LineEdit { height: 38px; placeholder-text: "5102 / 5405 / 5101"; text <=> CardapioStore.f-cfop; }
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    alignment: start;
+                                    Text { text: "PADRÕES:"; color: Theme.text-muted; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+                                    MiniChip { text: "5102 (Revenda Normal)"; active: CardapioStore.f-cfop == "5102"; clicked => { CardapioStore.f-cfop = "5102"; } }
+                                    MiniChip { text: "5405 (Subst. Tributária ST)"; active: CardapioStore.f-cfop == "5405"; clicked => { CardapioStore.f-cfop = "5405"; } }
+                                    MiniChip { text: "5101 (Produção Própria)"; active: CardapioStore.f-cfop == "5101"; clicked => { CardapioStore.f-cfop = "5101"; } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------- Rodapé fixo ----------
+        Rectangle {
+            height: foot.preferred-height;
+            background: Theme.surface;
+            border-radius: 22px;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            foot := HorizontalLayout {
+                padding: 14px;
+                spacing: 12px;
+                Rectangle {
+                    width: 40px;
+                    height: 40px;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: 14px;
+                    background: Theme.primary.with-alpha(0.12);
+                    Text { text: "R$"; color: Theme.primary; font-size: 13px; font-weight: 900; }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        Text { text: CardapioStore.f-name != "" ? CardapioStore.f-name : "Novo Produto"; color: Theme.text; font-size: 13px; font-weight: 900; overflow: elide; }
+                        if CardapioStore.f-code != "": Pill { text: "#" + CardapioStore.f-code; mono: true; }
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        alignment: start;
+                        Text { text: "Venda: " + CardapioStore.footer-sale; color: Theme.text-muted; font-size: 12px; }
+                        if CardapioStore.footer-cost != "": Text { text: "Custo: " + CardapioStore.footer-cost; color: Theme.text-muted; font-size: 12px; }
+                        if CardapioStore.footer-margin != "": Text {
+                            text: "Margem: " + CardapioStore.footer-margin;
+                            color: CardapioStore.footer-margin-tone == 0 ? Theme.available : CardapioStore.footer-margin-tone == 1 ? Theme.closing : Theme.danger;
+                            font-size: 12px;
+                            font-weight: 800;
+                        }
+                    }
+                }
+                if CardapioStore.f-editing: Btn {
+                    y: (parent.height - self.height) / 2;
+                    text: "Excluir";
+                    icon: Icons.trash-2;
+                    has-icon: true;
+                    fill: Theme.danger.with-alpha(0.12);
+                    tone: Theme.danger;
+                    clicked => { CardapioStore.delete-current(); }
+                }
+                Btn { y: (parent.height - self.height) / 2; text: "Cancelar"; clicked => { CardapioStore.back(); } }
+                Btn {
+                    y: (parent.height - self.height) / 2;
+                    text: CardapioStore.f-editing ? "Salvar Alterações" : "Cadastrar Produto";
+                    icon: Icons.check;
+                    has-icon: true;
+                    fill: Theme.primary;
+                    tone: Theme.primary-text;
+                    font-size: 13px;
+                    weight: 900;
+                    clicked => { CardapioStore.save(); }
+                }
+            }
+        }
+    }
+}

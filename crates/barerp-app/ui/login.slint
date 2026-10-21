@@ -1,0 +1,167 @@
+// Tela de login: escolha do funcionário + PIN no teclado numérico (ou no teclado do PC).
+
+import { Theme } from "theme.slint";
+
+export struct StaffItem {
+    id: string,
+    name: string,
+    role: string,
+}
+
+component Key inherits Rectangle {
+    in property <string> label;
+    in property <bool> accent;
+    callback clicked;
+    height: 64px;
+    // Mesma largura para todas as teclas, qualquer que seja o texto
+    preferred-width: 100px;
+    horizontal-stretch: 1;
+    border-radius: Theme.radius;
+    background: touch.pressed ? Theme.border : (accent ? Theme.primary : Theme.surface-2);
+    Text {
+        text: root.label;
+        color: root.accent ? Theme.primary-text : Theme.text;
+        font-size: 24px;
+        font-weight: 700;
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+export component LoginPage inherits Rectangle {
+    in property <[StaffItem]> staff;
+    in property <string> error;
+    in property <bool> busy;
+    in-out property <int> selected: 0;
+    in-out property <string> pin;
+    callback submit(string, string);
+    property <int> pin-length: root.pin.character-count;
+
+    background: Theme.bg;
+
+    function press(digit: string) {
+        if (root.pin.character-count < 32) { root.pin += digit; }
+    }
+    function send() {
+        if (root.staff.length > 0 && root.pin != "" && !root.busy) {
+            root.submit(root.staff[root.selected].id, root.pin);
+        }
+    }
+
+    // Digitação pelo teclado do PC
+    keys := FocusScope {
+        key-pressed(event) => {
+            if (event.text == Key.Return) { root.send(); return accept; }
+            if (event.text == Key.Backspace) {
+                root.pin = "";
+                return accept;
+            }
+            // Senhas podem ter letras: aceita qualquer caractere imprimível do teclado do PC
+            // (teclas especiais do Slint ficam abaixo do espaço ou na faixa U+F700)
+            if (event.text.character-count == 1 && event.text >= " " && event.text < "\u{7f}") {
+                root.press(event.text);
+                return accept;
+            }
+            if (event.text.character-count == 1 && event.text > "\u{9f}" && event.text < "\u{f700}") {
+                root.press(event.text);
+                return accept;
+            }
+            reject
+        }
+    }
+    init => { keys.focus(); }
+
+    HorizontalLayout {
+        alignment: center;
+        VerticalLayout {
+            alignment: center;
+            spacing: 18px;
+            width: 420px;
+
+            Text { text: "BarERP Pro"; color: Theme.primary; font-size: 34px; font-weight: 900; horizontal-alignment: center; }
+            Text { text: "Escolha seu usuário e digite a senha (ou use o teclado)"; color: Theme.text-muted; font-size: Theme.font-body; horizontal-alignment: center; }
+
+            // Funcionários
+            Rectangle {
+                height: min(root.staff.length, 4) * 52px + 8px;
+                background: Theme.surface;
+                border-radius: Theme.radius;
+                border-width: 1px;
+                border-color: Theme.border;
+                Flickable {
+                    content-height: root.staff.length * 52px + 8px;
+                    VerticalLayout {
+                        padding: 4px;
+                        for s[i] in root.staff: Rectangle {
+                            height: 52px;
+                            border-radius: 10px;
+                            background: i == root.selected ? Theme.primary.with-alpha(0.18) : transparent;
+                            HorizontalLayout {
+                                padding-left: 14px;
+                                padding-right: 14px;
+                                Text { text: s.name; color: Theme.text; font-size: 17px; font-weight: 700; vertical-alignment: center; }
+                                Text { text: s.role; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; horizontal-alignment: right; }
+                            }
+                            TouchArea { clicked => { root.selected = i; root.pin = ""; keys.focus(); } }
+                        }
+                    }
+                }
+            }
+
+            // Senha digitada (pontos)
+            Rectangle {
+                height: 56px;
+                background: Theme.surface;
+                border-radius: Theme.radius;
+                border-width: 1px;
+                border-color: root.error != "" ? Theme.danger : Theme.border;
+                if root.pin == "": Text { text: "Senha"; color: Theme.text-muted; font-size: 18px; }
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 12px;
+                    // Oito posições fixas (o gerador do Slint falha com `for` sobre um inteiro calculado)
+                    for d[i] in [0, 1, 2, 3, 4, 5, 6, 7]: Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        visible: i < root.pin-length;
+                        width: i < root.pin-length ? 14px : 0px;
+                        height: 14px;
+                        border-radius: 7px;
+                        background: Theme.text;
+                    }
+                }
+            }
+
+            if root.error != "": Text {
+                text: root.error;
+                color: Theme.danger;
+                font-size: 14px;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+
+            // Teclado numérico
+            GridLayout {
+                spacing: 10px;
+                Row {
+                    Key { label: "1"; clicked => { root.press("1"); } }
+                    Key { label: "2"; clicked => { root.press("2"); } }
+                    Key { label: "3"; clicked => { root.press("3"); } }
+                }
+                Row {
+                    Key { label: "4"; clicked => { root.press("4"); } }
+                    Key { label: "5"; clicked => { root.press("5"); } }
+                    Key { label: "6"; clicked => { root.press("6"); } }
+                }
+                Row {
+                    Key { label: "7"; clicked => { root.press("7"); } }
+                    Key { label: "8"; clicked => { root.press("8"); } }
+                    Key { label: "9"; clicked => { root.press("9"); } }
+                }
+                Row {
+                    Key { label: "Limpar"; clicked => { root.pin = ""; } }
+                    Key { label: "0"; clicked => { root.press("0"); } }
+                    Key { label: root.busy ? "…" : "Entrar"; accent: true; clicked => { root.send(); } }
+                }
+            }
+        }
+    }
+}

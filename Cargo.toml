@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = ["crates/barerp-core", "crates/barerp-db", "crates/barerp-app", "crates/barerp-print", "crates/barerp-report", "crates/barerp-fiscal", "crates/barerp-backup", "crates/barerp-menu-publish", "crates/barerp-server", "crates/barerp-catalog", "crates/barerp-license", "crates/barerp-updater"]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+authors = ["Pablo Franco"]
+license = "LicenseRef-Proprietary"
+publish = false
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# O código gerado das telas Slint passa de 500 mil linhas: sem debuginfo o build de desenvolvimento cai bastante
+[profile.dev.package.barerp-app]
+debug = false

@@ -1,0 +1,418 @@
+// Mesas & Salão — port de TablesView.tsx + TableCard.tsx (mapa) e dos modais da área (mesas_modals.slint).
+// Estado e callbacks no global `MesasStore`, ligado em `src/pages/mesas.rs`.
+
+import { LineEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icons, Icon } from "../icons.slint";
+import { MesasModals, MesasModal, ModGroup, DetailLine, AddProduct, AddCart, PayLine, SplitItem, Choice, HistoryRow, ManageTable, ManageSection, WaiterRow, StaffRow, PermItem } from "mesas_modals.slint";
+
+export { MesasModal, ModGroup, DetailLine, AddProduct, AddCart, PayLine, SplitItem, Choice, HistoryRow, ManageTable, ManageSection, WaiterRow, StaffRow, PermItem }
+
+export struct MesaCard {
+    id: string,
+    number: int,
+    name: string,
+    section: string,
+    status: string,          // AVAILABLE, OCCUPIED, CLOSING, RESERVED
+    capacity: int,
+    customer: string,        // "Cliente sem nome" quando vazio
+    people: int,
+    elapsed: string,         // "42m" / "1h 5m"
+    items: int,
+    total: string,           // "R$ 87,50"
+    haver: string,           // "Haver R$ 20,00 · Falta R$ 67,50" ou ""
+    fee: bool,               // +10% ativo
+}
+
+export global MesasStore {
+    // Indicadores
+    in property <string> occupancy: "0 / 0";
+    in property <string> occupancy-pct: "(0%)";
+    in property <int> free-count;
+    in property <int> occupied-count;
+    in property <int> closing-count;
+    in property <int> total-count;
+    in property <string> open-revenue: "R$ 0,00";
+
+    // Filtros
+    in property <[string]> sections;
+    in-out property <string> section-filter: "ALL";
+    in-out property <string> status-filter: "ALL";
+    in-out property <string> search;
+    in property <bool> loading;
+
+    in property <[MesaCard]> cards;
+
+    callback filters-changed();
+    callback refresh();
+    callback open-history();
+    callback open-manage();
+    callback open-new-table();
+    callback card-open(string);      // mesa livre: abrir
+    callback card-select(string);    // clique no cartão: detalhes
+    callback card-order(string);     // "Pedido"
+    callback card-pay(string);       // "Conta" / "Receber"
+    // Chamado por outras áreas (ex.: Caixa → "Comandas Finalizadas"; Retaguarda → equipe e celulares)
+    callback open-order-history();
+    callback open-waiters();
+    callback open-staff();
+    callback open-connect-mobile();
+}
+
+component StatTile inherits Rectangle {
+    in property <image> icon;
+    in property <color> tone;
+    in property <string> label;
+    in property <string> value;
+    in property <string> extra;
+    in property <color> value-color: Theme.text;
+    height: 68px;
+    border-radius: 16px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    HorizontalLayout {
+        padding: 14px;
+        spacing: 12px;
+        Rectangle {
+            width: 40px;
+            height: 40px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 12px;
+            background: root.tone.with-alpha(0.12);
+            border-width: 1px;
+            border-color: root.tone.with-alpha(0.25);
+            Icon { source: root.icon; color: root.tone; size: 20px; }
+        }
+        VerticalLayout {
+            alignment: center;
+            Text { text: root.label; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; }
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                Text { text: root.value; color: root.value-color; font-size: 20px; font-weight: 900; }
+                if root.extra != "": Text { text: root.extra; color: Theme.text-muted; font-size: 12px; vertical-alignment: bottom; }
+            }
+        }
+    }
+}
+
+component ToolButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <bool> primary;
+    in property <color> icon-color: root.primary ? Theme.primary-text : Theme.primary;
+    callback clicked;
+    height: 36px;
+    width: row.preferred-width + 24px;
+    border-radius: 12px;
+    background: root.primary ? (touch.has-hover ? Theme.primary.brighter(0.1) : Theme.primary) : (touch.has-hover ? Theme.border : Theme.surface-2);
+    border-width: root.primary ? 0px : 1px;
+    border-color: Theme.border;
+    row := HorizontalLayout {
+        spacing: 6px;
+        alignment: center;
+        Icon { source: root.icon; color: root.icon-color; size: 15px; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: root.primary ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: root.primary ? 900 : 700; vertical-alignment: center; }
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component SectionChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked;
+    height: 32px;
+    width: label.preferred-width + 24px;
+    border-radius: 12px;
+    background: root.active ? Theme.primary : (touch.has-hover ? Theme.border : Theme.surface-2);
+    label := Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 700; }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component StatusChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <color> tone: Theme.text;
+    callback clicked;
+    height: 28px;
+    width: label.preferred-width + 20px;
+    border-radius: 9px;
+    background: root.active ? root.tone.with-alpha(0.18) : transparent;
+    label := Text { text: root.text; color: root.active ? root.tone : Theme.text-muted; font-size: 12px; font-weight: 700; }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component ActionButton inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <color> tone;
+    in property <bool> strong;
+    callback clicked;
+    height: 34px;
+    horizontal-stretch: 1;
+    border-radius: 11px;
+    background: root.strong ? Theme.primary : (touch.has-hover ? root.tone : root.tone.with-alpha(0.15));
+    border-width: 1px;
+    border-color: root.strong ? Theme.primary : root.tone.with-alpha(0.3);
+    property <color> fg: root.strong ? Theme.primary-text : (touch.has-hover ? Theme.bg : root.tone);
+    HorizontalLayout {
+        alignment: center;
+        spacing: 5px;
+        Icon { source: root.icon; color: root.fg; size: 14px; y: (parent.height - self.height) / 2; }
+        Text { text: root.text; color: root.fg; font-size: 12px; font-weight: root.strong ? 900 : 700; vertical-alignment: center; }
+    }
+    touch := TouchArea { clicked => { root.clicked(); } }
+}
+
+component MesaTile inherits Rectangle {
+    in property <MesaCard> data;
+    callback select();
+    callback open();
+    callback order();
+    callback pay();
+
+    property <bool> free: data.status == "AVAILABLE";
+    property <bool> closing: data.status == "CLOSING";
+    property <color> tone: closing ? Theme.closing : data.status == "OCCUPIED" ? Theme.occupied : data.status == "RESERVED" ? Theme.purple : Theme.available;
+
+    border-radius: 18px;
+    background: free ? Theme.surface : tone.with-alpha(0.07);
+    border-width: closing ? 2px : 1px;
+    border-color: free ? (body.has-hover ? Theme.border : Theme.surface-2) : tone.with-alpha(body.has-hover ? 0.8 : 0.5);
+
+    body := TouchArea { clicked => { if (root.free) { root.open(); } else { root.select(); } } }
+
+    VerticalLayout {
+        padding: 14px;
+        spacing: 8px;
+        // Número, nome, seção e status
+        HorizontalLayout {
+            spacing: 8px;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Text { text: data.number; color: Theme.text; font-size: 38px; font-weight: 900; }
+                    if data.name != "": Text { text: data.name; color: Theme.text; font-size: 15px; font-weight: 700; vertical-alignment: center; overflow: elide; max-width: 130px; }
+                }
+                Text { text: data.section; color: Theme.text-muted; font-size: 12px; overflow: elide; }
+            }
+            Rectangle {
+                height: 22px;
+                width: badge.preferred-width + 18px;
+                border-radius: 11px;
+                background: root.tone.with-alpha(0.16);
+                border-width: 1px;
+                border-color: root.tone.with-alpha(0.35);
+                opacity: root.closing ? (mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.55) : 1;
+                badge := Text {
+                    text: root.free ? "Livre" : root.closing ? "Fechamento" : data.status == "RESERVED" ? "Reservada" : "Ocupada";
+                    color: root.tone;
+                    font-size: 11px;
+                    font-weight: 800;
+                }
+            }
+        }
+
+        if root.free: VerticalLayout {
+            vertical-stretch: 1;
+            alignment: center;
+            spacing: 6px;
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                x: (parent.width - self.width) / 2;
+                border-radius: 12px;
+                background: Theme.surface-2;
+                Icon { source: Icons.users; color: body.has-hover ? Theme.available : Theme.text-muted; size: 22px; }
+            }
+            Text { text: "Capacidade: " + data.capacity + " lugares"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+        }
+
+        if !root.free: VerticalLayout {
+            vertical-stretch: 1;
+            spacing: 8px;
+            HorizontalLayout {
+                spacing: 6px;
+                Text { text: (data.customer != "" ? data.customer : "Cliente sem nome") + " (" + data.people + "p)"; color: Theme.text; font-size: 12px; font-weight: 600; overflow: elide; horizontal-stretch: 1; vertical-alignment: center; }
+                if data.elapsed != "": Rectangle {
+                    height: 22px;
+                    width: time.preferred-width + 32px;
+                    border-radius: 6px;
+                    background: Theme.surface-2;
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        Icon { source: Icons.clock; color: Theme.primary; size: 12px; y: (parent.height - self.height) / 2; }
+                        time := Text { text: data.elapsed; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                    }
+                }
+            }
+            Rectangle {
+                border-radius: 12px;
+                background: Theme.bg;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                HorizontalLayout {
+                    padding: 10px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        Text { text: "CONSUMO (" + data.items + " ITENS)"; color: Theme.text-muted; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+                        Text { text: data.total; color: Theme.available; font-size: 19px; font-weight: 900; }
+                        if data.haver != "": Text { text: data.haver; color: Theme.occupied; font-size: 10px; font-weight: 700; overflow: elide; }
+                    }
+                    if data.fee: Rectangle {
+                        width: 40px;
+                        height: 20px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 5px;
+                        background: Theme.surface-2;
+                        Text { text: "+10%"; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
+                    }
+                }
+            }
+        }
+
+        // Ações diretas
+        Rectangle { height: 1px; background: Theme.surface-2; }
+        if root.free: ActionButton {
+            text: "Abrir Mesa";
+            icon: Icons.plus;
+            tone: Theme.available;
+            clicked => { root.open(); }
+        }
+        if !root.free: HorizontalLayout {
+            spacing: 6px;
+            ActionButton { text: "Pedido"; icon: Icons.plus; tone: Theme.occupied; clicked => { root.order(); } }
+            ActionButton { text: root.closing ? "Receber" : "Conta"; icon: Icons.dollar-sign; tone: Theme.available; strong: root.closing; clicked => { root.pay(); } }
+        }
+    }
+}
+
+export component MesasAreaPage inherits Rectangle {
+    background: Theme.bg;
+
+    property <length> min-tile: 236px;
+    property <length> gap: 14px;
+    property <length> tile-h: 232px;
+    property <int> cols: max(1, floor((grid.width + gap) / (min-tile + gap)));
+    property <length> tile-w: (grid.width - (cols - 1) * gap) / cols;
+
+    VerticalLayout {
+        padding: 20px;
+        padding-bottom: 12px;
+        spacing: 14px;
+
+        // Indicadores do salão
+        HorizontalLayout {
+            spacing: 10px;
+            StatTile { icon: Icons.users; tone: Theme.occupied; label: "OCUPAÇÃO"; value: MesasStore.occupancy; extra: MesasStore.occupancy-pct; }
+            StatTile { icon: Icons.layout-grid; tone: Theme.available; label: "LIVRES"; value: MesasStore.free-count + " mesas"; value-color: Theme.available; }
+            StatTile { icon: Icons.clock; tone: Theme.closing; label: "FECHANDO"; value: MesasStore.closing-count + " contas"; value-color: Theme.closing; }
+            StatTile { icon: Icons.dollar-sign; tone: Theme.purple; label: "EM ABERTO"; value: MesasStore.open-revenue; }
+        }
+
+        // Busca, ações e filtros
+        Rectangle {
+            border-radius: 16px;
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.surface-2;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 10px;
+                HorizontalLayout {
+                    spacing: 8px;
+                    LineEdit {
+                        horizontal-stretch: 1;
+                        height: 38px;
+                        placeholder-text: "Buscar mesa ou cliente (ex: 2, Mariana)...";
+                        text <=> MesasStore.search;
+                        edited => { MesasStore.filters-changed(); }
+                    }
+                    ToolButton { icon: Icons.refresh-cw; text: MesasStore.loading ? "Atualizando..." : "Atualizar"; icon-color: Theme.text-muted; clicked => { MesasStore.refresh(); } }
+                    ToolButton { icon: Icons.file-text; text: "Comandas Finalizadas"; clicked => { MesasStore.open-history(); } }
+                    ToolButton { icon: Icons.map-pin; text: "Editar Locais"; clicked => { MesasStore.open-manage(); } }
+                    ToolButton { icon: Icons.plus; text: "Nova Mesa"; primary: true; clicked => { MesasStore.open-new-table(); } }
+                }
+                Rectangle { height: 1px; background: Theme.surface-2; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    Flickable {
+                        height: 32px;
+                        horizontal-stretch: 1;
+                        content-width: sections-row.preferred-width;
+                        sections-row := HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            SectionChip {
+                                text: "Todas as Áreas";
+                                active: MesasStore.section-filter == "ALL";
+                                clicked => { MesasStore.section-filter = "ALL"; MesasStore.filters-changed(); }
+                            }
+                            for s in MesasStore.sections: SectionChip {
+                                text: s;
+                                active: MesasStore.section-filter == s;
+                                clicked => { MesasStore.section-filter = s; MesasStore.filters-changed(); }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        width: status-row.preferred-width + 6px;
+                        height: 32px;
+                        border-radius: 11px;
+                        background: Theme.bg;
+                        border-width: 1px;
+                        border-color: Theme.surface-2;
+                        status-row := HorizontalLayout {
+                            x: 3px;
+                            spacing: 2px;
+                            alignment: center;
+                            StatusChip { y: 2px; text: "Todas (" + MesasStore.total-count + ")"; active: MesasStore.status-filter == "ALL"; clicked => { MesasStore.status-filter = "ALL"; MesasStore.filters-changed(); } }
+                            StatusChip { y: 2px; text: "Livres (" + MesasStore.free-count + ")"; tone: Theme.available; active: MesasStore.status-filter == "AVAILABLE"; clicked => { MesasStore.status-filter = "AVAILABLE"; MesasStore.filters-changed(); } }
+                            StatusChip { y: 2px; text: "Ocupadas (" + MesasStore.occupied-count + ")"; tone: Theme.occupied; active: MesasStore.status-filter == "OCCUPIED"; clicked => { MesasStore.status-filter = "OCCUPIED"; MesasStore.filters-changed(); } }
+                            StatusChip { y: 2px; text: "Fechando (" + MesasStore.closing-count + ")"; tone: Theme.closing; active: MesasStore.status-filter == "CLOSING"; clicked => { MesasStore.status-filter = "CLOSING"; MesasStore.filters-changed(); } }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Grade de mesas
+        grid := Rectangle {
+            vertical-stretch: 1;
+            if MesasStore.cards.length == 0: Rectangle {
+                border-radius: 24px;
+                background: Theme.surface;
+                border-width: 1px;
+                border-color: Theme.surface-2;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 6px;
+                    Icon { source: Icons.layout-grid; color: Theme.text-muted; size: 48px; x: (parent.width - self.width) / 2; }
+                    Text { text: "Nenhuma mesa encontrada"; color: Theme.text; font-size: 16px; font-weight: 700; horizontal-alignment: center; }
+                    Text { text: "Tente alterar os filtros ou adicione uma nova mesa."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+                }
+            }
+            Flickable {
+                content-height: ceil(MesasStore.cards.length / root.cols) * (root.tile-h + root.gap);
+                for card[i] in MesasStore.cards: MesaTile {
+                    x: mod(i, root.cols) * (root.tile-w + root.gap);
+                    y: floor(i / root.cols) * (root.tile-h + root.gap);
+                    width: root.tile-w;
+                    height: root.tile-h;
+                    data: card;
+                    select => { MesasStore.card-select(card.id); }
+                    open => { MesasStore.card-open(card.id); }
+                    order => { MesasStore.card-order(card.id); }
+                    pay => { MesasStore.card-pay(card.id); }
+                }
+            }
+        }
+    }
+
+    // Modais da área (detalhes, abrir, lançar, fechar conta, transferir, juntar, histórico, locais, nova mesa)
+    MesasModals { width: root.width; height: root.height; }
+}
