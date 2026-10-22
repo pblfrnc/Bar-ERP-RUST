@@ -10,7 +10,7 @@ use slint::platform::{Platform, WindowAdapter};
 use slint::{ComponentHandle, PhysicalSize, Rgb8Pixel};
 
 use barerp_app::pages::cardapio::preview;
-use barerp_app::{AppWindow, Page, Theme};
+use barerp_app::{AppWindow, CardapioStore, CdModal, CdNcm, Page, Theme};
 use barerp_db::{modifiers, products, suppliers, Db};
 
 const WIDTH: u32 = 1440;
@@ -86,6 +86,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         save(&window, &out.join(format!("c5-cardapio-digital-{suffix}.png")))?;
         preview::suppliers(&ui);
         save(&window, &out.join(format!("c6-fornecedores-{suffix}.png")))?;
+        // Tabela NCM com a pesquisa pelo nome (resultados de exemplo, sem chamar a Focus)
+        preview::list(&ui, list.clone(), categories.clone(), supplier_list.clone(), groups.clone());
+        let st = ui.global::<CardapioStore>();
+        st.set_modal(CdModal::Ncm);
+        st.set_n_code("cerveja".into());
+        st.set_n_total_label("3 RESULTADOS · TOQUE PARA VER O CÓDIGO".into());
+        st.set_n_results(std::rc::Rc::new(slint::VecModel::from(vec![
+            CdNcm { codigo: "22030000".into(), descricao: "Cervejas de malte.".into() },
+            CdNcm { codigo: "22029900".into(), descricao: "Águas, incluindo as águas minerais e as águas gaseificadas, adicionadas de açúcar ou de outros edulcorantes ou aromatizadas e outras bebidas não alcoólicas. Outras. Outras (cerveja sem álcool)".into() },
+            CdNcm { codigo: "22060090".into(), descricao: "Outras bebidas fermentadas. Outras".into() },
+        ]))
+        .into());
+        save(&window, &out.join(format!("c7-ncm-por-nome-{suffix}.png")))?;
+        st.set_n_results(std::rc::Rc::new(slint::VecModel::<CdNcm>::default()).into());
+        st.set_modal(CdModal::None);
         preview::close(&ui);
     }
     Ok(())
