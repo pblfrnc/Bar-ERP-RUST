@@ -83,6 +83,8 @@ component EscolhaModelo inherits HorizontalLayout {
         mt := Text { text: m; color: parent.ativo ? Theme.primary : Theme.text-muted; font-size: 13px; font-weight: 800; }
         mtoque := TouchArea { mouse-cursor: pointer; clicked => { root.escolher(i == 1); } }
     }
+    // Espaço elástico: sem ele a largura máxima desta linha limitava a coluna inteira do menu
+    Rectangle { horizontal-stretch: 1; }
 }
 
 export component MenuFiscal inherits Rectangle {
