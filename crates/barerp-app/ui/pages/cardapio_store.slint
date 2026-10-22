@@ -27,6 +27,8 @@ export struct CdProduct {
 }
 
 export struct CdCategory { id: string, name: string, range: string, active: bool }
+// Resultado da pesquisa de NCM pelo nome ou pelo início do código (API de NCM da Focus)
+export struct CdNcm { codigo: string, descricao: string }
 
 export struct CdComponent {
     index: int,            // posição na lista de insumos (f-component-labels); -1 = nenhum
@@ -255,9 +257,14 @@ export global CardapioStore {
     in property <string> n-result-desc;
     in property <string> n-fed;
     in property <string> n-est;
+    // Pesquisa pelo nome: lista de resultados, total e se há mais páginas
+    in property <[CdNcm]> n-results;
+    in property <string> n-total-label;
+    in property <bool> n-more;
     callback n-search();
     callback n-quick(string);
     callback n-use();
+    callback n-more-load();
 
     // ---------- Folha de balanço ----------
     in property <[string]> s-category-labels;

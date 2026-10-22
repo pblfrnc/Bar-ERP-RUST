@@ -565,6 +565,37 @@ async fn consultas_sefaz_ncm_cnpj() {
 }
 
 #[tokio::test]
+async fn pesquisa_de_ncm_pelo_nome() {
+    let a = ambiente(true).await;
+    Mock::given(method("GET"))
+        .and(path("/v2/ncms"))
+        .and(query_param("descricao", "cerveja"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("X-Total-Count", "3")
+                .set_body_json(json!([{ "codigo": "22030000", "descricao_completa": "Cervejas de malte." }])),
+        )
+        .mount(&a.focus)
+        .await;
+    let (s, r) = json_de(&a.app, get("/ncms?q=cerveja")).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!((r["total"].as_u64(), r["itens"][0]["codigo"].as_str()), (Some(3), Some("22030000")));
+    assert_eq!(r["itens"][0]["descricao"], "Cervejas de malte.");
+
+    // Termo curto demais não vai à Focus
+    let (s, _) = json_de(&a.app, get("/ncms?q=ce")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = json_de(&a.app, get("/ncms?q=2")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // Sem token: avisa onde cadastrar
+    let sem = ambiente(false).await;
+    let (s, r) = json_de(&sem.app, get("/ncms?q=cerveja")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert!(r["error"].as_str().unwrap_or("").contains("token da Focus"));
+}
+
+#[tokio::test]
 async fn xml_emitida_do_cofre_ou_da_focus() {
     let a = ambiente(true).await;
     let reg = RegistroEmitida { referencia: "nfce_a".into(), chave: Some(CHAVE.into()), ..Default::default() };

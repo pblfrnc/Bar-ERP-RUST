@@ -306,7 +306,7 @@ component ReportSheet inherits Sheet {
 
 // ---------- Consulta de NCM ----------
 component NcmSheet inherits Sheet {
-    panel-width: 560px;
+    panel-width: 680px;
     icon: CardapioIcons.book-open;
     tone: Theme.purple;
     title: "Consulta Oficial de NCM";
@@ -320,7 +320,7 @@ component NcmSheet inherits Sheet {
             LineEdit {
                 height: 42px;
                 horizontal-stretch: 1;
-                placeholder-text: "Digite o código NCM (ex: 22030000)";
+                placeholder-text: "Nome do produto (ex: cerveja, refrigerante) ou código NCM";
                 text <=> CardapioStore.n-code;
                 accepted => { CardapioStore.n-search(); }
             }
@@ -330,11 +330,13 @@ component NcmSheet inherits Sheet {
                 fill: Theme.purple;
                 tone: #ffffff;
                 busy: CardapioStore.n-loading;
-                enabled: CardapioStore.n-code.character-count >= 4;
+                enabled: CardapioStore.n-code.character-count >= 2;
                 clicked => { CardapioStore.n-search(); }
             }
         }
-        FieldLabel { text: "ATALHOS COMUNS NO BAR & RESTAURANTE"; }
+        if CardapioStore.n-results.length == 0: FieldLabel { text: "ATALHOS COMUNS NO BAR & RESTAURANTE"; }
+        if CardapioStore.n-results.length == 0: VerticalLayout {
+        spacing: 12px;
         for line in [
             [{ code: "22030000", label: "Cervejas e Chopes" }, { code: "22021000", label: "Refrigerantes" }, { code: "22011000", label: "Águas Minerais" }],
             [{ code: "22084000", label: "Cachaças e Aguardentes" }, { code: "22083020", label: "Whiskies" }, { code: "22086000", label: "Vodkas" }],
@@ -356,6 +358,7 @@ component NcmSheet inherits Sheet {
                 }
                 qt := TouchArea { clicked => { CardapioStore.n-quick(q.code); } }
             }
+        }
         }
         Notice { text: CardapioStore.n-error; tone: Theme.danger; }
         if CardapioStore.n-has-result: Rectangle {
@@ -392,6 +395,38 @@ component NcmSheet inherits Sheet {
                     }
                 }
                 Btn { text: "Usar este NCM no Produto"; fill: Theme.purple; tone: #ffffff; weight: 800; clicked => { CardapioStore.n-use(); } }
+            }
+        }
+        // Resultados da pesquisa pelo nome (toque abre a consulta oficial do código)
+        if CardapioStore.n-results.length > 0: VerticalLayout {
+            spacing: 6px;
+            FieldLabel { text: CardapioStore.n-total-label; }
+            lista := Flickable {
+                height: min(lista-col.preferred-height, 300px);
+                content-height: lista-col.preferred-height;
+                lista-col := VerticalLayout {
+                    width: lista.width;
+                    spacing: 4px;
+                    for r in CardapioStore.n-results: Rectangle {
+                        height: linha.preferred-height;
+                        border-radius: 10px;
+                        background: lt.has-hover ? Theme.surface-2 : Theme.bg;
+                        border-width: CardapioStore.n-has-result && CardapioStore.n-result-code == r.codigo ? 2px : 0px;
+                        border-color: Theme.purple;
+                        linha := HorizontalLayout {
+                            padding: 10px;
+                            spacing: 12px;
+                            Text { text: r.codigo; color: Theme.purple; font-size: 14px; font-weight: 800; font-family: "Menlo"; min-width: 84px; }
+                            Text { text: r.descricao; color: Theme.text; font-size: 13px; wrap: word-wrap; horizontal-stretch: 1; max-height: 54px; overflow: elide; }
+                        }
+                        lt := TouchArea { mouse-cursor: pointer; clicked => { CardapioStore.n-quick(r.codigo); } }
+                    }
+                }
+            }
+            if CardapioStore.n-more: Btn {
+                text: CardapioStore.n-loading ? "Carregando..." : "Carregar mais resultados";
+                enabled: !CardapioStore.n-loading;
+                clicked => { CardapioStore.n-more-load(); }
             }
         }
     }

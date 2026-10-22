@@ -474,12 +474,42 @@ pub(super) async fn ncm(State(st): State<FiscalState>, Path(codigo): Path<String
         "ok": true,
         "valido": true,
         "codigo": opt(d, "codigo").unwrap_or(codigo),
-        "descricao": txt(d, "descricao"),
+        // A documentação da Focus mostra `descricao_completa`; aceita os dois
+        "descricao": opt(d, "descricao").or_else(|| opt(d, "descricao_completa")).unwrap_or_default(),
         "dataInicio": d.get("data_inicio"),
         "dataFim": d.get("data_fim"),
         "aliquotaNacional": d.get("aliquota_nacional"),
         "aliquotaEstadual": d.get("aliquota_estadual"),
         "aliquotaImportado": d.get("aliquota_importado"),
+    })))
+}
+
+#[derive(Deserialize)]
+pub(super) struct PesquisaNcmQuery {
+    #[serde(default)]
+    q: String,
+    #[serde(default)]
+    offset: usize,
+}
+
+/// Pesquisa de NCM pelo nome ou pelo início do código (`GET /v2/ncms` da Focus, 50 por página).
+pub(super) async fn pesquisar_ncms(
+    State(st): State<FiscalState>,
+    Query(p): Query<PesquisaNcmQuery>,
+) -> ApiResult<Json<Value>> {
+    let termo = p.q.trim();
+    let so_numeros = termo.chars().all(|c| c.is_ascii_digit() || c == '.' || c == ' ');
+    if (so_numeros && so_digitos(termo).len() < 2) || (!so_numeros && termo.chars().count() < 3) {
+        return Err(ApiError::bad_request("Digite ao menos 3 letras do nome ou 2 dígitos do código NCM."));
+    }
+    let cfg = st.config().await?;
+    let focus = st.focus_ou(&cfg, "Para pesquisar o NCM pelo nome, cadastre o token da Focus NFe nas Configurações fiscais.")?;
+    let r = focus.pesquisar_ncms(termo, p.offset).await.map_err(erro_fiscal)?;
+    Ok(Json(json!({
+        "ok": true,
+        "total": r.total,
+        "offset": r.offset,
+        "itens": r.itens.iter().map(|n| json!({ "codigo": n.codigo, "descricao": n.descricao })).collect::<Vec<_>>(),
     })))
 }
 

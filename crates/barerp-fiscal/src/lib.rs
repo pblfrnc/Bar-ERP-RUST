@@ -23,8 +23,8 @@ pub use error::FiscalError;
 /// Método HTTP de [`FocusClient::requisitar`].
 pub use reqwest::Method;
 pub use focus::{
-    Ambiente, Arquivo, Emissao, FocusClient, ListaRecebidas, NotaAutorizada, NotaRecebidaFocus, RespostaFocus,
-    StatusSefaz, XmlRecebida,
+    Ambiente, Arquivo, Emissao, FocusClient, ListaRecebidas, NcmFocus, NotaAutorizada, NotaRecebidaFocus, PesquisaNcm,
+    RespostaFocus, StatusSefaz, XmlRecebida,
 };
 pub use payload::{
     codigo_forma_pagamento, montar_nfce, montar_nfe, ratear_desconto, referencia_nfce, referencia_nfe, Destinatario,

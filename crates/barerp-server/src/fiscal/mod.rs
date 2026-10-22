@@ -154,6 +154,7 @@ pub fn router(state: FiscalState) -> Router {
         .route("/export-month", get(contador::export_month))
         .route("/focus-backups", get(config::focus_backups))
         .route("/ncm/:code", get(config::ncm))
+        .route("/ncms", get(config::pesquisar_ncms))
         .route("/sefaz-status", get(config::sefaz_status))
         .route("/inutilizar-numeracao", post(emissao::inutilizar_nfe))
         .route("/inutilizar-numeracao-nfce", post(emissao::inutilizar_nfce))

@@ -103,6 +103,25 @@ pub struct StatusSefaz {
     pub tempo_medio: f64,
 }
 
+/// Um NCM da pesquisa `/v2/ncms`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct NcmFocus {
+    /// 8 dígitos, sem pontos
+    pub codigo: String,
+    /// `descricao_completa` da Focus
+    pub descricao: String,
+}
+
+/// Uma página da pesquisa de NCM.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PesquisaNcm {
+    pub itens: Vec<NcmFocus>,
+    /// Total de ocorrências (`X-Total-Count`)
+    pub total: usize,
+    /// Posição do primeiro item desta página
+    pub offset: usize,
+}
+
 /// Uma nota de `/v2/nfes_recebidas`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NotaRecebidaFocus {
@@ -653,6 +672,51 @@ impl FocusClient {
             }
         }
         None
+    }
+
+    /// Pesquisa de NCM (`GET /v2/ncms`, API acessória da Focus). Só números pesquisa pelo início do código
+    /// (`codigo`); com letras, por parte da descrição (`descricao`). A Focus devolve 50 por vez e o total no
+    /// cabeçalho `X-Total-Count`; `offset` pega as páginas seguintes.
+    pub async fn pesquisar_ncms(&self, termo: &str, offset: usize) -> Result<PesquisaNcm, FiscalError> {
+        let termo = termo.trim();
+        let so_numeros = !termo.is_empty() && termo.chars().all(|c| c.is_ascii_digit() || c == '.' || c == ' ');
+        let mut query: Vec<(&str, String)> =
+            vec![if so_numeros { ("codigo", digits(termo)) } else { ("descricao", termo.to_string()) }];
+        if offset > 0 {
+            query.push(("offset", offset.to_string()));
+        }
+        let res = self.req(Method::GET, "/v2/ncms").query(&query).header("Accept", "application/json").send().await?;
+        let status = res.status();
+        let total = res
+            .headers()
+            .get("X-Total-Count")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.trim().parse::<usize>().ok());
+        let texto = res.text().await?;
+        let corpo: Value = serde_json::from_str(&texto).unwrap_or(Value::String(texto));
+        if !status.is_success() {
+            let mensagem = corpo
+                .get("mensagem")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("Focus NFe ({}) na pesquisa de NCM", status.as_u16()));
+            return Err(FiscalError::Focus { http_status: status.as_u16(), mensagem, detalhes: corpo });
+        }
+        let itens: Vec<NcmFocus> = corpo
+            .as_array()
+            .map(|lista| {
+                lista
+                    .iter()
+                    .filter_map(|n| {
+                        let codigo = digits(n.get("codigo")?.as_str()?);
+                        let descricao = n.get("descricao_completa").and_then(Value::as_str).unwrap_or("").trim().to_string();
+                        (!codigo.is_empty()).then_some(NcmFocus { codigo, descricao })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let total = total.unwrap_or(offset + itens.len());
+        Ok(PesquisaNcm { itens, total, offset })
     }
 
     /// Chamada genérica à API da Focus (`/v2/empresas`, `/v2/ncms`, `/v2/backups`, e-mail...) com o token.

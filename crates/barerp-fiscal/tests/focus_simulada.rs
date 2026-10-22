@@ -536,3 +536,54 @@ async fn cep_pela_brasilapi_ou_viacep() {
     assert_eq!((e.logradouro.as_str(), e.uf.as_str()), ("Praça da Sé", "SP"));
     assert_eq!(barerp_fiscal::publico::consultar_cep(&u, &u, "123").await, None);
 }
+
+#[tokio::test]
+async fn pesquisa_de_ncm_por_nome_e_por_codigo() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v2/ncms"))
+        .and(query_param("descricao", "cerveja de malte"))
+        .and(query_param_is_missing("offset"))
+        .and(header("authorization", AUTH))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .insert_header("X-Total-Count", "62")
+                .set_body_json(json!([
+                    { "codigo": "22030000", "descricao_completa": "Cervejas de malte.", "capitulo": "22" },
+                    { "codigo": "2203.00.00", "descricao_completa": " Repetido com pontos " },
+                    { "descricao_completa": "Sem código: ignorado" }
+                ])),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v2/ncms"))
+        .and(query_param("codigo", "2203"))
+        .and(query_param("offset", "50"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([{ "codigo": "22030000", "descricao_completa": "Cervejas" }])))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v2/ncms"))
+        .and(query_param("descricao", "xx"))
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({ "codigo": "permissao_negada", "mensagem": "Token sem acesso" })))
+        .mount(&server)
+        .await;
+
+    let c = cliente(&server).await;
+    let r = c.pesquisar_ncms("  cerveja de malte ", 0).await.unwrap();
+    assert_eq!((r.total, r.offset), (62, 0));
+    assert_eq!(r.itens.len(), 2, "item sem código fica de fora");
+    assert_eq!(r.itens[0].codigo, "22030000");
+    assert_eq!(r.itens[1].codigo, "22030000", "pontos saem do código");
+    assert_eq!(r.itens[1].descricao, "Repetido com pontos");
+
+    // Só números (com ou sem pontos) pesquisa pelo início do código; sem X-Total-Count o total é o que veio
+    let r = c.pesquisar_ncms("22.03", 50).await.unwrap();
+    assert_eq!((r.itens.len(), r.total, r.offset), (1, 51, 50));
+
+    match c.pesquisar_ncms("xx", 0).await {
+        Err(FiscalError::Focus { http_status, mensagem, .. }) => assert_eq!((http_status, mensagem.as_str()), (403, "Token sem acesso")),
+        outro => panic!("esperava erro da Focus, veio {outro:?}"),
+    }
+}

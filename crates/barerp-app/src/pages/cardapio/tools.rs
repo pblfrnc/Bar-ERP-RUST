@@ -12,7 +12,12 @@ use barerp_server::Corpo;
 use super::{close_modal, emit, notify, num_text, reload, store, with_state};
 use crate::ctx::{open_external, AppCtx};
 use crate::view::model;
-use crate::{AppWindow, CdHistory, CdModal, CdReportCat};
+use crate::{AppWindow, CdHistory, CdModal, CdNcm, CdReportCat};
+
+thread_local! {
+    /// Pesquisa de NCM pelo nome em andamento: termo, resultados já carregados e total da Focus.
+    static NCM_LISTA: std::cell::RefCell<(String, Vec<CdNcm>, usize)> = const { std::cell::RefCell::new((String::new(), Vec::new(), 0)) };
+}
 
 #[derive(Default)]
 pub(crate) struct ToolsState {
@@ -214,11 +219,116 @@ pub(crate) fn render_report(ui: &AppWindow, r: &products::StockReport) {
 
 // ---------- Consulta de NCM ----------
 
+/// Campo da Tabela NCM: código completo (8 dígitos) consulta direto; nome ou parte do código pesquisa a lista.
+fn search_ncm_term(ctx: &AppCtx, term: String) {
+    let term = term.trim().to_string();
+    let only_digits = !term.is_empty() && term.chars().all(|c| c.is_ascii_digit() || c == '.' || c == ' ');
+    let digits_count = term.chars().filter(char::is_ascii_digit).count();
+    if only_digits && digits_count == 8 {
+        clear_ncm_list(ctx);
+        search_ncm(ctx, term);
+    } else {
+        list_ncm(ctx, term, false);
+    }
+}
+
+fn clear_ncm_list(ctx: &AppCtx) {
+    NCM_LISTA.with(|l| *l.borrow_mut() = (String::new(), Vec::new(), 0));
+    if let Some(ui) = ctx.ui() {
+        let st = store(&ui);
+        st.set_n_results(model(Vec::new()));
+        st.set_n_more(false);
+        st.set_n_total_label("".into());
+    }
+}
+
+/// Termo para a URL (`?q=`): letras, números e alguns sinais ficam; o resto vira %XX (UTF-8).
+fn query_encode(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            b' ' => "+".into(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+/// Pesquisa de NCM pelo nome ou pelo início do código (`/api/fiscal/ncms`, Focus `/v2/ncms`). `more` busca a
+/// próxima página do mesmo termo.
+fn list_ncm(ctx: &AppCtx, term: String, more: bool) {
+    let Some(ui) = ctx.ui() else { return };
+    let st = store(&ui);
+    let (term, offset) = if more {
+        NCM_LISTA.with(|l| { let l = l.borrow(); (l.0.clone(), l.1.len()) })
+    } else {
+        (term, 0)
+    };
+    let letters = term.chars().filter(|c| c.is_alphabetic()).count();
+    let digits_count = term.chars().filter(char::is_ascii_digit).count();
+    if (letters == 0 && digits_count < 2) || (letters > 0 && term.chars().count() < 3) {
+        st.set_n_error("Digite ao menos 3 letras do nome do produto (ex: cerveja) ou 2 dígitos do código NCM.".into());
+        return;
+    }
+    let Some(server) = ctx.server.clone() else {
+        st.set_n_error("Consulta de NCM indisponível: o servidor interno não está rodando.".into());
+        return;
+    };
+    st.set_n_loading(true);
+    st.set_n_error("".into());
+    if !more {
+        st.set_n_has_result(false);
+    }
+    let path = format!("/ncms?q={}&offset={offset}", query_encode(&term));
+    ctx.spawn(async move { server.fiscal("GET", &path, Corpo::Nada).await }, move |ui, r| {
+        let st = store(ui);
+        st.set_n_loading(false);
+        let j = r.json();
+        if !r.ok() {
+            let e = r.erro();
+            st.set_n_error(if e.trim().is_empty() { "Não foi possível pesquisar o NCM na Focus NFe.".into() } else { e }.into());
+            return;
+        }
+        let total = j.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let new: Vec<CdNcm> = j
+            .get("itens")
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .map(|n| CdNcm {
+                        codigo: n.get("codigo").and_then(|v| v.as_str()).unwrap_or("").into(),
+                        descricao: n.get("descricao").and_then(|v| v.as_str()).unwrap_or("").into(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let list = NCM_LISTA.with(|l| {
+            let mut l = l.borrow_mut();
+            if !more {
+                *l = (term.clone(), Vec::new(), 0);
+            }
+            l.1.extend(new);
+            l.2 = total.max(l.1.len());
+            l.1.clone()
+        });
+        if list.is_empty() {
+            st.set_n_error(format!("Nenhum NCM encontrado para \"{term}\". Tente outra palavra (ex: cerveja, suco, pão).").into());
+        }
+        st.set_n_more(list.len() < total);
+        st.set_n_total_label(
+            if total == 1 { "1 RESULTADO".to_string() } else { format!("{total} RESULTADOS · TOQUE PARA VER O CÓDIGO") }.into(),
+        );
+        st.set_n_results(model(list));
+    });
+}
+
 fn search_ncm(ctx: &AppCtx, code: String) {
     let Some(ui) = ctx.ui() else { return };
     let st = store(&ui);
     let clean: String = code.chars().filter(|c| c.is_ascii_digit()).take(8).collect();
-    st.set_n_code(clean.clone().into());
+    // Com a lista da pesquisa pelo nome aberta, o campo continua com o termo pesquisado
+    if NCM_LISTA.with(|l| l.borrow().1.is_empty()) {
+        st.set_n_code(clean.clone().into());
+    }
     if clean.len() < 4 {
         st.set_n_error("Digite ao menos 4 dígitos do NCM (ex: 22030000 para Cerveja).".into());
         return;
@@ -422,6 +532,7 @@ pub(crate) fn bind(ctx: &AppCtx) {
                 st.set_n_has_result(false);
                 st.set_n_loading(false);
                 st.set_modal(CdModal::Ncm);
+                clear_ncm_list(&ctx);
             }
         }
     });
@@ -430,13 +541,17 @@ pub(crate) fn bind(ctx: &AppCtx) {
         move || {
             if let Some(ui) = ctx.ui() {
                 let code = store(&ui).get_n_code().to_string();
-                search_ncm(&ctx, code);
+                search_ncm_term(&ctx, code);
             }
         }
     });
     st.on_n_quick({
         let ctx = ctx.clone();
         move |code| search_ncm(&ctx, code.to_string())
+    });
+    st.on_n_more_load({
+        let ctx = ctx.clone();
+        move || list_ncm(&ctx, String::new(), true)
     });
     st.on_n_use({
         let ctx = ctx.clone();
@@ -469,4 +584,16 @@ pub(crate) fn bind(ctx: &AppCtx) {
         let ctx = ctx.clone();
         move || export_sheet(&ctx)
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::query_encode;
+
+    #[test]
+    fn termo_da_pesquisa_de_ncm_na_url() {
+        assert_eq!(query_encode("cerveja de malte"), "cerveja+de+malte");
+        assert_eq!(query_encode("pão & queijo"), "p%C3%A3o+%26+queijo");
+        assert_eq!(query_encode("22.03"), "22.03");
+    }
 }
