@@ -1,0 +1,422 @@
+// Menu lateral do Módulo Fiscal (mesmo padrão da Retaguarda) e o Painel fiscal, a tela inicial do módulo.
+// O menu troca de tela pelo `FiscalStore.abrir`; o painel é preenchido por `carregar_painel` em
+// `src/pages/fiscal.rs`.
+
+import { Theme } from "../theme.slint";
+import { FiscalStore, FxPainelNota, FxPainelRecebida } from "fiscal_store.slint";
+import { FxCor, FxCores, Icon } from "fiscal_ui.slint";
+import { FiscalIcons } from "fiscal_icons.slint";
+import { Icons } from "../icons.slint";
+import { SefazDetalhes } from "fiscal_hub.slint";
+
+component GrupoMenu inherits Text {
+    color: Theme.text-muted;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+}
+
+component ItemMenu inherits Rectangle {
+    in property <image> icone;
+    in property <string> texto;
+    in property <bool> ativo;
+    in property <bool> so-icone;
+    // Selo à direita (ex.: "2 no prazo", "3")
+    in property <string> selo;
+    in property <color> selo-cor: Theme.danger;
+    callback clicked;
+    height: 42px;
+    border-radius: 10px;
+    background: root.ativo ? Theme.primary : (toque.has-hover ? Theme.surface-2 : transparent);
+    HorizontalLayout {
+        padding-left: root.so-icone ? 0 : 12px;
+        padding-right: root.so-icone ? 0 : 10px;
+        spacing: 10px;
+        alignment: root.so-icone ? center : stretch;
+        VerticalLayout { alignment: center; Icon { source: root.icone; color: root.ativo ? #020617 : (toque.has-hover ? Theme.text : Theme.text-muted); size: 18px; } }
+        if !root.so-icone: Text {
+            text: root.texto;
+            color: root.ativo ? #020617 : Theme.text;
+            font-size: 15px;
+            font-weight: root.ativo ? 900 : 600;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+        if !root.so-icone && root.selo != "": VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 22px;
+                width: max(22px, st.preferred-width + 14px);
+                border-radius: 11px;
+                background: root.selo-cor.with-alpha(0.2);
+                st := Text { text: root.selo; color: root.selo-cor; font-size: 12px; font-weight: 900; }
+            }
+        }
+    }
+    if root.so-icone && root.selo != "": Rectangle {
+        x: parent.width - 14px;
+        y: 6px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: root.selo-cor;
+    }
+    toque := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+// Escolha NFC-e / NF-e logo abaixo do item aberto (Reimprimir, Cancelar, Inutilizar)
+component EscolhaModelo inherits HorizontalLayout {
+    in property <bool> nfe;
+    callback escolher(bool);
+    padding-left: 40px;
+    padding-bottom: 4px;
+    spacing: 6px;
+    for m[i] in ["NFC-e", "NF-e"]: Rectangle {
+        height: 32px;
+        width: mt.preferred-width + 26px;
+        border-radius: 8px;
+        property <bool> ativo: (i == 1) == root.nfe;
+        background: self.ativo ? Theme.primary.with-alpha(0.2) : (mtoque.has-hover ? Theme.surface-2 : transparent);
+        border-width: 1px;
+        border-color: self.ativo ? Theme.primary : Theme.border;
+        mt := Text { text: m; color: parent.ativo ? Theme.primary : Theme.text-muted; font-size: 13px; font-weight: 800; }
+        mtoque := TouchArea { mouse-cursor: pointer; clicked => { root.escolher(i == 1); } }
+    }
+}
+
+export component MenuFiscal inherits Rectangle {
+    in property <bool> so-icone;
+    property <string> tela: FiscalStore.tela;
+    property <bool> reimprimir: root.tela == "reimprimir-nfce" || root.tela == "reimprimir-nfe";
+    property <bool> cancelar: root.tela == "cancelar-nfce" || root.tela == "cancelar-nfe";
+    property <int> cancelaveis: FiscalStore.painel.cancelaveis-nfce + FiscalStore.painel.cancelaveis-nfe;
+    background: Theme.surface;
+    Rectangle { x: parent.width - 1px; width: 1px; background: Theme.surface-2; }
+
+    VerticalLayout {
+        padding: 12px;
+        padding-right: 13px;
+        spacing: 2px;
+        Flickable {
+            vertical-stretch: 1;
+            content-height: itens.preferred-height;
+            itens := VerticalLayout {
+                width: parent.width;
+                spacing: 2px;
+                alignment: start;
+                if !root.so-icone: GrupoMenu { text: "VISÃO GERAL"; }
+                ItemMenu {
+                    icone: Icons.chart-column; texto: "Painel fiscal"; so-icone: root.so-icone; ativo: root.tela == "hub";
+                    selo: FiscalStore.painel.rejeitadas + FiscalStore.painel.recebidas-pendentes > 0 ? (FiscalStore.painel.rejeitadas + FiscalStore.painel.recebidas-pendentes) + "" : "";
+                    clicked => { FiscalStore.abrir("hub"); }
+                }
+                if !root.so-icone: Rectangle { height: 8px; }
+                if !root.so-icone: GrupoMenu { text: "EMISSÃO"; }
+                ItemMenu { icone: FiscalIcons.receipt; texto: "Emitir NFC-e"; so-icone: root.so-icone; ativo: root.tela == "nfce"; clicked => { FiscalStore.abrir("nfce"); } }
+                ItemMenu { icone: FiscalIcons.file-text; texto: "Emitir NF-e"; so-icone: root.so-icone; ativo: root.tela == "nfe"; clicked => { FiscalStore.abrir("nfe"); } }
+                if !root.so-icone: Rectangle { height: 8px; }
+                if !root.so-icone: GrupoMenu { text: "NOTAS EMITIDAS"; }
+                ItemMenu { icone: FiscalIcons.printer; texto: "Reimprimir"; so-icone: root.so-icone; ativo: root.reimprimir; clicked => { FiscalStore.abrir("reimprimir-nfce"); } }
+                if root.reimprimir && !root.so-icone: EscolhaModelo {
+                    nfe: root.tela == "reimprimir-nfe";
+                    escolher(nfe) => { FiscalStore.abrir(nfe ? "reimprimir-nfe" : "reimprimir-nfce"); }
+                }
+                ItemMenu {
+                    icone: FiscalIcons.circle-x; texto: "Cancelar"; so-icone: root.so-icone; ativo: root.cancelar;
+                    selo: root.cancelaveis > 0 ? root.cancelaveis + " no prazo" : "";
+                    selo-cor: Theme.closing;
+                    clicked => { FiscalStore.abrir(FiscalStore.painel.cancelaveis-nfce == 0 && FiscalStore.painel.cancelaveis-nfe > 0 ? "cancelar-nfe" : "cancelar-nfce"); }
+                }
+                if root.cancelar && !root.so-icone: EscolhaModelo {
+                    nfe: root.tela == "cancelar-nfe";
+                    escolher(nfe) => { FiscalStore.abrir(nfe ? "cancelar-nfe" : "cancelar-nfce"); }
+                }
+                ItemMenu { icone: FiscalIcons.shield-alert; texto: "Inutilizar numeração"; so-icone: root.so-icone; ativo: FiscalStore.inut-modelo != ""; clicked => { FiscalStore.inut-abrir("nfce"); } }
+                if !root.so-icone: Rectangle { height: 8px; }
+                if !root.so-icone: GrupoMenu { text: "RECEBIMENTO"; }
+                ItemMenu { icone: FiscalIcons.scan; texto: "1º BIP — receber nota"; so-icone: root.so-icone; ativo: root.tela == "receber"; clicked => { FiscalStore.abrir("receber"); } }
+                ItemMenu { icone: FiscalIcons.package-plus; texto: "2º BIP — dar entrada"; so-icone: root.so-icone; ativo: root.tela == "importar"; clicked => { FiscalStore.abrir("importar"); } }
+                ItemMenu {
+                    icone: FiscalIcons.clock; texto: "Notas pendentes"; so-icone: root.so-icone; ativo: root.tela == "pendentes";
+                    selo: FiscalStore.painel.recebidas-pendentes > 0 ? FiscalStore.painel.recebidas-pendentes + "" : "";
+                    clicked => { FiscalStore.abrir("pendentes"); }
+                }
+                if !root.so-icone: Rectangle { height: 8px; }
+                if !root.so-icone: GrupoMenu { text: "FERRAMENTAS"; }
+                ItemMenu { icone: FiscalIcons.book-open; texto: "Tabela NCM"; so-icone: root.so-icone; clicked => { FiscalStore.abrir-ncm(); } }
+                ItemMenu { icone: FiscalIcons.briefcase; texto: "Painel do contador"; so-icone: root.so-icone; ativo: root.tela == "contador"; clicked => { FiscalStore.abrir("contador"); } }
+                ItemMenu { icone: FiscalIcons.settings; texto: "Configurações fiscais"; so-icone: root.so-icone; ativo: root.tela == "config"; clicked => { FiscalStore.abrir("config"); } }
+            }
+        }
+
+        // Situação da SEFAZ e ambiente, sempre à vista (toque abre os detalhes)
+        sefaz := Rectangle {
+            height: root.so-icone ? 44px : 58px;
+            border-radius: 12px;
+            property <color> cor: FiscalStore.sefaz.carregando ? Theme.text-muted : FiscalStore.sefaz.online ? Theme.available : Theme.danger;
+            background: self.cor.with-alpha(stoque.has-hover ? 0.2 : 0.12);
+            border-width: 1px;
+            border-color: self.cor.with-alpha(0.45);
+            HorizontalLayout {
+                padding-left: root.so-icone ? 0 : 12px;
+                padding-right: 10px;
+                spacing: 8px;
+                alignment: root.so-icone ? center : stretch;
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle { width: 10px; height: 10px; border-radius: 5px; background: sefaz.cor; }
+                }
+                if !root.so-icone: VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Text { text: FiscalStore.sefaz.rotulo; color: sefaz.cor; font-size: 14px; font-weight: 900; overflow: elide; }
+                    Text {
+                        text: (FiscalStore.painel.producao ? "Produção" : "Homologação (teste)")
+                            + (FiscalStore.sefaz.latencia != "" ? " · " + FiscalStore.sefaz.latencia : "");
+                        color: Theme.text-muted;
+                        font-size: 12px;
+                        overflow: elide;
+                    }
+                }
+            }
+            stoque := TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.sefaz-detalhes = !FiscalStore.sefaz-detalhes; } }
+        }
+    }
+}
+
+// Detalhes da SEFAZ por cima de tudo, ao lado do menu
+export component SefazFlutuante inherits Rectangle {
+    if FiscalStore.sefaz-detalhes: TouchArea { clicked => { FiscalStore.sefaz-detalhes = false; } }
+    if FiscalStore.sefaz-detalhes: SefazDetalhes {
+        x: 12px;
+        y: root.height - self.height - 84px;
+    }
+}
+
+component Indicador inherits Rectangle {
+    in property <string> rotulo;
+    in property <string> valor;
+    in property <string> detalhe;
+    in property <color> cor: Theme.text;
+    in property <bool> alerta;
+    border-radius: 16px;
+    background: root.alerta ? Theme.danger.with-alpha(0.08) : Theme.surface;
+    border-width: 1px;
+    border-color: root.alerta ? Theme.danger.with-alpha(0.5) : Theme.surface-2;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 4px;
+        Text { text: root.rotulo; color: root.alerta ? Theme.danger : Theme.text-muted; font-size: 13px; font-weight: 800; letter-spacing: 0.4px; }
+        Text { text: root.valor; color: root.cor; font-size: 28px; font-weight: 900; overflow: elide; }
+        Text { text: root.detalhe; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
+    }
+}
+
+component Atalho inherits Rectangle {
+    in property <image> icone;
+    in property <string> titulo;
+    in property <string> texto;
+    in property <FxCor> cor;
+    callback clicked;
+    height: 84px;
+    border-radius: 16px;
+    background: FxCores.de(root.cor).with-alpha(toque.has-hover ? 0.24 : 0.14);
+    border-width: 1px;
+    border-color: FxCores.de(root.cor).with-alpha(0.5);
+    HorizontalLayout {
+        padding: 16px;
+        spacing: 14px;
+        Rectangle {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background: FxCores.de(root.cor);
+            Icon { source: root.icone; color: #ffffff; size: 26px; }
+        }
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            Text { text: root.titulo; color: Theme.text; font-size: 17px; font-weight: 900; }
+            Text { text: root.texto; color: Theme.text-muted; font-size: 13px; overflow: elide; }
+        }
+    }
+    toque := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+}
+
+component Situacao inherits Rectangle {
+    in property <string> texto;
+    in property <int> tom;
+    property <color> cor: root.tom == 0 ? Theme.available : root.tom == 1 ? Theme.closing : root.tom == 2 ? Theme.danger : Theme.text-muted;
+    height: 24px;
+    width: st.preferred-width + 18px;
+    border-radius: 12px;
+    background: root.cor.with-alpha(0.16);
+    st := Text { text: root.texto; color: root.cor; font-size: 12px; font-weight: 900; }
+}
+
+component Quadro inherits Rectangle {
+    in property <image> icone;
+    in property <string> titulo;
+    border-radius: 18px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.surface-2;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 4px;
+        alignment: start;
+        HorizontalLayout {
+            spacing: 8px;
+            padding-bottom: 6px;
+            VerticalLayout { alignment: center; Icon { source: root.icone; color: Theme.primary; size: 18px; } }
+            Text { text: root.titulo; color: Theme.text; font-size: 17px; font-weight: 900; vertical-alignment: center; }
+        }
+        @children
+    }
+}
+
+export component PainelFiscal inherits Rectangle {
+    property <length> largura: root.width - 44px;
+    Flickable {
+        content-height: col.preferred-height + 36px;
+        col := VerticalLayout {
+            x: 22px;
+            y: 18px;
+            width: root.largura;
+            height: self.preferred-height;
+            spacing: 14px;
+
+            HorizontalLayout {
+                spacing: 12px;
+                Text { text: "Painel fiscal"; color: Theme.text; font-size: 24px; font-weight: 900; vertical-alignment: center; }
+                if !FiscalStore.painel.producao && !FiscalStore.painel.carregando: VerticalLayout {
+                    alignment: center;
+                    Situacao { texto: "AMBIENTE DE TESTE (HOMOLOGAÇÃO)"; tom: 1; }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Rectangle {
+                    height: 44px;
+                    width: at.preferred-width + 28px;
+                    border-radius: 12px;
+                    border-width: 1px;
+                    border-color: Theme.border;
+                    background: atoque.has-hover ? Theme.border : Theme.surface-2;
+                    at := HorizontalLayout {
+                        alignment: center;
+                        spacing: 8px;
+                        VerticalLayout { alignment: center; Icon { source: FiscalIcons.refresh-cw; color: Theme.text; size: 16px; } }
+                        Text { text: FiscalStore.painel.carregando ? "Atualizando..." : "Atualizar"; color: Theme.text; font-size: 15px; font-weight: 700; vertical-alignment: center; }
+                    }
+                    atoque := TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.painel-atualizar(); } }
+                }
+            }
+
+            // Indicadores
+            HorizontalLayout {
+                spacing: 12px;
+                Indicador {
+                    horizontal-stretch: 1;
+                    rotulo: "NFC-e HOJE";
+                    valor: FiscalStore.painel.nfce-hoje;
+                    detalhe: FiscalStore.painel.nfce-hoje-valor + " autorizados";
+                }
+                Indicador {
+                    horizontal-stretch: 1;
+                    rotulo: "NF-e NO MÊS";
+                    valor: FiscalStore.painel.nfe-mes;
+                    detalhe: FiscalStore.painel.nfe-mes-valor;
+                }
+                Indicador {
+                    horizontal-stretch: 1;
+                    rotulo: "PRÓXIMA NFC-e";
+                    valor: FiscalStore.painel.nfce-numeracao;
+                    detalhe: "Próxima NF-e: " + FiscalStore.painel.nfe-numeracao;
+                }
+                Indicador {
+                    horizontal-stretch: 1;
+                    property <int> total: FiscalStore.painel.rejeitadas + FiscalStore.painel.processando + FiscalStore.painel.recebidas-pendentes;
+                    alerta: self.total > 0;
+                    rotulo: "PRECISA DE ATENÇÃO";
+                    valor: self.total;
+                    cor: self.total > 0 ? Theme.danger : Theme.available;
+                    detalhe: self.total == 0 ? "Tudo em dia"
+                        : FiscalStore.painel.rejeitadas + " rejeitada(s) · " + FiscalStore.painel.processando + " processando · "
+                        + FiscalStore.painel.recebidas-pendentes + " de fornecedor";
+                }
+            }
+
+            // Ações mais usadas
+            HorizontalLayout {
+                spacing: 12px;
+                Atalho { horizontal-stretch: 1; icone: FiscalIcons.receipt; titulo: "Emitir NFC-e"; texto: "Cupom avulso, fora do caixa"; cor: FxCor.roxo; clicked => { FiscalStore.abrir("nfce"); } }
+                Atalho { horizontal-stretch: 1; icone: FiscalIcons.file-text; titulo: "Emitir NF-e"; texto: "Nota A4 para empresa"; cor: FxCor.azul; clicked => { FiscalStore.abrir("nfe"); } }
+                Atalho { horizontal-stretch: 1; icone: FiscalIcons.scan; titulo: "Receber nota"; texto: "Bipe a DANFE do fornecedor"; cor: FxCor.ambar; clicked => { FiscalStore.abrir("receber"); } }
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                Quadro {
+                    horizontal-stretch: 3;
+                    icone: FiscalIcons.file-text;
+                    titulo: "Últimas notas emitidas";
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text { width: 64px; text: "MODELO"; color: Theme.text-muted; font-size: 12px; font-weight: 800; }
+                        Text { width: 80px; text: "NÚMERO"; color: Theme.text-muted; font-size: 12px; font-weight: 800; }
+                        Text { horizontal-stretch: 1; text: "EMITIDA EM"; color: Theme.text-muted; font-size: 12px; font-weight: 800; }
+                        Text { width: 110px; text: "VALOR"; color: Theme.text-muted; font-size: 12px; font-weight: 800; }
+                        Text { width: 130px; text: "SITUAÇÃO"; color: Theme.text-muted; font-size: 12px; font-weight: 800; }
+                    }
+                    if FiscalStore.painel-notas.length == 0: Text {
+                        text: FiscalStore.painel.carregando ? "Carregando..." : "Nenhuma nota emitida ainda.";
+                        color: Theme.text-muted;
+                        font-size: 14px;
+                        min-height: 60px;
+                        vertical-alignment: center;
+                    }
+                    for n in FiscalStore.painel-notas: Rectangle {
+                        height: 44px;
+                        Rectangle { y: 0; height: 1px; background: Theme.surface-2; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Text { width: 64px; text: n.modelo; color: Theme.text; font-size: 14px; vertical-alignment: center; }
+                            Text { width: 80px; text: n.numero; color: Theme.text; font-size: 14px; font-weight: 800; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: n.quando; color: Theme.text-muted; font-size: 14px; vertical-alignment: center; overflow: elide; }
+                            Text { width: 110px; text: n.valor; color: Theme.text; font-size: 14px; font-weight: 800; vertical-alignment: center; }
+                            VerticalLayout { width: 130px; alignment: center; HorizontalLayout { alignment: start; Situacao { texto: n.situacao; tom: n.tom; } } }
+                        }
+                    }
+                }
+                Quadro {
+                    horizontal-stretch: 2;
+                    icone: FiscalIcons.package-plus;
+                    titulo: "Notas de fornecedor";
+                    if FiscalStore.painel-recebidas.length == 0: Text {
+                        text: FiscalStore.painel.carregando ? "Carregando..." : "Nenhuma nota esperando entrada no estoque.";
+                        color: Theme.text-muted;
+                        font-size: 14px;
+                        min-height: 60px;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                    }
+                    for r in FiscalStore.painel-recebidas: Rectangle {
+                        height: 56px;
+                        Rectangle { y: 0; height: 1px; background: Theme.surface-2; }
+                        HorizontalLayout {
+                            spacing: 10px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text { text: r.emitente; color: Theme.text; font-size: 14px; font-weight: 700; overflow: elide; }
+                                Text { text: r.detalhe; color: Theme.text-muted; font-size: 13px; overflow: elide; }
+                            }
+                            VerticalLayout { alignment: center; Situacao { texto: r.situacao; tom: r.tom; } }
+                        }
+                        TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.abrir("pendentes"); } }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -15,6 +15,26 @@ export struct FxSefaz {
     dica: string,
 }
 
+// Painel fiscal (tela inicial do módulo)
+export struct FxPainel {
+    carregando: bool,
+    nfce-hoje: int,
+    nfce-hoje-valor: string,
+    nfe-mes: int,
+    nfe-mes-valor: string,
+    nfce-numeracao: string,   // "1.284 · série 2"
+    nfe-numeracao: string,
+    producao: bool,
+    rejeitadas: int,
+    processando: int,
+    cancelaveis-nfce: int,
+    cancelaveis-nfe: int,
+    recebidas-pendentes: int,
+}
+// tom: 0 verde (autorizada / no estoque), 1 âmbar (processando / pendente), 2 vermelho (rejeitada), 3 neutro
+export struct FxPainelNota { modelo: string, numero: string, quando: string, valor: string, situacao: string, tom: int }
+export struct FxPainelRecebida { emitente: string, detalhe: string, situacao: string, tom: int }
+
 // Nota emitida nas listas de reimpressão e cancelamento
 export struct FxNota {
     referencia: string,
@@ -145,6 +165,10 @@ export global FiscalStore {
     // reimprimir-nfe | cancelar-nfce | cancelar-nfe | config
     in-out property <string> tela: "hub";
     callback abrir(string);
+    in property <FxPainel> painel: { carregando: true };
+    in property <[FxPainelNota]> painel-notas;
+    in property <[FxPainelRecebida]> painel-recebidas;
+    callback painel-atualizar();
     // Tabela NCM & Alíquotas (modal da área Cardápio)
     callback abrir-ncm();
 

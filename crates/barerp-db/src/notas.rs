@@ -498,7 +498,7 @@ pub async fn buscar_emitidas_chave_contendo(db: &Db, trecho: &str) -> DbResult<V
 
 /// Série e numeração de um modelo: o próximo número configurado (enviado à Focus) e o maior número
 /// já emitido nessa série, para conferir buracos antes de inutilizar.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Numeracao {
     pub serie: String,
@@ -952,6 +952,75 @@ pub async fn resumo_fiscal_mes(db: &Db, ano: i32, mes: u32) -> DbResult<Option<R
 }
 
 // ============================================================
+// Painel fiscal (tela inicial do Módulo Fiscal)
+// ============================================================
+
+/// Números da tela inicial do Módulo Fiscal. O dia e o mês são os do calendário (como a SEFAZ), pela hora
+/// local em que a nota foi gravada.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PainelFiscal {
+    /// NFC-e autorizadas hoje: quantidade e valor
+    pub nfce_hoje: (usize, f64),
+    /// NF-e autorizadas no mês: quantidade e valor
+    pub nfe_mes: (usize, f64),
+    pub numeracao_nfce: Numeracao,
+    pub numeracao_nfe: Numeracao,
+    /// "producao" ou "homologacao"
+    pub ambiente: String,
+    /// Rejeitadas pela SEFAZ nos últimos 7 dias
+    pub rejeitadas: usize,
+    /// Ainda sem retorno definitivo da SEFAZ
+    pub processando: usize,
+    /// Autorizadas que ainda podem ser canceladas (NFC-e até 30 min, NF-e até 24 h)
+    pub cancelaveis_nfce: usize,
+    pub cancelaveis_nfe: usize,
+    /// As 8 notas emitidas mais recentes
+    pub recentes: Vec<NotaEmitida>,
+    /// Notas de fornecedor ainda não lançadas no estoque
+    pub recebidas_pendentes: usize,
+    /// As 5 notas de fornecedor mais recentes ainda não lançadas no estoque
+    pub recebidas: Vec<NotaRecebidaResumo>,
+}
+
+pub async fn painel_fiscal(db: &Db, agora: DateTime<Utc>) -> DbResult<PainelFiscal> {
+    let hoje = agora.with_timezone(&Local).date_naive();
+    let sql = format!(r#"SELECT {COLUNAS_EMITIDA} FROM "NotaEmitida" ORDER BY "createdAt" DESC LIMIT 2000"#);
+    let emitidas: Vec<NotaEmitida> = sqlx::query_as(&sql).fetch_all(db.pool()).await?;
+    let dia = |n: &NotaEmitida| n.created_at.0.with_timezone(&Local).date_naive();
+    let somar = |filtro: &dyn Fn(&NotaEmitida) -> bool| {
+        emitidas.iter().filter(|n| filtro(n)).fold((0usize, 0.0f64), |(q, v), n| (q + 1, v + n.valor_total.unwrap_or(0.0)))
+    };
+    let nfce_hoje = somar(&|n| n.status == "autorizado" && n.tipo() == TipoNota::Nfce && dia(n) == hoje);
+    let nfe_mes = somar(&|n| {
+        n.status == "autorizado" && n.tipo() == TipoNota::Nfe && dia(n).year() == hoje.year() && dia(n).month() == hoje.month()
+    });
+    let semana = agora - chrono::Duration::days(7);
+    let rejeitadas = emitidas.iter().filter(|n| n.status == "erro_autorizacao" && n.created_at.0 >= semana).count();
+    let processando = emitidas.iter().filter(|n| n.status == "processando").count();
+
+    let cfg = ler_config_fiscal(db).await?.unwrap_or_default();
+    let ambiente = cfg.environment.filter(|e| !e.trim().is_empty()).unwrap_or_else(|| "homologacao".into());
+    let entrada = listar_recebidas(db, &FiltroRecebidas::default()).await?;
+    let recebidas: Vec<NotaRecebidaResumo> = entrada.notas.into_iter().filter(|n| n.status != "finalizada").collect();
+
+    Ok(PainelFiscal {
+        nfce_hoje,
+        nfe_mes,
+        numeracao_nfce: numeracao(db, TipoNota::Nfce).await?,
+        numeracao_nfe: numeracao(db, TipoNota::Nfe).await?,
+        ambiente,
+        rejeitadas,
+        processando,
+        cancelaveis_nfce: emitidas_cancelaveis(db, TipoNota::Nfce, agora).await?.len(),
+        cancelaveis_nfe: emitidas_cancelaveis(db, TipoNota::Nfe, agora).await?.len(),
+        recentes: emitidas.into_iter().take(8).collect(),
+        recebidas_pendentes: recebidas.len(),
+        recebidas: recebidas.into_iter().take(5).collect(),
+    })
+}
+
+// ============================================================
 // Cofre de XML em disco (guarda por 5 anos)
 // ============================================================
 
@@ -1205,6 +1274,42 @@ mod tests {
         .execute(db.pool())
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn painel_do_modulo_fiscal() {
+        let db = Db::open_in_memory().await.unwrap();
+        let emitir = |referencia: &str, valor: f64, status: &str| RegistroEmitida {
+            referencia: referencia.into(),
+            numero: Some("1".into()),
+            serie: Some("1".into()),
+            valor_total: Some(valor),
+            status: Some(status.into()),
+            ..Default::default()
+        };
+        gravar_emitida(&db, &emitir("nfce_1", 30.0, "autorizado")).await.unwrap();
+        gravar_emitida(&db, &emitir("nfce_2", 20.5, "autorizado")).await.unwrap();
+        gravar_emitida(&db, &emitir("nfce_3", 10.0, "erro_autorizacao")).await.unwrap();
+        gravar_emitida(&db, &emitir("nfe_1", 500.0, "autorizado")).await.unwrap();
+        gravar_emitida(&db, &emitir("nfe_2", 99.0, "processando")).await.unwrap();
+        gravar_emitida(&db, &emitir("nfce_4", 15.0, "cancelado")).await.unwrap();
+        let fornecedor = RegistroRecebida { chave: CHAVE_55.into(), emitente: Some("Ambev".into()), valor_total: Some(80.0), ..Default::default() };
+        gravar_recebida(&db, &fornecedor, None).await.unwrap();
+
+        let p = painel_fiscal(&db, Utc::now()).await.unwrap();
+        assert_eq!(p.nfce_hoje, (2, 50.5), "só as NFC-e autorizadas");
+        assert_eq!(p.nfe_mes, (1, 500.0));
+        assert_eq!((p.rejeitadas, p.processando), (1, 1));
+        assert_eq!((p.cancelaveis_nfce, p.cancelaveis_nfe), (2, 1));
+        assert_eq!(p.recentes.len(), 6);
+        assert_eq!(p.ambiente, "homologacao");
+        assert_eq!(p.recebidas_pendentes, 1);
+        assert_eq!(p.recebidas[0].emitente, "Ambev");
+
+        // Amanhã as NFC-e de hoje não contam mais nem podem ser canceladas
+        let amanha = painel_fiscal(&db, Utc::now() + chrono::Duration::days(1)).await.unwrap();
+        assert_eq!(amanha.nfce_hoje, (0, 0.0));
+        assert_eq!(amanha.cancelaveis_nfce, 0);
     }
 
     #[tokio::test]

@@ -323,10 +323,26 @@ export component InutilizacaoSheet inherits FxSheet {
     largura: 600px;
     fechar => { FiscalStore.inut-modelo = ""; }
 
+    // Modelo da numeração (o menu lateral abre sempre na NFC-e)
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        for m[i] in ["NFC-e (cupom, modelo 65)", "NF-e (nota, modelo 55)"]: Rectangle {
+            height: 40px;
+            width: mt.preferred-width + 28px;
+            border-radius: 10px;
+            property <bool> ativo: (i == 1) == root.nfe;
+            background: self.ativo ? Theme.primary.with-alpha(0.18) : (mtoque.has-hover ? Theme.surface-2 : transparent);
+            border-width: 1px;
+            border-color: self.ativo ? Theme.primary : Theme.border;
+            mt := Text { text: m; color: parent.ativo ? Theme.primary : Theme.text-muted; font-size: 14px; font-weight: 800; }
+            mtoque := TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.inut-abrir(i == 1 ? "nfe" : "nfce"); } }
+        }
+    }
     if root.nfe: FxAviso {
         cor: FxCor.azul;
         icone: FiscalIcons.info;
-        text: "Esta tela é exclusiva para NF-e (notas de saída, modelo 55). Para inutilizar numeração de NFC-e (cupom fiscal, modelo 65), use a opção \"Inutilizar NFC-e\" ao lado. A SEFAZ exige justificativa com no mínimo 15 caracteres.";
+        text: "Esta tela é exclusiva para NF-e (notas de saída, modelo 55). Para inutilizar numeração de NFC-e (cupom fiscal, modelo 65), escolha NFC-e acima. A SEFAZ exige justificativa com no mínimo 15 caracteres.";
     }
     FxAviso {
         cor: FxCor.ambar;

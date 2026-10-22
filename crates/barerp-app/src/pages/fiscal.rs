@@ -18,7 +18,7 @@ use chrono::Datelike;
 use slint::{ComponentHandle, SharedString, Timer, TimerMode};
 
 use crate::ctx::AppCtx;
-use crate::{AppWindow, FiscalStore, FxBackup, FxBip, FxCategoria, FxConfirma, FxItemNfce, FxNcmPedido, FxNota, FxNotaAchada, FxPendente, FxProdutoAchado, FxProdutoBusca, FxRecebida, FxItemImport, FxNfeOk, FxQueda, FxSefaz, FxValidacao, FxVendaOk};
+use crate::{AppWindow, FiscalStore, FxPainel, FxPainelNota, FxPainelRecebida, FxBackup, FxBip, FxCategoria, FxConfirma, FxItemNfce, FxNcmPedido, FxNota, FxNotaAchada, FxPendente, FxProdutoAchado, FxProdutoBusca, FxRecebida, FxItemImport, FxNfeOk, FxQueda, FxSefaz, FxValidacao, FxVendaOk};
 
 thread_local! {
     /// Atualiza o selo da SEFAZ a cada 5 minutos, como o SefazStatusBadge.
@@ -58,7 +58,15 @@ pub fn bind(ctx: &AppCtx) {
     store.on_sefaz_atualizar(move || atualizar_sefaz(&c));
     atualizar_sefaz(ctx);
     let c = ctx.clone();
-    TIMER_SEFAZ.with(|t| t.start(TimerMode::Repeated, std::time::Duration::from_secs(5 * 60), move || atualizar_sefaz(&c)));
+    store.on_painel_atualizar(move || carregar_painel(&c));
+    carregar_painel(ctx);
+    let c = ctx.clone();
+    TIMER_SEFAZ.with(|t| {
+        t.start(TimerMode::Repeated, std::time::Duration::from_secs(5 * 60), move || {
+            atualizar_sefaz(&c);
+            carregar_painel(&c);
+        })
+    });
 
     let c = ctx.clone();
     store.on_inut_abrir(move |modelo| abrir_inutilizacao(&c, &modelo));
@@ -352,12 +360,122 @@ fn store_de(ui: &AppWindow) -> FiscalStore<'_> {
 }
 
 /// Troca de tela (o React trocava `activeTab`).
+/// "1.284" (número com ponto de milhar).
+fn milhar(n: i64) -> String {
+    let s = n.abs().to_string();
+    let grupos: Vec<&str> = s.as_bytes().rchunks(3).rev().map(|c| std::str::from_utf8(c).unwrap_or("")).collect();
+    format!("{}{}", if n < 0 { "-" } else { "" }, grupos.join("."))
+}
+
+/// Situação da nota emitida para o painel: texto e tom (0 verde, 1 âmbar, 2 vermelho, 3 neutro).
+fn situacao_emitida(status: &str) -> (&'static str, i32) {
+    match status {
+        "autorizado" => ("Autorizada", 0),
+        "processando" => ("Processando", 1),
+        "erro_autorizacao" => ("Rejeitada", 2),
+        "cancelado" => ("Cancelada", 3),
+        _ => ("Sem retorno", 1),
+    }
+}
+
+/// Painel fiscal (tela inicial): notas do dia e do mês, numeração, pendências, últimas notas e notas de fornecedor.
+fn carregar_painel(ctx: &AppCtx) {
+    let Some(ui) = ctx.ui() else { return };
+    let s = store_de(&ui);
+    let mut atual = s.get_painel();
+    atual.carregando = true;
+    s.set_painel(atual);
+    let db = ctx.db.clone();
+    ctx.spawn(async move { barerp_db::notas::painel_fiscal(&db, chrono::Utc::now()).await }, |ui, r| match r {
+        Ok(p) => mostrar_painel(ui, &p),
+        Err(e) => {
+            tracing::warn!("painel fiscal: {e}");
+            let s = store_de(ui);
+            let mut painel = s.get_painel();
+            painel.carregando = false;
+            s.set_painel(painel);
+        }
+    });
+}
+
+fn mostrar_painel(ui: &AppWindow, p: &barerp_db::notas::PainelFiscal) {
+    let s = store_de(ui);
+    let brl = barerp_core::money::brl;
+    let proxima = |n: &barerp_db::notas::Numeracao| {
+        let proximo = n.ultimo_emitido.map_or(n.proximo_configurado, |u| (u + 1).max(n.proximo_configurado));
+        format!("{} · série {}", milhar(proximo), n.serie)
+    };
+    s.set_painel(FxPainel {
+        carregando: false,
+        nfce_hoje: p.nfce_hoje.0 as i32,
+        nfce_hoje_valor: brl(p.nfce_hoje.1).into(),
+        nfe_mes: p.nfe_mes.0 as i32,
+        nfe_mes_valor: brl(p.nfe_mes.1).into(),
+        nfce_numeracao: proxima(&p.numeracao_nfce).into(),
+        nfe_numeracao: proxima(&p.numeracao_nfe).into(),
+        producao: p.ambiente == "producao",
+        rejeitadas: p.rejeitadas as i32,
+        processando: p.processando as i32,
+        cancelaveis_nfce: p.cancelaveis_nfce as i32,
+        cancelaveis_nfe: p.cancelaveis_nfe as i32,
+        recebidas_pendentes: p.recebidas_pendentes as i32,
+    });
+    let notas: Vec<FxPainelNota> = p
+        .recentes
+        .iter()
+        .map(|n| {
+            let (situacao, tom) = situacao_emitida(&n.status);
+            let modelo = if n.tipo() == barerp_db::notas::TipoNota::Nfce { "NFC-e" } else { "NF-e" };
+            let numero = n.numero.as_deref().and_then(|x| x.trim().parse::<i64>().ok()).map(milhar).unwrap_or_else(|| "—".into());
+            FxPainelNota {
+                modelo: modelo.into(),
+                numero: numero.into(),
+                quando: n.created_at.0.with_timezone(&chrono::Local).format("%d/%m %H:%M").to_string().into(),
+                valor: n.valor_total.map(brl).unwrap_or_default().into(),
+                situacao: situacao.into(),
+                tom,
+            }
+        })
+        .collect();
+    s.set_painel_notas(std::rc::Rc::new(slint::VecModel::from(notas)).into());
+    let recebidas: Vec<FxPainelRecebida> = p
+        .recebidas
+        .iter()
+        .map(|r| {
+            let (situacao, tom) = if r.has_xml { ("XML baixado", 0) } else { ("XML pendente", 1) };
+            let numero = if r.numero.is_empty() { String::new() } else { format!("NF {} · ", r.numero) };
+            FxPainelRecebida {
+                emitente: if r.emitente.is_empty() { "Fornecedor sem nome".into() } else { r.emitente.clone().into() },
+                detalhe: format!("{numero}{}", brl(r.valor_total)).into(),
+                situacao: situacao.into(),
+                tom,
+            }
+        })
+        .collect();
+    s.set_painel_recebidas(std::rc::Rc::new(slint::VecModel::from(recebidas)).into());
+}
+
+/// Para os prints das telas (`examples/fiscal_shots.rs`): painel com os números dados, sem servidor.
+pub mod preview {
+    use super::*;
+
+    pub fn painel(ui: &AppWindow, p: &barerp_db::notas::PainelFiscal, tela: &str) {
+        mostrar_painel(ui, p);
+        let s = store_de(ui);
+        s.set_tela(tela.into());
+        s.set_sefaz(FxSefaz { online: true, rotulo: "SEFAZ PA Online".into(), latencia: "180 ms".into(), ..Default::default() });
+    }
+}
+
 fn abrir(ctx: &AppCtx, tela: &str) {
     let Some(ui) = ctx.ui() else { return };
     let s = store_de(&ui);
     s.set_tela(tela.into());
     match tela {
-        "hub" => atualizar_sefaz(ctx),
+        "hub" => {
+            atualizar_sefaz(ctx);
+            carregar_painel(ctx);
+        }
         "reimprimir-nfce" | "reimprimir-nfe" => {
             s.set_rp_busca(SharedString::new());
             s.set_rp_serie(SharedString::new());

@@ -3,8 +3,9 @@
 // Cada tela fica num `fiscal_*.slint`; aqui só a troca de telas e os modais comuns.
 
 import { Theme } from "../theme.slint";
-import { FiscalStore, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda, FxProdutoAchado } from "fiscal_store.slint";
-import { FiscalHub, InutilizacaoSheet } from "fiscal_hub.slint";
+import { FiscalStore, FxPainel, FxPainelNota, FxPainelRecebida, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda, FxProdutoAchado } from "fiscal_store.slint";
+import { InutilizacaoSheet } from "fiscal_hub.slint";
+import { MenuFiscal, PainelFiscal, SefazFlutuante } from "fiscal_painel.slint";
 import { ReimprimirNota, CancelarNota } from "fiscal_notas.slint";
 import { ConfiguracoesFiscais } from "fiscal_config.slint";
 import { PainelContador } from "fiscal_contador.slint";
@@ -14,21 +15,31 @@ import { EmissorNfce } from "fiscal_nfce.slint";
 import { EmissaoNfe } from "fiscal_nfe.slint";
 import { ImportarNota } from "fiscal_importar.slint";
 
-export { FiscalStore, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda, FxProdutoAchado }
+export { FiscalStore, FxPainel, FxPainelNota, FxPainelRecebida, FxSefaz, FxNota, FxNotaAchada, FxValidacao, FxCategoria, FxBackup, FxBip, FxRecebida, FxPendente, FxConfirma, FxProdutoBusca, FxItemNfce, FxVendaOk, FxNcmPedido, FxNfeOk, FxItemImport, FxQueda, FxProdutoAchado }
 
 export component FiscalAreaPage inherits Rectangle {
     background: Theme.bg;
+    // Janela estreita: o menu lateral fica só com os ícones
+    property <bool> so-icone: root.width < 1100px;
 
-    if FiscalStore.tela == "hub": FiscalHub { }
-    if FiscalStore.tela == "receber": ReceberNota { }
-    if FiscalStore.tela == "importar": ImportarNota { }
-    if FiscalStore.tela == "pendentes": NotasPendentes { }
-    if FiscalStore.tela == "nfe": EmissaoNfe { }
-    if FiscalStore.tela == "nfce": EmissorNfce { }
-    if FiscalStore.tela == "contador": PainelContador { }
-    if FiscalStore.tela == "reimprimir-nfce" || FiscalStore.tela == "reimprimir-nfe": ReimprimirNota { }
-    if FiscalStore.tela == "cancelar-nfce" || FiscalStore.tela == "cancelar-nfe": CancelarNota { }
-    if FiscalStore.tela == "config": ConfiguracoesFiscais { }
+    HorizontalLayout {
+        // Menu lateral com todas as funções do módulo (mesmo padrão da Retaguarda)
+        MenuFiscal { width: root.so-icone ? 68px : 262px; so-icone: root.so-icone; }
+        Rectangle {
+            horizontal-stretch: 1;
+            if FiscalStore.tela == "hub": PainelFiscal { }
+            if FiscalStore.tela == "receber": ReceberNota { }
+            if FiscalStore.tela == "importar": ImportarNota { }
+            if FiscalStore.tela == "pendentes": NotasPendentes { }
+            if FiscalStore.tela == "nfe": EmissaoNfe { }
+            if FiscalStore.tela == "nfce": EmissorNfce { }
+            if FiscalStore.tela == "contador": PainelContador { }
+            if FiscalStore.tela == "reimprimir-nfce" || FiscalStore.tela == "reimprimir-nfe": ReimprimirNota { }
+            if FiscalStore.tela == "cancelar-nfce" || FiscalStore.tela == "cancelar-nfe": CancelarNota { }
+            if FiscalStore.tela == "config": ConfiguracoesFiscais { }
+        }
+    }
 
+    SefazFlutuante { width: root.width; height: root.height; }
     if FiscalStore.inut-modelo != "": InutilizacaoSheet { }
 }
