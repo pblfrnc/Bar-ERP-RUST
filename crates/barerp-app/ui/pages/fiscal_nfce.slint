@@ -40,6 +40,7 @@ component LinhaItem inherits Rectangle {
         spacing: 14px;
         VerticalLayout {
             horizontal-stretch: 4;
+            min-width: 0px;
             spacing: 4px;
             HorizontalLayout {
                 spacing: 8px;
@@ -87,10 +88,9 @@ export component BuscaProdutos inherits FxCard {
             HorizontalLayout {
                 spacing: 8px;
                 VerticalLayout { alignment: center; Icon { source: FiscalIcons.search; color: Theme.text-muted; size: 14px; } }
-                FxLabel { text: "BUSCA RÁPIDA DE PRODUTOS (INICIAIS, CÓDIGO OU BARCODE)"; horizontal-stretch: 1; vertical-alignment: center; }
-                Text { text: "Pressione"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
+                FxLabel { text: "BUSCAR PRODUTO (NOME, CÓDIGO OU EAN)"; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
                 VerticalLayout { alignment: center; Kbd { text: "Enter"; } }
-                Text { text: "para adicionar"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
+                Text { text: "adiciona"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
             }
             HorizontalLayout {
                 spacing: 8px;
@@ -201,9 +201,11 @@ export component ItensNota inherits FxCard {
 
 export component EmissorNfce inherits Rectangle {
     forward-focus: busca;
-    Flickable {
+    // Rolagem presa à largura da tela: sem isso o conteúdo largo rolava para o lado com o menu do Módulo Fiscal
+    rolagem := Flickable {
         content-height: corpo.preferred-height;
         corpo := VerticalLayout {
+            width: rolagem.width;
             padding: 24px;
             padding-bottom: 60px;
             spacing: 18px;
@@ -246,6 +248,7 @@ export component EmissorNfce inherits Rectangle {
                 // Coluna esquerda: busca e itens
                 VerticalLayout {
                     horizontal-stretch: 7;
+                    min-width: 0px;
                     spacing: 18px;
                     busca := BuscaProdutos { }
                     ItensNota {
@@ -256,6 +259,7 @@ export component EmissorNfce inherits Rectangle {
                 // Coluna direita: consumidor, pagamento e emissão
                 VerticalLayout {
                     horizontal-stretch: 5;
+                    min-width: 0px;
                     spacing: 18px;
                     FxCard {
                         height: cdados.preferred-height;

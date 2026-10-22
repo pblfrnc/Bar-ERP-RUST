@@ -17,9 +17,11 @@ component Rotulo inherits HorizontalLayout {
 
 export component EmissaoNfe inherits Rectangle {
     forward-focus: busca;
-    Flickable {
+    // Rolagem presa à largura da tela: sem isso o conteúdo largo rolava para o lado com o menu do Módulo Fiscal
+    rolagem := Flickable {
         content-height: corpo.preferred-height;
         corpo := VerticalLayout {
+            width: rolagem.width;
             padding: 24px;
             padding-bottom: 60px;
             spacing: 18px;
@@ -61,6 +63,7 @@ export component EmissaoNfe inherits Rectangle {
                 spacing: 18px;
                 VerticalLayout {
                     horizontal-stretch: 7;
+                    min-width: 0px;
                     spacing: 18px;
                     busca := BuscaProdutos { }
                     ItensNota {
@@ -70,6 +73,7 @@ export component EmissaoNfe inherits Rectangle {
                 }
                 VerticalLayout {
                     horizontal-stretch: 5;
+                    min-width: 0px;
                     spacing: 18px;
                     FxCard {
                         height: dest.preferred-height;
@@ -126,8 +130,8 @@ export component EmissaoNfe inherits Rectangle {
                                     spacing: 6px;
                                     VerticalLayout { alignment: center; Icon { source: FiscalIcons.map-pin; color: Theme.text-muted; size: 13px; } }
                                     FxLabel { text: "ENDEREÇO DO DESTINATÁRIO *"; horizontal-stretch: 1; vertical-alignment: center; }
-                                    Text { text: FiscalStore.ne-doc.character-count == 18 ? "Preenchido pela Receita" : "Preencha o CEP para auto-completar"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
                                 }
+                                Text { text: FiscalStore.ne-doc.character-count == 18 ? "Preenchido pela Receita" : "Preencha o CEP para auto-completar"; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
                                 HorizontalLayout {
                                     spacing: 10px;
                                     FxField {

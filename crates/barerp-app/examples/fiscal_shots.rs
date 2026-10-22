@@ -11,7 +11,7 @@ use slint::{ComponentHandle, PhysicalSize, Rgb8Pixel};
 use chrono::{Duration, Utc};
 
 use barerp_app::pages::fiscal::preview;
-use barerp_app::{AppWindow, FiscalStore, FxPendente, Page, Theme};
+use barerp_app::{AppWindow, FiscalStore, FxItemNfce, FxPendente, Page, Theme};
 use barerp_db::notas::{NotaEmitida, NotaRecebidaResumo, Numeracao, PainelFiscal};
 use barerp_db::DbTime;
 
@@ -156,6 +156,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         store.set_pd_xml("todos".into());
         preview::painel(&ui, &painel, "pendentes");
         save(&window, &out.join(format!("f3-pendentes-{suffix}.png")))?;
+
+        // Emissão: três itens, um deles sem NCM
+        let item = |nome: &str, codigo: &str, ncm: &str, qtd: i32, unitario: &str, subtotal: &str| FxItemNfce {
+            nome: nome.into(),
+            codigo: codigo.into(),
+            ncm_ok: !ncm.is_empty(),
+            ncm: ncm.into(),
+            cfop: "5102".into(),
+            qtd,
+            unitario: unitario.into(),
+            subtotal: subtotal.into(),
+        };
+        store.set_nf_itens(std::rc::Rc::new(slint::VecModel::from(vec![
+            item("Heineken Long Neck 330ml", "1001", "22030000", 6, "R$ 12,00", "R$ 72,00"),
+            item("Porção de Fritas Grande", "3007", "", 1, "R$ 35,00", "R$ 35,00"),
+            item("Água Mineral sem Gás 500ml", "4013", "22011000", 2, "R$ 5,00", "R$ 10,00"),
+        ]))
+        .into());
+        store.set_nf_unidades(9);
+        store.set_nf_total("R$ 117,00".into());
+        preview::painel(&ui, &painel, "nfce");
+        save(&window, &out.join(format!("f4-emitir-nfce-{suffix}.png")))?;
+        preview::painel(&ui, &painel, "nfe");
+        save(&window, &out.join(format!("f5-emitir-nfe-{suffix}.png")))?;
     }
     Ok(())
 }
