@@ -11,7 +11,7 @@ use slint::{ComponentHandle, PhysicalSize, Rgb8Pixel};
 use chrono::{Duration, Utc};
 
 use barerp_app::pages::fiscal::preview;
-use barerp_app::{AppWindow, Page, Theme};
+use barerp_app::{AppWindow, FiscalStore, FxPendente, Page, Theme};
 use barerp_db::notas::{NotaEmitida, NotaRecebidaResumo, Numeracao, PainelFiscal};
 use barerp_db::DbTime;
 
@@ -124,6 +124,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         save(&window, &out.join(format!("f1-painel-fiscal-{suffix}.png")))?;
         preview::painel(&ui, &painel, "cancelar-nfce");
         save(&window, &out.join(format!("f2-cancelar-{suffix}.png")))?;
+
+        // Notas pendentes: uma em cada situação, com e sem XML
+        let chave = "1526 1036 2751 6300 0124 5500 2000 0000 0217 9443 1341";
+        let pendente = |emitente: &str, nf: &str, valor: &str, estado: i32, xml: bool| FxPendente {
+            chave: format!("{emitente}{nf}").into(),
+            chave_fmt: chave.into(),
+            emitente: emitente.into(),
+            cnpj: "07.526.557/0001-00".into(),
+            nf: format!("NF {nf} • Série 1").into(),
+            data: "21/10/2026".into(),
+            valor: valor.into(),
+            estado,
+            xml,
+        };
+        let store = ui.global::<FiscalStore>();
+        store.set_pd_notas(std::rc::Rc::new(slint::VecModel::from(vec![
+            pendente("AMBEV S.A.", "88231", "R$ 4.912,30", 0, true),
+            pendente("DISTRIBUIDORA NORTE LTDA", "5104", "R$ 1.208,00", 0, false),
+            pendente("FRIGORIFICO PARA LTDA", "22017", "R$ 860,40", 1, true),
+            pendente("COMERCIAL DE BEBIDAS BELEM", "1190", "R$ 2.150,00", 2, true),
+        ]))
+        .into());
+        store.set_pd_total(4);
+        store.set_pd_pendentes(2);
+        store.set_pd_recebidas(1);
+        store.set_pd_finalizadas(1);
+        store.set_pd_com_xml(3);
+        store.set_pd_sem_xml(1);
+        store.set_pd_status("todos".into());
+        store.set_pd_xml("todos".into());
+        preview::painel(&ui, &painel, "pendentes");
+        save(&window, &out.join(format!("f3-pendentes-{suffix}.png")))?;
     }
     Ok(())
 }

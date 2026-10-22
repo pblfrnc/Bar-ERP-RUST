@@ -62,11 +62,16 @@ component LinhaPendente inherits Rectangle {
     border-width: 1px;
     border-color: root.n.estado == 0 ? Theme.closing.with-alpha(0.4) : root.n.estado == 1 ? Theme.occupied.with-alpha(0.4) : Theme.border;
     height: l.preferred-height;
-    l := HorizontalLayout {
+    // Dados e valor em cima; as ações numa linha própria embaixo (enfileiradas ao lado dos dados elas
+    // alargavam a tela e criavam rolagem lateral com o menu do Módulo Fiscal aberto)
+    l := VerticalLayout {
         padding: 18px;
+        spacing: 12px;
+      HorizontalLayout {
         spacing: 18px;
         VerticalLayout {
             horizontal-stretch: 1;
+            min-width: 0px;
             spacing: 8px;
             HorizontalLayout {
                 spacing: 10px;
@@ -112,12 +117,11 @@ component LinhaPendente inherits Rectangle {
             }
         }
         VerticalLayout {
-            alignment: center;
-            spacing: 10px;
-            VerticalLayout {
-                FxLabel { text: "VALOR TOTAL"; horizontal-alignment: right; }
-                Text { text: root.n.valor; color: Theme.text; font-size: 20px; font-weight: 900; horizontal-alignment: right; }
-            }
+            alignment: start;
+            FxLabel { text: "VALOR TOTAL"; horizontal-alignment: right; }
+            Text { text: root.n.valor; color: Theme.text; font-size: 20px; font-weight: 900; horizontal-alignment: right; }
+        }
+      }
             HorizontalLayout {
                 spacing: 8px;
                 alignment: end;
@@ -155,15 +159,15 @@ component LinhaPendente inherits Rectangle {
                 if root.n.xml: AcaoPequena { icone: FiscalIcons.download; clicked => { FiscalStore.pd-baixar-xml(root.n.chave); } }
                 if root.n.xml: AcaoPequena { icone: FiscalIcons.external-link; clicked => { FiscalStore.pd-ver-danfe(root.n.chave); } }
             }
-        }
     }
 }
 
 export component NotasPendentes inherits Rectangle {
     property <bool> tem-filtro: FiscalStore.pd-inicio != "" || FiscalStore.pd-fim != "" || FiscalStore.pd-busca != "";
-    Flickable {
+    rolagem := Flickable {
         content-height: corpo.preferred-height;
         corpo := VerticalLayout {
+            width: rolagem.width;
             padding: 24px;
             padding-bottom: 80px;
             spacing: 18px;
@@ -229,9 +233,13 @@ export component NotasPendentes inherits Rectangle {
                         FxOpcao { text: "Recebidas (2º Bip)  " + FiscalStore.pd-recebidas; cor: FxCor.azul; ativo: FiscalStore.pd-status == "recebida"; clicked => { FiscalStore.pd-status = "recebida"; FiscalStore.pd-filtrar(); } }
                         FxOpcao { text: "Finalizadas  " + FiscalStore.pd-finalizadas; cor: FxCor.verde; ativo: FiscalStore.pd-status == "finalizada"; clicked => { FiscalStore.pd-status = "finalizada"; FiscalStore.pd-filtrar(); } }
                         Rectangle { horizontal-stretch: 1; }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
                         FxOpcao { text: "Todos XMLs"; cor: FxCor.neutro; ativo: FiscalStore.pd-xml == "todos"; clicked => { FiscalStore.pd-xml = "todos"; FiscalStore.pd-filtrar(); } }
                         FxOpcao { text: "XML Baixado (" + FiscalStore.pd-com-xml + ")"; cor: FxCor.verde; ativo: FiscalStore.pd-xml == "com_xml"; clicked => { FiscalStore.pd-xml = "com_xml"; FiscalStore.pd-filtrar(); } }
                         FxOpcao { text: "XML Pendente (" + FiscalStore.pd-sem-xml + ")"; cor: FxCor.ambar; ativo: FiscalStore.pd-xml == "sem_xml"; clicked => { FiscalStore.pd-xml = "sem_xml"; FiscalStore.pd-filtrar(); } }
+                        Rectangle { horizontal-stretch: 1; }
                     }
                     HorizontalLayout {
                         spacing: 10px;
@@ -255,8 +263,8 @@ export component NotasPendentes inherits Rectangle {
             }
             HorizontalLayout {
                 spacing: 18px;
-                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: true; } } Text { text: "Bolinha Verde: XML baixado e pronto para entrada"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; } }
-                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: false; } } Text { text: "Bolinha Amarela: XML pendente de liberação SEFAZ"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; } }
+                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: true; } } Text { text: "XML baixado"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; } }
+                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: false; } } Text { text: "XML pendente na SEFAZ"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; } }
                 Rectangle { horizontal-stretch: 1; }
                 Text { text: "Exibindo " + FiscalStore.pd-notas.length + " de " + FiscalStore.pd-total + " notas"; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
             }
