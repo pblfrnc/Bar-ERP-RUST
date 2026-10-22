@@ -98,17 +98,20 @@ export component MenuFiscal inherits Rectangle {
         padding: 12px;
         padding-right: 13px;
         spacing: 2px;
-        Flickable {
+        rolagem := Flickable {
             vertical-stretch: 1;
             content-height: itens.preferred-height;
+            // Largura fixa da rolagem: sem ela a coluna encolhia para a largura da escolha NFC-e/NF-e
             itens := VerticalLayout {
-                width: parent.width;
+                width: rolagem.width;
                 spacing: 2px;
                 alignment: start;
                 if !root.so-icone: GrupoMenu { text: "VISÃO GERAL"; }
                 ItemMenu {
                     icone: Icons.chart-column; texto: "Painel fiscal"; so-icone: root.so-icone; ativo: root.tela == "hub";
-                    selo: FiscalStore.painel.rejeitadas + FiscalStore.painel.recebidas-pendentes > 0 ? (FiscalStore.painel.rejeitadas + FiscalStore.painel.recebidas-pendentes) + "" : "";
+                    // Mesma conta do quadro "Precisa de atenção"
+                    property <int> pendencias: FiscalStore.painel.rejeitadas + FiscalStore.painel.processando + FiscalStore.painel.recebidas-pendentes;
+                    selo: self.pendencias > 0 ? self.pendencias + "" : "";
                     clicked => { FiscalStore.abrir("hub"); }
                 }
                 if !root.so-icone: Rectangle { height: 8px; }
