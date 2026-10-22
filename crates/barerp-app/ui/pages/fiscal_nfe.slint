@@ -62,7 +62,7 @@ export component EmissaoNfe inherits Rectangle {
             HorizontalLayout {
                 spacing: 18px;
                 VerticalLayout {
-                    horizontal-stretch: 7;
+                    horizontal-stretch: 1;
                     min-width: 0px;
                     spacing: 18px;
                     busca := BuscaProdutos { }
@@ -71,9 +71,9 @@ export component EmissaoNfe inherits Rectangle {
                         vazio: "Digite as iniciais ou código do produto no campo de busca acima e pressione Enter para incluí-lo na nota.";
                     }
                 }
+                // Largura fixa: a lista de itens fica com o resto (com o menu do Módulo Fiscal ela ficava espremida)
                 VerticalLayout {
-                    horizontal-stretch: 5;
-                    min-width: 0px;
+                    width: 460px;
                     spacing: 18px;
                     FxCard {
                         height: dest.preferred-height;

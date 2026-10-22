@@ -247,7 +247,7 @@ export component EmissorNfce inherits Rectangle {
                 spacing: 18px;
                 // Coluna esquerda: busca e itens
                 VerticalLayout {
-                    horizontal-stretch: 7;
+                    horizontal-stretch: 1;
                     min-width: 0px;
                     spacing: 18px;
                     busca := BuscaProdutos { }
@@ -257,9 +257,9 @@ export component EmissorNfce inherits Rectangle {
                     }
                 }
                 // Coluna direita: consumidor, pagamento e emissão
+                // Largura fixa: a lista de itens fica com o resto (com o menu do Módulo Fiscal ela ficava espremida)
                 VerticalLayout {
-                    horizontal-stretch: 5;
-                    min-width: 0px;
+                    width: 400px;
                     spacing: 18px;
                     FxCard {
                         height: cdados.preferred-height;
