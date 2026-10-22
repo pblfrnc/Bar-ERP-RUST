@@ -613,7 +613,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-app"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "barerp-backup",
  "barerp-catalog",
@@ -643,7 +643,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-backup"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "chrono",
  "serde",
@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-catalog"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "barerp-core",
  "barerp-db",
@@ -674,7 +674,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-core"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "aes-gcm",
  "chrono",
@@ -691,7 +691,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-db"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "barerp-core",
  "chrono",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-fiscal"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "barerp-core",
  "chrono",
@@ -723,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-license"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "barerp-db",
  "chrono",
@@ -742,7 +742,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-menu-publish"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "barerp-core",
  "barerp-db",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-print"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "chrono",
  "insta",
@@ -772,7 +772,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-report"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "chrono",
  "pdf-writer",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-server"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "axum",
  "barerp-backup",
@@ -812,7 +812,7 @@ dependencies = [
 
 [[package]]
 name = "barerp-updater"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "chrono",
  "reqwest",

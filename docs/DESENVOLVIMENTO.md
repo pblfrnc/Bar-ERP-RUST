@@ -7,6 +7,8 @@ Decidida em 18/10/2026. Desde 21/10/2026 esta pasta é o repositório **privado*
 **Cada push na `main` daqui roda o `.github/workflows/release.yml`**: compila o instalador do Windows e publica na
 release `latest`, de onde o atualizador do app nativo baixa. Trabalhe numa branch e só leve para a `main` quando o
 Pablo pedir; um push novo cancela a compilação anterior que ainda estiver rodando (só a última versão sai).
+A versão publicada é `<major.minor do Cargo.toml>.<run_number − PRIMEIRO_BUILD>` (2.1.0, 2.1.1, …): para abrir
+uma versão nova (ex.: 2.2), mude o `version` do `[workspace.package]` e ponha em `PRIMEIRO_BUILD` o número do próximo build.
 Push no `pblfrnc/bar-erp` continua proibido: cada push na `main` de lá gera uma release que o PC do cliente baixa
 sozinho.
 

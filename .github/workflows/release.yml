@@ -50,12 +50,18 @@ jobs:
       - name: cargo-xwin
         run: cargo install --locked cargo-xwin
 
-      # Versão 2.0.<número do build>: o app compara a versão e o commit com o version.json
+      # Versão <major.minor do Cargo.toml>.<builds desde o início dessa versão>: o app compara a versão
+      # e o commit com o version.json. Ao subir o major.minor no Cargo.toml, troque PRIMEIRO_BUILD
+      # pelo número do próximo build (o run_number dele), para a contagem voltar a .0.
       - name: Versão
         id: v
+        env:
+          PRIMEIRO_BUILD: 11 # 2.1.0
         run: |
           base=$(sed -n '/^\[workspace.package\]/,/^\[/ s/^version = "\([0-9]*\.[0-9]*\)\..*"/\1/p' Cargo.toml)
-          version="$base.${{ github.run_number }}"
+          patch=$(( ${{ github.run_number }} - PRIMEIRO_BUILD ))
+          [ "$patch" -lt 0 ] && patch=0
+          version="$base.$patch"
           sed -i "/^\[workspace.package\]/,/^\[/ s/^version = \".*\"/version = \"$version\"/" Cargo.toml
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
