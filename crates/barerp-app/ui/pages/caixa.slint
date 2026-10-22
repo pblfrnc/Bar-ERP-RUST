@@ -1065,7 +1065,7 @@ component QuickSale inherits Rectangle {
                         }
                         Rectangle {
                             vertical-stretch: 1;
-                            min-height: 130px;
+                            min-height: 190px;
                             if CaixaStore.cart.length == 0: VerticalLayout {
                                 alignment: center;
                                 spacing: 8px;
@@ -1101,103 +1101,7 @@ component QuickSale inherits Rectangle {
                                 width: parent.width;
                                 padding: 16px;
                                 spacing: 10px;
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    VerticalLayout {
-                                        spacing: 4px;
-                                        FieldLabel { text: "DESCONTO (R$)"; }
-                                        CxInput { text <=> CaixaStore.discount; placeholder: "0,00"; mono: true; font-size: 13px; edited => { CaixaStore.recompute(); } }
-                                    }
-                                    VerticalLayout {
-                                        spacing: 4px;
-                                        FieldLabel { text: "CLIENTE (OPCIONAL)"; }
-                                        CxInput { text <=> CaixaStore.customer; placeholder: "Nome ou CPF"; font-size: 13px; }
-                                    }
-                                }
-                                VerticalLayout {
-                                    spacing: 6px;
-                                    FieldLabel { text: "FORMA DE PAGAMENTO"; }
-                                    HorizontalLayout {
-                                        spacing: 6px;
-                                        PayMethod { icon: @image-url("icons/qr-code.svg"); label: "PIX"; key-label: "⇧A"; tint: Theme.available; active: CaixaStore.method == "PIX"; clicked => { CaixaStore.method = "PIX"; CaixaStore.recompute(); } }
-                                        PayMethod { icon: @image-url("icons/banknote.svg"); label: "Dinheiro"; key-label: "⇧B"; tint: Theme.primary; active: CaixaStore.method == "CASH"; clicked => { CaixaStore.method = "CASH"; CaixaStore.recompute(); } }
-                                        PayMethod { icon: @image-url("icons/credit-card.svg"); label: "Crédito"; key-label: "⇧C"; tint: Theme.occupied; active: CaixaStore.method == "CREDIT_CARD"; clicked => { CaixaStore.method = "CREDIT_CARD"; CaixaStore.recompute(); } }
-                                        PayMethod { icon: @image-url("icons/credit-card.svg"); label: "Débito"; key-label: "⇧D"; tint: Theme.purple; active: CaixaStore.method == "DEBIT_CARD"; clicked => { CaixaStore.method = "DEBIT_CARD"; CaixaStore.recompute(); } }
-                                    }
-                                }
-                                if CaixaStore.method == "CASH": Rectangle {
-                                    background: Theme.bg;
-                                    border-radius: 12px;
-                                    border-width: 1px;
-                                    border-color: Theme.border;
-                                    VerticalLayout {
-                                        padding: 10px;
-                                        spacing: 8px;
-                                        HorizontalLayout {
-                                            spacing: 8px;
-                                            Text { text: "Valor Entregue:"; color: Theme.text-muted; font-size: 13px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
-                                            CxInput {
-                                                width: 130px;
-                                                text <=> CaixaStore.tendered;
-                                                placeholder: CaixaStore.total-placeholder;
-                                                mono: true;
-                                                weight: 800;
-                                                font-size: 13px;
-                                                align: right;
-                                                edited => { CaixaStore.recompute(); }
-                                            }
-                                        }
-                                        // Teclado numérico na tela (toque) com notas comuns e "Exato"
-                                        GridLayout {
-                                            spacing: 6px;
-                                            Row {
-                                                CxButton { text: "7"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("7"); } }
-                                                CxButton { text: "8"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("8"); } }
-                                                CxButton { text: "9"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("9"); } }
-                                                CxButton { text: "R$ 50"; min-height: 44px; font-size: 14px; weight: 800; fg: Theme.available; clicked => { CaixaStore.tendered = "50"; CaixaStore.recompute(); } }
-                                            }
-                                            Row {
-                                                CxButton { text: "4"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("4"); } }
-                                                CxButton { text: "5"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("5"); } }
-                                                CxButton { text: "6"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("6"); } }
-                                                CxButton { text: "R$ 100"; min-height: 44px; font-size: 14px; weight: 800; fg: Theme.available; clicked => { CaixaStore.tendered = "100"; CaixaStore.recompute(); } }
-                                            }
-                                            Row {
-                                                CxButton { text: "1"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("1"); } }
-                                                CxButton { text: "2"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("2"); } }
-                                                CxButton { text: "3"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("3"); } }
-                                                CxButton { text: "R$ 20"; min-height: 44px; font-size: 14px; weight: 800; fg: Theme.available; clicked => { CaixaStore.tendered = "20"; CaixaStore.recompute(); } }
-                                            }
-                                            Row {
-                                                CxButton { text: "00"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("00"); } }
-                                                CxButton { text: "0"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("0"); } }
-                                                CxButton { text: ","; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad(","); } }
-                                                CxButton { icon: @image-url("../../assets/icons/delete.svg"); min-height: 44px; fg: Theme.text-muted; clicked => { CaixaStore.keypad("back"); } }
-                                            }
-                                        }
-                                        CxButton {
-                                            text: "Exato (sem troco)";
-                                            min-height: 40px;
-                                            font-size: 14px;
-                                            weight: 800;
-                                            fg: Theme.primary;
-                                            clicked => { CaixaStore.tendered = ""; CaixaStore.shortcut("exactCash"); }
-                                        }
-                                        if CaixaStore.change-label != "": HorizontalLayout {
-                                            Text { text: "Troco a Devolver:"; color: Theme.primary; font-size: 13px; font-weight: 900; horizontal-stretch: 1; }
-                                            Text { text: CaixaStore.change-label; color: Theme.primary; font-size: 14px; font-weight: 900; font-family: "Menlo"; }
-                                        }
-                                    }
-                                }
-                                HorizontalLayout {
-                                    VerticalLayout {
-                                        alignment: end;
-                                        horizontal-stretch: 1;
-                                        FieldLabel { text: "TOTAL A PAGAR"; }
-                                        if CaixaStore.has-discount: Text { text: CaixaStore.subtotal-label; color: Theme.text-muted; font-size: 12px; stroke: Theme.text-muted; }
-                                    }
-                                    Text { text: CaixaStore.total-label; color: Theme.available; font-size: 26px; font-weight: 900; font-family: "Menlo"; }
-                                }
+                                // NFC-e e comprovante primeiro: ficam sempre à vista, mesmo com o teclado numérico aberto
                                 Rectangle {
                                     border-radius: 12px;
                                     border-width: 1px;
@@ -1253,6 +1157,95 @@ component QuickSale inherits Rectangle {
                                     }
                                 }
                                     TouchArea { mouse-cursor: pointer; clicked => { CaixaStore.print-receipt = !CaixaStore.print-receipt; } }
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    VerticalLayout {
+                                        spacing: 4px;
+                                        FieldLabel { text: "DESCONTO (R$)"; }
+                                        CxInput { text <=> CaixaStore.discount; placeholder: "0,00"; mono: true; font-size: 13px; edited => { CaixaStore.recompute(); } }
+                                    }
+                                    VerticalLayout {
+                                        spacing: 4px;
+                                        FieldLabel { text: "CLIENTE (OPCIONAL)"; }
+                                        CxInput { text <=> CaixaStore.customer; placeholder: "Nome ou CPF"; font-size: 13px; }
+                                    }
+                                }
+                                VerticalLayout {
+                                    spacing: 6px;
+                                    FieldLabel { text: "FORMA DE PAGAMENTO"; }
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        PayMethod { icon: @image-url("icons/qr-code.svg"); label: "PIX"; key-label: "⇧A"; tint: Theme.available; active: CaixaStore.method == "PIX"; clicked => { CaixaStore.method = "PIX"; CaixaStore.recompute(); } }
+                                        PayMethod { icon: @image-url("icons/banknote.svg"); label: "Dinheiro"; key-label: "⇧B"; tint: Theme.primary; active: CaixaStore.method == "CASH"; clicked => { CaixaStore.method = "CASH"; CaixaStore.recompute(); } }
+                                        PayMethod { icon: @image-url("icons/credit-card.svg"); label: "Crédito"; key-label: "⇧C"; tint: Theme.occupied; active: CaixaStore.method == "CREDIT_CARD"; clicked => { CaixaStore.method = "CREDIT_CARD"; CaixaStore.recompute(); } }
+                                        PayMethod { icon: @image-url("icons/credit-card.svg"); label: "Débito"; key-label: "⇧D"; tint: Theme.purple; active: CaixaStore.method == "DEBIT_CARD"; clicked => { CaixaStore.method = "DEBIT_CARD"; CaixaStore.recompute(); } }
+                                    }
+                                }
+                                if CaixaStore.method == "CASH": Rectangle {
+                                    background: Theme.bg;
+                                    border-radius: 12px;
+                                    border-width: 1px;
+                                    border-color: Theme.border;
+                                    VerticalLayout {
+                                        padding: 10px;
+                                        spacing: 8px;
+                                        HorizontalLayout {
+                                            spacing: 8px;
+                                            Text { text: "Valor Entregue:"; color: Theme.text-muted; font-size: 13px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
+                                            CxInput {
+                                                width: 130px;
+                                                text <=> CaixaStore.tendered;
+                                                placeholder: CaixaStore.total-placeholder;
+                                                mono: true;
+                                                weight: 800;
+                                                font-size: 13px;
+                                                align: right;
+                                                edited => { CaixaStore.recompute(); }
+                                            }
+                                        }
+                                        // Teclado numérico na tela (toque), compacto para a NFC-e e o comprovante continuarem à vista
+                                        GridLayout {
+                                            spacing: 5px;
+                                            Row {
+                                                CxButton { text: "7"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("7"); } }
+                                                CxButton { text: "8"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("8"); } }
+                                                CxButton { text: "9"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("9"); } }
+                                                CxButton { text: "R$ 50"; min-height: 38px; font-size: 14px; weight: 800; fg: Theme.available; clicked => { CaixaStore.tendered = "50"; CaixaStore.recompute(); } }
+                                            }
+                                            Row {
+                                                CxButton { text: "4"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("4"); } }
+                                                CxButton { text: "5"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("5"); } }
+                                                CxButton { text: "6"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("6"); } }
+                                                CxButton { text: "R$ 100"; min-height: 38px; font-size: 14px; weight: 800; fg: Theme.available; clicked => { CaixaStore.tendered = "100"; CaixaStore.recompute(); } }
+                                            }
+                                            Row {
+                                                CxButton { text: "1"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("1"); } }
+                                                CxButton { text: "2"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("2"); } }
+                                                CxButton { text: "3"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("3"); } }
+                                                CxButton { text: "Exato"; min-height: 38px; font-size: 14px; weight: 800; fg: Theme.primary; clicked => { CaixaStore.tendered = ""; CaixaStore.shortcut("exactCash"); } }
+                                            }
+                                            Row {
+                                                CxButton { text: "00"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("00"); } }
+                                                CxButton { text: "0"; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad("0"); } }
+                                                CxButton { text: ","; min-height: 38px; font-size: 18px; weight: 800; clicked => { CaixaStore.keypad(","); } }
+                                                CxButton { icon: @image-url("../../assets/icons/delete.svg"); min-height: 38px; fg: Theme.text-muted; clicked => { CaixaStore.keypad("back"); } }
+                                            }
+                                        }
+                                        if CaixaStore.change-label != "": HorizontalLayout {
+                                            Text { text: "Troco a Devolver:"; color: Theme.primary; font-size: 13px; font-weight: 900; horizontal-stretch: 1; }
+                                            Text { text: CaixaStore.change-label; color: Theme.primary; font-size: 14px; font-weight: 900; font-family: "Menlo"; }
+                                        }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    VerticalLayout {
+                                        alignment: end;
+                                        horizontal-stretch: 1;
+                                        FieldLabel { text: "TOTAL A PAGAR"; }
+                                        if CaixaStore.has-discount: Text { text: CaixaStore.subtotal-label; color: Theme.text-muted; font-size: 12px; stroke: Theme.text-muted; }
+                                    }
+                                    Text { text: CaixaStore.total-label; color: Theme.available; font-size: 26px; font-weight: 900; font-family: "Menlo"; }
                                 }
                                 }
                             }
