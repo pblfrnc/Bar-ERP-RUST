@@ -3,9 +3,12 @@
 > Notas técnicas, decisões e regras para quem mexe no código. A apresentação do app está no [README](../README.md).
 
 Reescrita do BarERP (Node + Electron + React) em Rust, com telas nativas em Slint (sem webview nem Chromium).
-Decidida em 18/10/2026. Desde 21/10/2026 esta pasta é o repositório **privado** `pblfrnc/Bar-ERP-RUST` (sem CI nem
-releases). Push no `pblfrnc/bar-erp` continua proibido: cada push na `main` de lá gera uma release que o PC do cliente
-baixa sozinho.
+Decidida em 18/10/2026. Desde 21/10/2026 esta pasta é o repositório **privado** `pblfrnc/Bar-ERP-RUST`.
+**Cada push na `main` daqui roda o `.github/workflows/release.yml`**: compila o instalador do Windows e publica na
+release `latest`, de onde o atualizador do app nativo baixa. Trabalhe numa branch e só leve para a `main` quando o
+Pablo pedir; um push novo cancela a compilação anterior que ainda estiver rodando (só a última versão sai).
+Push no `pblfrnc/bar-erp` continua proibido: cada push na `main` de lá gera uma release que o PC do cliente baixa
+sozinho.
 
 ## Decisões
 - **Interface:** Slint, desenhada pelo próprio app. Licença royalty-free: exige o crédito "Made with Slint" na tela Sobre.
@@ -45,6 +48,7 @@ cargo run -p barerp-app --example cardapio_shots -- <cópia do bar.db> <pasta>
 cargo run -p barerp-app --example kds_shots -- <pasta>          # dados inventados
 cargo run -p barerp-app --example retaguarda_shots -- <pasta>   # dados inventados
 cargo run -p barerp-app --example caixa_shots -- <banco> <pasta> # venda rápida, atalhos (F1) e tela bloqueada
+cargo run -p barerp-app --example fiscal_shots -- <pasta>        # menu do Módulo Fiscal e Painel fiscal
 # banco de demonstração (mesas, cardápio e comandas abertas) para os prints, sem a cópia do cliente:
 cargo run -p barerp-db --example demo_db -- <arquivo novo>
 ```
@@ -86,7 +90,7 @@ Os exemplos aplicam as migrações no arquivo, então use sempre uma **cópia** 
 ## Regras obrigatórias
 1. **Nada de push no `bar-erp`.** NUNCA `git push`, deploy Netlify/Render ou release no `pblfrnc/bar-erp`: push na
    `main` de lá gera release que o PC do cliente (JUBAR) baixa sozinho. A reescrita vive no repo privado
-   `pblfrnc/Bar-ERP-RUST`; commit e push lá só quando o Pablo pedir, e nada de CI ou release sem ele decidir.
+   `pblfrnc/Bar-ERP-RUST`; push na `main` de lá também gera release (do app nativo), então só quando o Pablo pedir.
 2. **Nenhuma chamada real à Focus NFe** (nem homologação) sem o Pablo autorizar. Testes com wiremock.
 3. **Nunca abrir o banco real do cliente**; use cópias (`BARERP_DB=<cópia>`). As migrações gravam no arquivo.
 4. **Não mexer no projeto Node** (`server/`, `client/`, `electron/`): ele segue em produção até a troca.
