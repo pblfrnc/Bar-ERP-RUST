@@ -10,7 +10,7 @@ use slint::platform::{Platform, WindowAdapter};
 use slint::{ComponentHandle, PhysicalSize, Rgb8Pixel};
 
 use barerp_app::pages::mesas::preview;
-use barerp_app::{AppWindow, Page, Theme};
+use barerp_app::{AppWindow, MesasStore, Page, Theme};
 use barerp_db::{catalog, orders, staff, tables, waiters, Db};
 
 const WIDTH: u32 = 1440;
@@ -76,6 +76,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.global::<Theme>().set_dark(dark);
         preview::map(&ui, cards.clone());
         save(&window, &out.join(format!("m1-mapa-{suffix}.png")))?;
+        // Número digitado direto no mapa
+        ui.global::<MesasStore>().set_jump("12".into());
+        save(&window, &out.join(format!("m1b-mapa-digitando-{suffix}.png")))?;
+        ui.global::<MesasStore>().set_jump("".into());
+        // Planta do salão (sem posições gravadas: fileiras na ordem do número), no modo editar
+        ui.global::<MesasStore>().set_plan_mode(true);
+        ui.global::<MesasStore>().set_plan_edit(true);
+        save(&window, &out.join(format!("m1c-planta-{suffix}.png")))?;
+        ui.global::<MesasStore>().set_plan_mode(false);
+        ui.global::<MesasStore>().set_plan_edit(false);
         preview::details(&ui, &busy.id, detail.clone());
         save(&window, &out.join(format!("m2-detalhe-{suffix}.png")))?;
         preview::launch(&ui, &busy.id, products.clone(), categories.clone(), promotions.clone());

@@ -20,7 +20,7 @@ component Tile inherits Rectangle {
     VerticalLayout {
         padding: 10px;
         spacing: 2px;
-        Text { text: root.label; color: Theme.text-muted; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; }
+        Text { text: root.label; color: Theme.text-muted; font-size: 12px; font-weight: 800; letter-spacing: 0.5px; }
         Text { text: root.value; color: root.tone; font-size: 15px; font-weight: 900; font-family: "Menlo"; }
     }
 }
@@ -71,14 +71,14 @@ component ComponentRow inherits Rectangle {
                     Text { text: "+"; color: Theme.text; font-weight: 900; }
                     plus := TouchArea { clicked => { CardapioStore.comp-step(root.slot, 1); } }
                 }
-                Text { text: root.data.unit; color: Theme.text-muted; font-size: 10px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
+                Text { text: root.data.unit; color: Theme.text-muted; font-size: 12px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
             }
         }
         Text {
             width: 72px;
             text: root.data.subtotal;
             color: Theme.available;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 800;
             font-family: "Menlo";
             horizontal-alignment: right;
@@ -117,7 +117,7 @@ component GroupPickView inherits Rectangle {
                 if root.data.position > 0: Text { text: root.data.position + "."; color: Theme.primary; font-size: 13px; font-weight: 900; }
                 Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 800; overflow: elide; }
             }
-            Text { text: root.data.detail; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+            Text { text: root.data.detail; color: Theme.text-muted; font-size: 13px; overflow: elide; }
         }
     }
 }
@@ -169,7 +169,7 @@ export component ProductEditor inherits Rectangle {
                         text: CardapioStore.f-editing ? "Atualize preços, custos, estoque, fornecedor e regras tributárias"
                             : "Preencha o cadastro completo com automação de código de barras, tributação e custos";
                         color: Theme.text-muted;
-                        font-size: 12px;
+                        font-size: 13px;
                     }
                 }
                 if CardapioStore.f-editing: Btn {
@@ -233,7 +233,7 @@ export component ProductEditor inherits Rectangle {
                                 Text {
                                     text: "Bipe com leitor USB ou digite o EAN para cruzar com notas recebidas na SEFAZ e catálogo nacional (nome, marca, fornecedor, NCM, CEST e custo).";
                                     color: Theme.text-muted;
-                                    font-size: 12px;
+                                    font-size: 13px;
                                     wrap: word-wrap;
                                 }
                             }
@@ -348,7 +348,7 @@ export component ProductEditor inherits Rectangle {
                                             Text {
                                                 text: "+ Nova";
                                                 color: Theme.purple;
-                                                font-size: 12px;
+                                                font-size: 13px;
                                                 font-weight: 800;
                                                 TouchArea { clicked => { CardapioStore.open-category-from-form(); } }
                                             }
@@ -374,11 +374,20 @@ export component ProductEditor inherits Rectangle {
                                         spacing: 4px;
                                         FieldLabel { text: "UNIDADE DE MEDIDA"; }
                                         LineEdit { height: 40px; placeholder-text: "un, lata, garrafa, dose..."; text <=> CardapioStore.f-unit; }
+                                        // Duas fileiras: numa só, com a letra maior, a coluna passava da tela
                                         HorizontalLayout {
                                             spacing: 4px;
                                             alignment: start;
-                                            Text { text: "SUGESTÕES:"; color: Theme.text-muted; font-size: 10px; font-weight: 800; vertical-alignment: center; }
-                                            for u in ["un", "lata", "garrafa", "dose", "copo", "torre", "porção", "kg", "l"]: MiniChip {
+                                            for u in ["un", "lata", "garrafa", "dose", "copo"]: MiniChip {
+                                                text: u;
+                                                active: CardapioStore.f-unit == u;
+                                                clicked => { CardapioStore.f-unit = u; }
+                                            }
+                                        }
+                                        HorizontalLayout {
+                                            spacing: 4px;
+                                            alignment: start;
+                                            for u in ["torre", "porção", "kg", "l"]: MiniChip {
                                                 text: u;
                                                 active: CardapioStore.f-unit == u;
                                                 clicked => { CardapioStore.f-unit = u; }
@@ -418,7 +427,7 @@ export component ProductEditor inherits Rectangle {
                                         spacing: 4px;
                                         HorizontalLayout {
                                             FieldLabel { text: "MARGEM ALVO (%)"; horizontal-stretch: 1; }
-                                            Text { text: "auto-cálculo"; color: Theme.primary; font-size: 10px; font-weight: 800; }
+                                            Text { text: "auto-cálculo"; color: Theme.primary; font-size: 12px; font-weight: 800; }
                                         }
                                         Field { big: true; suffix: "%"; placeholder: "50"; text <=> CardapioStore.f-margin; edited => { CardapioStore.margin-edited(); } }
                                         Hint { text: "Calcula o preço de venda automaticamente."; }
@@ -443,11 +452,11 @@ export component ProductEditor inherits Rectangle {
                                         HorizontalLayout {
                                             spacing: 6px;
                                             Icon { source: CardapioIcons.trending-up; color: Theme.available; size: 15px; y: (parent.height - self.height) / 2; }
-                                            Text { text: "Simulador de Margem Comercial em Tempo Real"; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+                                            Text { text: "Simulador de Margem Comercial em Tempo Real"; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
                                             if CardapioStore.f-composed && CardapioStore.recipe-cost != "": Text {
                                                 text: "✦ Usar Custo da Receita (" + CardapioStore.recipe-cost + ")";
                                                 color: Theme.primary;
-                                                font-size: 11px;
+                                                font-size: 13px;
                                                 font-weight: 800;
                                                 vertical-alignment: center;
                                                 TouchArea { clicked => { CardapioStore.use-recipe-cost(); } }
@@ -480,7 +489,7 @@ export component ProductEditor inherits Rectangle {
                                     VerticalLayout {
                                         horizontal-stretch: 1;
                                         Text { text: "Venda por Caixa / Fardo Fechado"; color: Theme.text; font-size: 15px; font-weight: 900; }
-                                        Text { text: "Permite alternar entre preço avulso e preço de caixa no Caixa (PDV) e Mesas"; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                                        Text { text: "Permite alternar entre preço avulso e preço de caixa no Caixa (PDV) e Mesas"; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                                     }
                                     Toggle { y: (parent.height - self.height) / 2; checked <=> CardapioStore.f-has-box; }
                                 }
@@ -503,7 +512,7 @@ export component ProductEditor inherits Rectangle {
                                                 HorizontalLayout {
                                                     spacing: 4px;
                                                     alignment: start;
-                                                    Text { text: "COMUNS:"; color: Theme.text-muted; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+                                                    Text { text: "COMUNS:"; color: Theme.text-muted; font-size: 12px; font-weight: 800; vertical-alignment: center; }
                                                     for q in ["6", "12", "15", "24", "30"]: MiniChip {
                                                         text: q + " un";
                                                         active: CardapioStore.f-box-qty == q;
@@ -516,7 +525,7 @@ export component ProductEditor inherits Rectangle {
                                                 spacing: 4px;
                                                 FieldLabel { text: "PREÇO TOTAL DA CAIXA (R$) *"; }
                                                 Field { prefix: "R$"; placeholder: "216,00"; text <=> CardapioStore.f-box-price; edited => { CardapioStore.price-edited(); } }
-                                                if CardapioStore.box-unit-label != "": Text { text: CardapioStore.box-unit-label; color: Theme.available; font-size: 11px; font-weight: 600; wrap: word-wrap; }
+                                                if CardapioStore.box-unit-label != "": Text { text: CardapioStore.box-unit-label; color: Theme.available; font-size: 13px; font-weight: 600; wrap: word-wrap; }
                                             }
                                         }
                                         FieldLabel { text: "CÓDIGO DE BARRAS DA CAIXA (DUN-14 / EAN DA CAIXA FECHADA)"; }
@@ -570,7 +579,7 @@ export component ProductEditor inherits Rectangle {
                                         Text {
                                             text: "Corrija produtos que receberam nota com valor e quantidade integral de caixa, fardo ou peso";
                                             color: Theme.text-muted;
-                                            font-size: 11px;
+                                            font-size: 13px;
                                             wrap: word-wrap;
                                         }
                                     }
@@ -587,13 +596,13 @@ export component ProductEditor inherits Rectangle {
                                         Text {
                                             text: "Se você deu entrada na nota fiscal e o produto assumiu o custo total da embalagem (ex: caixa de cerveja, maços de cigarro ou 5kg de batata), selecione a quantidade fracionada abaixo e clique em Aplicar Conversão. O estoque será multiplicado e o custo unitário será recalculado automaticamente.";
                                             color: Theme.text;
-                                            font-size: 12px;
+                                            font-size: 13px;
                                             wrap: word-wrap;
                                         }
                                         HorizontalLayout {
                                             spacing: 5px;
                                             alignment: start;
-                                            Text { text: "Atalhos rápidos:"; color: Theme.text-muted; font-size: 11px; font-weight: 700; vertical-alignment: center; }
+                                            Text { text: "Atalhos rápidos:"; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                                             MiniChip { text: "10 un (Cigarro)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "10" && !CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("10", false); } }
                                             MiniChip { text: "12 un (Caixa)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "12" && !CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("12", false); } }
                                             MiniChip { text: "6 un (Pack)"; tone: Theme.purple; active: CardapioStore.f-conv-factor == "6" && !CardapioStore.f-conv-portion; clicked => { CardapioStore.conv-preset("6", false); } }
@@ -611,7 +620,7 @@ export component ProductEditor inherits Rectangle {
                                                     spacing: 6px;
                                                     alignment: start;
                                                     LineEdit { width: 96px; height: 38px; input-type: number; text <=> CardapioStore.f-conv-factor; }
-                                                    Text { text: CardapioStore.f-conv-portion ? "porções" : "unidades"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                                                    Text { text: CardapioStore.f-conv-portion ? "porções" : "unidades"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                                                 }
                                             }
                                             HorizontalLayout {
@@ -663,7 +672,7 @@ export component ProductEditor inherits Rectangle {
                                 Text {
                                     text: "Ative caso este item seja produzido no estabelecimento (ex: Torre de Chopp descontando litros do barril, Cocktails & Drinks descontando doses, Pizzas, Pratos e Porções descontando insumos).";
                                     color: Theme.text-muted;
-                                    font-size: 12px;
+                                    font-size: 13px;
                                     wrap: word-wrap;
                                 }
                                 if CardapioStore.f-composed: Rectangle {
@@ -676,8 +685,8 @@ export component ProductEditor inherits Rectangle {
                                         padding: 12px;
                                         spacing: 8px;
                                         HorizontalLayout {
-                                            Text { text: "INGREDIENTES / INSUMOS QUE COMPÕEM ESTE ITEM:"; color: Theme.text; font-size: 11px; font-weight: 800; horizontal-stretch: 1; }
-                                            if CardapioStore.recipe-cost != "": Text { text: "Custo Somado: " + CardapioStore.recipe-cost; color: Theme.available; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
+                                            Text { text: "INGREDIENTES / INSUMOS QUE COMPÕEM ESTE ITEM:"; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-stretch: 1; }
+                                            if CardapioStore.recipe-cost != "": Text { text: "Custo Somado: " + CardapioStore.recipe-cost; color: Theme.available; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
                                         }
                                         for c[i] in CardapioStore.f-components: ComponentRow { data: c; slot: i; }
                                         Rectangle {
@@ -690,7 +699,7 @@ export component ProductEditor inherits Rectangle {
                                                 alignment: center;
                                                 spacing: 6px;
                                                 Icon { source: Icons.plus; color: add.has-hover ? Theme.primary : Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
-                                                Text { text: "Adicionar Insumo / Ingrediente"; color: add.has-hover ? Theme.primary : Theme.text-muted; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                                                Text { text: "Adicionar Insumo / Ingrediente"; color: add.has-hover ? Theme.primary : Theme.text-muted; font-size: 13px; font-weight: 800; vertical-alignment: center; }
                                             }
                                             add := TouchArea { clicked => { CardapioStore.comp-add(); } }
                                         }
@@ -716,7 +725,7 @@ export component ProductEditor inherits Rectangle {
                                     Text {
                                         text: "Gerenciar grupos";
                                         color: Theme.primary;
-                                        font-size: 12px;
+                                        font-size: 13px;
                                         font-weight: 800;
                                         vertical-alignment: center;
                                         TouchArea { clicked => { CardapioStore.open-modifiers(); } }
@@ -725,7 +734,7 @@ export component ProductEditor inherits Rectangle {
                                 if CardapioStore.f-groups.length == 0: Text {
                                     text: "Nenhum grupo cadastrado. Crie grupos como \"Ponto da carne\" ou \"Adicionais\" em Gerenciar grupos.";
                                     color: Theme.text-muted;
-                                    font-size: 12px;
+                                    font-size: 13px;
                                     wrap: word-wrap;
                                 }
                                 for row in (CardapioStore.f-groups.length + 1) / 2: HorizontalLayout {
@@ -737,7 +746,7 @@ export component ProductEditor inherits Rectangle {
                                 if CardapioStore.f-groups.length > 1: Text {
                                     text: "Os grupos aparecem para o garçom na ordem em que foram marcados.";
                                     color: Theme.text-muted;
-                                    font-size: 11px;
+                                    font-size: 13px;
                                 }
                             }
                         }
@@ -763,7 +772,7 @@ export component ProductEditor inherits Rectangle {
                                     spacing: 10px;
                                     Icon { source: Icons.qr-code; color: Theme.primary; size: 20px; y: (parent.height - self.height) / 2; }
                                     Text { text: "Cardápio Digital"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
-                                    Text { text: "Mostrar no cardápio"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                                    Text { text: "Mostrar no cardápio"; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                                     Toggle { y: (parent.height - self.height) / 2; checked <=> CardapioStore.f-show-in-menu; }
                                 }
                                 FieldLabel { text: "FOTO"; }
@@ -833,7 +842,7 @@ export component ProductEditor inherits Rectangle {
                                     Text {
                                         text: "+ Novo";
                                         color: Theme.primary;
-                                        font-size: 12px;
+                                        font-size: 13px;
                                         font-weight: 800;
                                         vertical-alignment: center;
                                         TouchArea { clicked => { CardapioStore.open-quick-supplier(); } }
@@ -856,10 +865,10 @@ export component ProductEditor inherits Rectangle {
                                         padding: 12px;
                                         spacing: 4px;
                                         HorizontalLayout {
-                                            Text { text: CardapioStore.sup-card-title; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; }
+                                            Text { text: CardapioStore.sup-card-title; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-stretch: 1; }
                                             if CardapioStore.sup-card-doc != "": Pill { text: CardapioStore.sup-card-doc; tone: Theme.available; mono: true; }
                                         }
-                                        if CardapioStore.sup-card-contact != "": Text { text: "Contato: " + CardapioStore.sup-card-contact; color: Theme.text-muted; font-size: 11px; }
+                                        if CardapioStore.sup-card-contact != "": Text { text: "Contato: " + CardapioStore.sup-card-contact; color: Theme.text-muted; font-size: 13px; }
                                         if CardapioStore.sup-card-phone != "": HorizontalLayout {
                                             spacing: 5px;
                                             alignment: start;
@@ -867,7 +876,7 @@ export component ProductEditor inherits Rectangle {
                                             Text {
                                                 text: "Falar no WhatsApp (" + CardapioStore.sup-card-phone + ")";
                                                 color: Theme.available;
-                                                font-size: 12px;
+                                                font-size: 13px;
                                                 font-weight: 800;
                                                 TouchArea { clicked => { CardapioStore.open-whatsapp(); } }
                                             }
@@ -942,7 +951,7 @@ export component ProductEditor inherits Rectangle {
                                 Text {
                                     text: "Estes códigos fiscais são transmitidos à SEFAZ em cada venda na NFC-e para evitar bitributação e rejeições.";
                                     color: Theme.text-muted;
-                                    font-size: 11px;
+                                    font-size: 13px;
                                     wrap: word-wrap;
                                 }
                                 HorizontalLayout {
@@ -955,15 +964,15 @@ export component ProductEditor inherits Rectangle {
                                             Text {
                                                 text: "Buscar NCM";
                                                 color: Theme.occupied;
-                                                font-size: 11px;
+                                                font-size: 13px;
                                                 font-weight: 800;
                                                 TouchArea { clicked => { CardapioStore.open-ncm(); } }
                                             }
                                         }
                                         LineEdit { height: 38px; placeholder-text: "Ex: 22030000"; text <=> CardapioStore.f-ncm; edited => { CardapioStore.ncm-edited(); } }
-                                        if CardapioStore.ncm-state == 1: Text { text: "Verificando na Receita..."; color: Theme.text-muted; font-size: 10px; }
+                                        if CardapioStore.ncm-state == 1: Text { text: "Verificando na Receita..."; color: Theme.text-muted; font-size: 12px; }
                                         if CardapioStore.ncm-state == 2: Notice { text: "✓ " + CardapioStore.ncm-detail; tone: Theme.available; }
-                                        if CardapioStore.ncm-state == 3: Text { text: "⚠ NCM não localizado"; color: Theme.closing; font-size: 10px; font-weight: 700; }
+                                        if CardapioStore.ncm-state == 3: Text { text: "⚠ NCM não localizado"; color: Theme.closing; font-size: 12px; font-weight: 700; }
                                     }
                                     VerticalLayout {
                                         horizontal-stretch: 1;
@@ -977,7 +986,7 @@ export component ProductEditor inherits Rectangle {
                                 HorizontalLayout {
                                     spacing: 4px;
                                     alignment: start;
-                                    Text { text: "PADRÕES:"; color: Theme.text-muted; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+                                    Text { text: "PADRÕES:"; color: Theme.text-muted; font-size: 12px; font-weight: 800; vertical-alignment: center; }
                                     MiniChip { text: "5102 (Revenda Normal)"; active: CardapioStore.f-cfop == "5102"; clicked => { CardapioStore.f-cfop = "5102"; } }
                                     MiniChip { text: "5405 (Subst. Tributária ST)"; active: CardapioStore.f-cfop == "5405"; clicked => { CardapioStore.f-cfop = "5405"; } }
                                     MiniChip { text: "5101 (Produção Própria)"; active: CardapioStore.f-cfop == "5101"; clicked => { CardapioStore.f-cfop = "5101"; } }
@@ -1019,12 +1028,12 @@ export component ProductEditor inherits Rectangle {
                     HorizontalLayout {
                         spacing: 12px;
                         alignment: start;
-                        Text { text: "Venda: " + CardapioStore.footer-sale; color: Theme.text-muted; font-size: 12px; }
-                        if CardapioStore.footer-cost != "": Text { text: "Custo: " + CardapioStore.footer-cost; color: Theme.text-muted; font-size: 12px; }
+                        Text { text: "Venda: " + CardapioStore.footer-sale; color: Theme.text-muted; font-size: 13px; }
+                        if CardapioStore.footer-cost != "": Text { text: "Custo: " + CardapioStore.footer-cost; color: Theme.text-muted; font-size: 13px; }
                         if CardapioStore.footer-margin != "": Text {
                             text: "Margem: " + CardapioStore.footer-margin;
                             color: CardapioStore.footer-margin-tone == 0 ? Theme.available : CardapioStore.footer-margin-tone == 1 ? Theme.closing : Theme.danger;
-                            font-size: 12px;
+                            font-size: 13px;
                             font-weight: 800;
                         }
                     }

@@ -29,7 +29,7 @@ component CategorySheet inherits Sheet {
         LineEdit { height: 42px; placeholder-text: "Ex: Alimentos, Lanches, Cervejas, Porções..."; text <=> CardapioStore.c-name; accepted => { CardapioStore.c-save(); } }
         HorizontalLayout {
             FieldLabel { text: "FAIXA NUMÉRICA INICIAL (CÓDIGO INTERNO) *"; horizontal-stretch: 1; }
-            Text { text: "#" + (CardapioStore.c-code-start != "" ? CardapioStore.c-code-start : "1001") + "+"; color: Theme.primary; font-size: 11px; font-weight: 800; font-family: "Menlo"; }
+            Text { text: "#" + (CardapioStore.c-code-start != "" ? CardapioStore.c-code-start : "1001") + "+"; color: Theme.primary; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
         }
         LineEdit { height: 42px; input-type: number; placeholder-text: "Ex: 1001, 2001, 5001..."; text <=> CardapioStore.c-code-start; }
         FieldLabel { text: "ATALHOS DE FAIXAS RECOMENDADAS:"; }
@@ -60,11 +60,11 @@ component CategorySheet inherits Sheet {
                 Check { checked: CardapioStore.c-renumber; clicked => { CardapioStore.c-renumber = !CardapioStore.c-renumber; } }
                 VerticalLayout {
                     horizontal-stretch: 1;
-                    Text { text: "Renumerar produtos existentes desta categoria"; color: Theme.text; font-size: 12px; font-weight: 800; }
+                    Text { text: "Renumerar produtos existentes desta categoria"; color: Theme.text; font-size: 13px; font-weight: 800; }
                     Text {
                         text: "Atualiza os códigos internos de todos os produtos desta categoria para ficarem no intervalo sequencial iniciando em #" + (CardapioStore.c-code-start != "" ? CardapioStore.c-code-start : "1001") + ".";
                         color: Theme.text-muted;
-                        font-size: 11px;
+                        font-size: 13px;
                         wrap: word-wrap;
                     }
                 }
@@ -92,7 +92,7 @@ component HistoryCard inherits Rectangle {
         spacing: 8px;
         HorizontalLayout {
             spacing: 6px;
-            Text { text: root.data.date; color: Theme.text; font-size: 11px; font-weight: 800; font-family: "Menlo"; horizontal-stretch: 1; vertical-alignment: center; }
+            Text { text: root.data.date; color: Theme.text; font-size: 13px; font-weight: 800; font-family: "Menlo"; horizontal-stretch: 1; vertical-alignment: center; }
             Pill { text: "Por: " + root.data.by; }
             Pill { text: root.data.xml ? "Entrada NF-e (XML)" : "Edição Manual"; tone: root.data.xml ? Theme.closing : Theme.purple; }
         }
@@ -108,16 +108,16 @@ component HistoryCard inherits Rectangle {
                 sale := VerticalLayout {
                     padding: 10px;
                     spacing: 3px;
-                    Text { text: "PREÇO DE VENDA"; color: Theme.text-muted; font-size: 10px; font-weight: 800; }
+                    Text { text: "PREÇO DE VENDA"; color: Theme.text-muted; font-size: 12px; font-weight: 800; }
                     HorizontalLayout {
-                        Text { text: root.data.old-price; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; stroke: Theme.text-muted; horizontal-stretch: 1; }
+                        Text { text: root.data.old-price; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; stroke: Theme.text-muted; horizontal-stretch: 1; }
                         Icon { source: CardapioIcons.arrow-right; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
-                        Text { text: root.data.new-price; color: Theme.text; font-size: 12px; font-weight: 900; font-family: "Menlo"; horizontal-stretch: 1; horizontal-alignment: right; }
+                        Text { text: root.data.new-price; color: Theme.text; font-size: 13px; font-weight: 900; font-family: "Menlo"; horizontal-stretch: 1; horizontal-alignment: right; }
                     }
                     Text {
                         text: root.data.price-diff;
                         color: root.data.price-dir > 0 ? Theme.available : root.data.price-dir < 0 ? Theme.danger : Theme.text-muted;
-                        font-size: 10px;
+                        font-size: 12px;
                         font-weight: 800;
                         horizontal-alignment: right;
                     }
@@ -133,23 +133,23 @@ component HistoryCard inherits Rectangle {
                 cost := VerticalLayout {
                     padding: 10px;
                     spacing: 3px;
-                    Text { text: "PREÇO DE CUSTO"; color: Theme.text-muted; font-size: 10px; font-weight: 800; }
+                    Text { text: "PREÇO DE CUSTO"; color: Theme.text-muted; font-size: 12px; font-weight: 800; }
                     HorizontalLayout {
-                        Text { text: root.data.old-cost; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; horizontal-stretch: 1; }
+                        Text { text: root.data.old-cost; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; horizontal-stretch: 1; }
                         Icon { source: CardapioIcons.arrow-right; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
-                        Text { text: root.data.new-cost; color: Theme.text; font-size: 12px; font-weight: 800; font-family: "Menlo"; horizontal-stretch: 1; horizontal-alignment: right; }
+                        Text { text: root.data.new-cost; color: Theme.text; font-size: 13px; font-weight: 800; font-family: "Menlo"; horizontal-stretch: 1; horizontal-alignment: right; }
                     }
                     Text {
                         text: root.data.cost-diff;
                         color: root.data.cost-dir > 0 ? Theme.danger : root.data.cost-dir < 0 ? Theme.available : Theme.text-muted;
-                        font-size: 10px;
+                        font-size: 12px;
                         font-weight: 800;
                         horizontal-alignment: right;
                     }
                 }
             }
         }
-        if root.data.chave != "": Text { text: "Chave NF-e: " + root.data.chave; color: Theme.text-muted; font-size: 10px; font-family: "Menlo"; overflow: elide; }
+        if root.data.chave != "": Text { text: "Chave NF-e: " + root.data.chave; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; overflow: elide; }
     }
 }
 
@@ -165,7 +165,7 @@ component HistorySheet inherits Sheet {
         vertical-stretch: 1;
         padding: 18px;
         spacing: 10px;
-        if CardapioStore.h-loading: Text { vertical-stretch: 1; text: "Carregando histórico..."; color: Theme.text-muted; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+        if CardapioStore.h-loading: Text { vertical-stretch: 1; text: "Carregando histórico..."; color: Theme.text-muted; font-size: 13px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
         if !CardapioStore.h-loading && CardapioStore.h-rows.length == 0: VerticalLayout {
             vertical-stretch: 1;
             alignment: center;
@@ -175,7 +175,7 @@ component HistorySheet inherits Sheet {
             Text {
                 text: "As alterações manuais e importações de XML aparecerão registradas aqui com responsável e variações.";
                 color: Theme.text-muted;
-                font-size: 12px;
+                font-size: 13px;
                 horizontal-alignment: center;
                 wrap: word-wrap;
             }
@@ -210,9 +210,9 @@ component ReportTile inherits Rectangle {
     VerticalLayout {
         padding: 14px;
         spacing: 3px;
-        Text { text: root.label; color: root.highlight ? Theme.purple : Theme.text-muted; font-size: 10px; font-weight: 800; letter-spacing: 0.5px; }
+        Text { text: root.label; color: root.highlight ? Theme.purple : Theme.text-muted; font-size: 12px; font-weight: 800; letter-spacing: 0.5px; }
         Text { text: root.value; color: root.tone; font-size: 17px; font-weight: 900; font-family: "Menlo"; }
-        Text { text: root.sub; color: root.highlight ? Theme.purple : Theme.text-muted; font-size: 10px; }
+        Text { text: root.sub; color: root.highlight ? Theme.purple : Theme.text-muted; font-size: 12px; }
     }
 }
 
@@ -228,7 +228,7 @@ component ReportSheet inherits Sheet {
         vertical-stretch: 1;
         padding: 18px;
         spacing: 12px;
-        if CardapioStore.r-loading: Text { vertical-stretch: 1; text: "Calculando valores do inventário..."; color: Theme.text-muted; font-size: 12px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+        if CardapioStore.r-loading: Text { vertical-stretch: 1; text: "Calculando valores do inventário..."; color: Theme.text-muted; font-size: 13px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
         if !CardapioStore.r-loading && CardapioStore.r-failed: Text { vertical-stretch: 1; text: "Falha ao carregar relatório."; color: Theme.text-muted; horizontal-alignment: center; vertical-alignment: center; }
         if !CardapioStore.r-loading && !CardapioStore.r-failed: HorizontalLayout {
             spacing: 10px;
@@ -253,8 +253,8 @@ component ReportSheet inherits Sheet {
                         padding-right: 14px;
                         spacing: 6px;
                         Icon { source: Icons.tag; color: Theme.primary; size: 15px; y: (parent.height - self.height) / 2; }
-                        Text { text: "LUCRO PREVISTO AGRUPADO POR CATEGORIA"; color: Theme.text; font-size: 11px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
-                        Text { text: CardapioStore.r-count; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                        Text { text: "LUCRO PREVISTO AGRUPADO POR CATEGORIA"; color: Theme.text; font-size: 13px; font-weight: 900; horizontal-stretch: 1; vertical-alignment: center; }
+                        Text { text: CardapioStore.r-count; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                     }
                 }
                 HorizontalLayout {
@@ -266,7 +266,7 @@ component ReportSheet inherits Sheet {
                         horizontal-stretch: h == "CATEGORIA" ? 2 : 1;
                         text: h;
                         color: Theme.text-muted;
-                        font-size: 10px;
+                        font-size: 12px;
                         font-weight: 800;
                         vertical-alignment: center;
                         horizontal-alignment: h == "CATEGORIA" ? left : h == "PRODUTOS" || h == "UNIDADES" || h == "MARGEM" ? center : right;
@@ -281,12 +281,12 @@ component ReportSheet inherits Sheet {
                             padding-left: 14px;
                             padding-right: 14px;
                             spacing: 8px;
-                            Text { horizontal-stretch: 2; text: r.name; color: Theme.text; font-size: 12px; font-weight: 800; vertical-alignment: center; overflow: elide; }
-                            Text { horizontal-stretch: 1; text: r.items; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; horizontal-alignment: center; vertical-alignment: center; }
-                            Text { horizontal-stretch: 1; text: r.units; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; horizontal-alignment: center; vertical-alignment: center; }
-                            Text { horizontal-stretch: 1; text: r.cost; color: Theme.text; font-size: 12px; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
-                            Text { horizontal-stretch: 1; text: r.sale; color: Theme.available; font-size: 12px; font-weight: 800; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
-                            Text { horizontal-stretch: 1; text: r.profit; color: Theme.purple; font-size: 12px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
+                            Text { horizontal-stretch: 2; text: r.name; color: Theme.text; font-size: 13px; font-weight: 800; vertical-alignment: center; overflow: elide; }
+                            Text { horizontal-stretch: 1; text: r.items; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: r.units; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: r.cost; color: Theme.text; font-size: 13px; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: r.sale; color: Theme.available; font-size: 13px; font-weight: 800; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
+                            Text { horizontal-stretch: 1; text: r.profit; color: Theme.purple; font-size: 13px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; vertical-alignment: center; }
                             HorizontalLayout {
                                 horizontal-stretch: 1;
                                 alignment: center;
@@ -351,8 +351,8 @@ component NcmSheet inherits Sheet {
                 qr := HorizontalLayout {
                     x: 8px;
                     spacing: 4px;
-                    Text { text: q.code; color: Theme.purple; font-size: 11px; font-weight: 800; font-family: "Menlo"; vertical-alignment: center; }
-                    Text { text: "— " + q.label; color: Theme.text; font-size: 11px; vertical-alignment: center; }
+                    Text { text: q.code; color: Theme.purple; font-size: 13px; font-weight: 800; font-family: "Menlo"; vertical-alignment: center; }
+                    Text { text: "— " + q.label; color: Theme.text; font-size: 13px; vertical-alignment: center; }
                 }
                 qt := TouchArea { clicked => { CardapioStore.n-quick(q.code); } }
             }
@@ -386,7 +386,7 @@ component NcmSheet inherits Sheet {
                         border-color: Theme.surface-2;
                         VerticalLayout {
                             padding: 9px;
-                            Text { text: "% " + tax.label; color: Theme.text-muted; font-size: 10px; }
+                            Text { text: "% " + tax.label; color: Theme.text-muted; font-size: 12px; }
                             Text { text: tax.value; color: Theme.text; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
                         }
                     }
@@ -428,7 +428,7 @@ component SheetModal inherits Sheet {
                 ob := VerticalLayout {
                     padding: 10px;
                     Text { text: o.label; color: Theme.text; font-size: 13px; font-weight: 800; }
-                    Text { text: o.hint; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                    Text { text: o.hint; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                 }
                 TouchArea { clicked => { CardapioStore.s-alpha = o.alpha; CardapioStore.s-changed(); } }
             }
@@ -441,10 +441,10 @@ component SheetModal inherits Sheet {
         Text {
             text: "A folha traz código, produto, unidade, estoque atual, Contagem em branco, " + (CardapioStore.s-show-cost ? "custo, " : "") + "preço atual e Novo preço em branco.";
             color: Theme.text-muted;
-            font-size: 12px;
+            font-size: 13px;
             wrap: word-wrap;
         }
-        if CardapioStore.s-feedback != "": Text { text: CardapioStore.s-feedback; color: CardapioStore.s-error ? Theme.danger : Theme.available; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+        if CardapioStore.s-feedback != "": Text { text: CardapioStore.s-feedback; color: CardapioStore.s-error ? Theme.danger : Theme.available; font-size: 13px; font-weight: 700; wrap: word-wrap; }
         HorizontalLayout {
             spacing: 8px;
             alignment: end;
@@ -522,7 +522,7 @@ component SupplierFormSheet inherits Sheet {
                         Text {
                             text: CardapioStore.sf-cnpj-busy ? "Consultando..." : "Consultar CNPJ";
                             color: Theme.available;
-                            font-size: 11px;
+                            font-size: 13px;
                             font-weight: 800;
                             TouchArea { clicked => { CardapioStore.sf-cnpj(); } }
                         }
@@ -663,10 +663,10 @@ component GroupCard inherits Rectangle {
                 alignment: start;
                 Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; }
                 Pill { y: (parent.height - self.height) / 2; text: root.data.rule; tone: root.data.required ? Theme.primary : Theme.text-muted; }
-                if root.data.inactive: Text { text: "INATIVO"; color: Theme.text-muted; font-size: 10px; font-weight: 900; vertical-alignment: center; }
+                if root.data.inactive: Text { text: "INATIVO"; color: Theme.text-muted; font-size: 12px; font-weight: 900; vertical-alignment: center; }
             }
-            Text { text: root.data.options; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
-            Text { text: root.data.usage; color: Theme.text-muted; font-size: 11px; }
+            Text { text: root.data.options; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
+            Text { text: root.data.usage; color: Theme.text-muted; font-size: 13px; }
         }
         Rectangle {
             width: 34px;
@@ -715,7 +715,7 @@ component OptionRow inherits HorizontalLayout {
     HorizontalLayout {
         spacing: 4px;
         Check { y: (parent.height - self.height) / 2; checked: root.data.active; clicked => { CardapioStore.m-opt-active(root.slot, !root.data.active); } }
-        Text { text: "Ativa"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+        Text { text: "Ativa"; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
     }
     Rectangle {
         width: 34px;
@@ -764,7 +764,7 @@ component ModifiersSheet inherits Sheet {
                         spacing: 6px;
                         Check { y: (parent.height - self.height) / 2; checked: CardapioStore.m-required; clicked => { CardapioStore.m-required = !CardapioStore.m-required; } }
                         Text { text: "Pergunta obrigatória"; color: Theme.text; font-size: 13px; font-weight: 800; vertical-alignment: center; }
-                        Text { text: "(o garçom precisa escolher)"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                        Text { text: "(o garçom precisa escolher)"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                     }
                     HorizontalLayout {
                         spacing: 6px;
@@ -783,7 +783,7 @@ component ModifiersSheet inherits Sheet {
                         alignment: center;
                         spacing: 6px;
                         Icon { source: Icons.plus; color: Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
-                        Text { text: "Adicionar opção"; color: Theme.text-muted; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                        Text { text: "Adicionar opção"; color: Theme.text-muted; font-size: 13px; font-weight: 800; vertical-alignment: center; }
                     }
                     oa := TouchArea { clicked => { CardapioStore.m-opt-add(); } }
                 }
@@ -808,7 +808,7 @@ component ModifiersSheet inherits Sheet {
                 spacing: 6px;
                 alignment: start;
                 Btn { text: "Novo grupo"; icon: Icons.plus; has-icon: true; fill: Theme.primary; tone: Theme.primary-text; weight: 900; clicked => { CardapioStore.m-new(); } }
-                Text { text: "ou comece de um modelo:"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                Text { text: "ou comece de um modelo:"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                 Btn { text: "Ponto da carne"; clicked => { CardapioStore.m-preset(0); } }
                 Btn { text: "Gelo e limão"; clicked => { CardapioStore.m-preset(1); } }
                 Btn { text: "Adicionais"; clicked => { CardapioStore.m-preset(2); } }
@@ -839,7 +839,7 @@ component DayChip inherits Rectangle {
     background: root.active ? Theme.primary : (touch.has-hover ? Theme.border : Theme.surface-2);
     border-width: 1px;
     border-color: root.active ? Theme.primary : Theme.border;
-    t := Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 800; }
+    t := Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: 800; }
     touch := TouchArea { clicked => { root.clicked(); } }
 }
 
@@ -863,8 +863,8 @@ component PromoCard inherits Rectangle {
                 Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; }
                 if root.data.running: Pill { y: (parent.height - self.height) / 2; text: "AGORA"; tone: Theme.available; solid: true; }
             }
-            Text { text: root.data.description; color: Theme.text; font-size: 12px; font-weight: 600; }
-            Text { text: root.data.targets; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+            Text { text: root.data.description; color: Theme.text; font-size: 13px; font-weight: 600; }
+            Text { text: root.data.targets; color: Theme.text-muted; font-size: 13px; overflow: elide; }
         }
         Toggle { y: (parent.height - self.height) / 2; checked: root.data.active; toggled => { CardapioStore.p-toggle(root.data.id); } }
         Rectangle {
@@ -985,7 +985,7 @@ component PromotionsSheet inherits Sheet {
                             cr := HorizontalLayout {
                                 x: 10px;
                                 spacing: 4px;
-                                Text { text: c.label; color: Theme.primary; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                                Text { text: c.label; color: Theme.primary; font-size: 13px; font-weight: 800; vertical-alignment: center; }
                                 Rectangle {
                                     width: 18px;
                                     Icon { source: Icons.x; color: Theme.primary; size: 13px; }
@@ -1022,7 +1022,7 @@ component PromotionsSheet inherits Sheet {
                                 spacing: 8px;
                                 Check { y: (parent.height - self.height) / 2; size: 18px; checked: r.selected; clicked => { CardapioStore.p-prod(r.id); } }
                                 Text { text: r.label; color: Theme.text; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; overflow: elide; }
-                                Text { text: r.detail; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; vertical-alignment: center; }
+                                Text { text: r.detail; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; vertical-alignment: center; }
                             }
                             rt := TouchArea { clicked => { CardapioStore.p-prod(r.id); } }
                         }
@@ -1037,11 +1037,11 @@ component PromotionsSheet inherits Sheet {
                     prev := VerticalLayout {
                         padding: 12px;
                         spacing: 3px;
-                        Text { text: CardapioStore.p-preview-title; color: Theme.available; font-size: 10px; font-weight: 900; }
+                        Text { text: CardapioStore.p-preview-title; color: Theme.available; font-size: 12px; font-weight: 900; }
                         for p in CardapioStore.p-preview: Text {
                             text: p.label;
                             color: p.selected ? Theme.available : Theme.danger;
-                            font-size: 12px;
+                            font-size: 13px;
                             font-weight: 600;
                             wrap: word-wrap;
                         }
@@ -1111,12 +1111,12 @@ component MenuRowView inherits Rectangle {
             VerticalLayout {
                 horizontal-stretch: 1;
                 Text { text: root.data.title; color: Theme.text; font-size: 13px; font-weight: 900; }
-                if root.data.subtitle != "": Text { text: root.data.subtitle; color: Theme.closing; font-size: 11px; font-weight: 600; wrap: word-wrap; }
+                if root.data.subtitle != "": Text { text: root.data.subtitle; color: Theme.closing; font-size: 13px; font-weight: 600; wrap: word-wrap; }
             }
             Text {
                 text: root.data.action;
                 color: Theme.primary;
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 800;
                 vertical-alignment: center;
                 TouchArea { clicked => { CardapioStore.d-toggle-many(1, root.data.id); } }
@@ -1128,11 +1128,11 @@ component MenuRowView inherits Rectangle {
             padding-left: 14px;
             padding-right: 10px;
             spacing: 8px;
-            Text { text: root.data.title + "  " + root.data.subtitle; color: Theme.text-muted; font-size: 11px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+            Text { text: root.data.title + "  " + root.data.subtitle; color: Theme.text-muted; font-size: 13px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
             Text {
                 text: root.data.action;
                 color: Theme.primary;
-                font-size: 11px;
+                font-size: 13px;
                 font-weight: 800;
                 vertical-alignment: center;
                 TouchArea { clicked => { CardapioStore.d-toggle-many(2, root.data.id); } }
@@ -1163,7 +1163,7 @@ component MenuRowView inherits Rectangle {
                     Text {
                         text: root.data.subtitle;
                         color: root.data.no-price ? Theme.danger : Theme.text-muted;
-                        font-size: 12px;
+                        font-size: 13px;
                         font-weight: root.data.no-price ? 700 : 400;
                         overflow: elide;
                     }
@@ -1174,7 +1174,7 @@ component MenuRowView inherits Rectangle {
                     width: ex.preferred-width + 16px;
                     border-radius: 9px;
                     background: et.has-hover ? Theme.surface-2 : transparent;
-                    ex := Text { text: "Foto e descrição " + (root.data.expanded ? "▴" : "▾"); color: Theme.text-muted; font-size: 12px; font-weight: 800; }
+                    ex := Text { text: "Foto e descrição " + (root.data.expanded ? "▴" : "▾"); color: Theme.text-muted; font-size: 13px; font-weight: 800; }
                     et := TouchArea { clicked => { CardapioStore.d-expand(root.data.id); } }
                 }
             }
@@ -1248,11 +1248,11 @@ component MenuItemsSheet inherits Sheet {
                     background: CardapioStore.d-filter == i ? Theme.primary : transparent;
                     border-width: 1px;
                     border-color: CardapioStore.d-filter == i ? Theme.primary : Theme.border;
-                    ft := Text { text: f; color: CardapioStore.d-filter == i ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 800; }
+                    ft := Text { text: f; color: CardapioStore.d-filter == i ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: 800; }
                     TouchArea { clicked => { CardapioStore.d-filter-pick(i); } }
                 }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: CardapioStore.d-count; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                Text { text: CardapioStore.d-count; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
             }
         }
         Rectangle { height: 1px; background: Theme.surface-2; }
@@ -1269,7 +1269,7 @@ component MenuItemsSheet inherits Sheet {
                 nm := HorizontalLayout {
                     padding: 12px;
                     spacing: 10px;
-                    Text { text: CardapioStore.d-not-menu; color: Theme.closing; font-size: 12px; wrap: word-wrap; horizontal-stretch: 1; vertical-alignment: center; }
+                    Text { text: CardapioStore.d-not-menu; color: Theme.closing; font-size: 13px; wrap: word-wrap; horizontal-stretch: 1; vertical-alignment: center; }
                     Btn { y: (parent.height - self.height) / 2; text: "Desmarcar esses " + CardapioStore.d-not-menu-count; fill: Theme.primary; tone: Theme.primary-text; weight: 900; clicked => { CardapioStore.d-uncheck-store(); } }
                 }
             }
@@ -1295,7 +1295,7 @@ component MenuItemsSheet inherits Sheet {
         VerticalLayout {
             padding: 16px;
             spacing: 8px;
-            if CardapioStore.d-feedback != "": Text { text: CardapioStore.d-feedback; color: CardapioStore.d-error ? Theme.danger : Theme.available; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+            if CardapioStore.d-feedback != "": Text { text: CardapioStore.d-feedback; color: CardapioStore.d-error ? Theme.danger : Theme.available; font-size: 13px; font-weight: 700; wrap: word-wrap; }
             HorizontalLayout {
                 spacing: 8px;
                 alignment: end;

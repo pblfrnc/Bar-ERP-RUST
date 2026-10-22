@@ -102,7 +102,7 @@ export component RButton inherits Rectangle {
     in property <color> hover-bg: self.bg.brighter(0.12);
     in property <color> outline: transparent;
     in property <bool> enabled: true;
-    in property <length> font-size: 12px;
+    in property <length> font-size: 13px;
     in property <int> weight: 800;
     in property <length> pad: 16px;
     callback clicked;
@@ -192,7 +192,7 @@ export component RInput inherits Rectangle {
                 edited => { root.edited(self.text); }
             }
         }
-        if root.suffix != "": Text { text: root.suffix; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+        if root.suffix != "": Text { text: root.suffix; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
     }
 }
 
@@ -226,7 +226,7 @@ export component ToggleRow inherits HorizontalLayout {
     spacing: 12px;
     alignment: start;
     VerticalLayout { alignment: center; Toggle { on: root.on; tone: root.tone; toggled => { root.toggled(); } } }
-    Text { text: root.text; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; }
+    Text { text: root.text; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; }
 }
 
 // Caixa de seleção (checkbox do original)
@@ -261,7 +261,7 @@ export component Badge inherits Rectangle {
     background: root.tone.with-alpha(0.14);
     border-width: 1px;
     border-color: root.tone.with-alpha(0.32);
-    bt := Text { text: root.text; color: root.tone; font-size: 10px; font-weight: 900; letter-spacing: 0.4px; }
+    bt := Text { text: root.text; color: root.tone; font-size: 12px; font-weight: 900; letter-spacing: 0.4px; }
 }
 
 // Ícone num círculo (ou quadrado arredondado) com fundo da cor em 10%
@@ -301,7 +301,7 @@ export component NavCard inherits Rectangle {
             spacing: 2px;
             horizontal-stretch: 1;
             Text { text: root.title; color: touch.has-hover ? root.tone : Theme.text; font-size: 15px; font-weight: 700; wrap: word-wrap; }
-            Text { text: root.subtitle; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+            Text { text: root.subtitle; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
         }
         VerticalLayout { alignment: center; RIcon { source: RtIcons.chevron-right; tint: touch.has-hover ? root.tone : Theme.text-muted; size: 20px; } }
     }
@@ -311,7 +311,7 @@ export component NavCard inherits Rectangle {
 // Rótulo de campo
 export component FieldLabel inherits Text {
     color: Theme.text-muted;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
 }
 
@@ -321,7 +321,7 @@ export component Feedback inherits HorizontalLayout {
     in property <bool> ok;
     spacing: 8px;
     VerticalLayout { alignment: start; RIcon { source: root.ok ? RtIcons.circle-check : RtIcons.alert; tint: root.ok ? Theme.available : Theme.danger; size: 16px; } }
-    Text { text: root.text; color: root.ok ? Theme.available : Theme.danger; font-size: 12px; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
+    Text { text: root.text; color: root.ok ? Theme.available : Theme.danger; font-size: 13px; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
 }
 
 // Faixa de alerta vermelha
@@ -338,7 +338,7 @@ export component AlertBox inherits Rectangle {
         padding-right: 16px;
         spacing: 8px;
         VerticalLayout { alignment: start; RIcon { source: RtIcons.alert; tint: root.tone; size: 16px; } }
-        Text { text: root.text; color: root.tone; font-size: 12px; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
+        Text { text: root.text; color: root.tone; font-size: 13px; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
     }
 }
 

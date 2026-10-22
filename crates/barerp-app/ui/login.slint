@@ -33,6 +33,8 @@ export component LoginPage inherits Rectangle {
     in property <bool> busy;
     in-out property <int> selected: 0;
     in-out property <string> pin;
+    // Tela bloqueada (Ctrl+B): mesmo login, com outro título; o app continua aberto por baixo
+    in property <bool> lock-mode;
     callback submit(string, string);
     property <int> pin-length: root.pin.character-count;
 
@@ -77,8 +79,13 @@ export component LoginPage inherits Rectangle {
             spacing: 18px;
             width: 420px;
 
-            Text { text: "BarERP Pro"; color: Theme.primary; font-size: 34px; font-weight: 900; horizontal-alignment: center; }
-            Text { text: "Escolha seu usuário e digite a senha (ou use o teclado)"; color: Theme.text-muted; font-size: Theme.font-body; horizontal-alignment: center; }
+            Text { text: root.lock-mode ? "Tela bloqueada" : "BarERP Pro"; color: Theme.primary; font-size: 34px; font-weight: 900; horizontal-alignment: center; }
+            Text {
+                text: root.lock-mode ? "Para continuar, escolha o operador e digite a senha" : "Escolha seu usuário e digite a senha (ou use o teclado)";
+                color: Theme.text-muted;
+                font-size: Theme.font-body;
+                horizontal-alignment: center;
+            }
 
             // Funcionários
             Rectangle {

@@ -83,7 +83,9 @@ export global CaixaStore {
     in property <bool> quick-loading;
     in property <[CxCategory]> categories;
     in property <string> all-label: "Todos (0)";
+    // ALL, TOP (mais vendidos) ou o id da categoria
     in-out property <string> category: "ALL";
+    in property <bool> has-top;
     in property <[CxProduct]> products;
     in-out property <string> search;
     in property <int> focus-search-tick;
@@ -133,6 +135,8 @@ export global CaixaStore {
     callback search-enter();
     callback pick-category(string);
     callback add-product(string, bool);
+    // Teclado numérico do valor entregue: dígito, "," , "back" ou "clear"
+    callback keypad(string);
     callback cart-qty(string, int);
     callback cart-remove(string);
     callback cart-clear();
@@ -169,7 +173,7 @@ component Kbd inherits Rectangle {
     border-width: 1px;
     border-color: root.fg.with-alpha(0.35);
     background: Theme.surface-2.with-alpha(0.6);
-    kt := Text { text: root.text; color: root.fg; font-size: 10px; font-weight: 800; font-family: "Menlo"; }
+    kt := Text { text: root.text; color: root.fg; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
 }
 
 // Botão com cor própria (fundo, texto e borda) e etiqueta de atalho opcional
@@ -267,7 +271,7 @@ component CxInput inherits Rectangle {
 
 component FieldLabel inherits Text {
     color: Theme.text-muted;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 800;
 }
 
@@ -287,7 +291,7 @@ component Badge inherits Rectangle {
     background: root.tint.with-alpha(0.15);
     border-width: 1px;
     border-color: root.tint.with-alpha(0.35);
-    bt := Text { text: root.text; color: root.tint; font-size: 11px; font-weight: 800; }
+    bt := Text { text: root.text; color: root.tint; font-size: 13px; font-weight: 800; }
 }
 
 component IconBox inherits Rectangle {
@@ -315,7 +319,7 @@ component StatCard inherits Rectangle {
     VerticalLayout {
         padding: 16px;
         spacing: 4px;
-        Text { text: root.label; color: root.highlight ? Theme.primary : Theme.text-muted; font-size: 11px; font-weight: 800; }
+        Text { text: root.label; color: root.highlight ? Theme.primary : Theme.text-muted; font-size: 13px; font-weight: 800; }
         @children
         if root.value != "": Text { text: root.value; color: root.value-color; font-size: 21px; font-weight: 900; }
     }
@@ -336,7 +340,7 @@ component MethodTile inherits Rectangle {
         HorizontalLayout {
             spacing: 6px;
             Icon { source: root.icon; tint: root.tint; width: 14px; height: 14px; }
-            Text { text: root.label; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; horizontal-stretch: 1; }
+            Text { text: root.label; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; horizontal-stretch: 1; }
         }
         Text { text: root.value; color: Theme.text; font-size: 16px; font-weight: 900; }
     }
@@ -358,22 +362,22 @@ component WaiterCard inherits Rectangle {
                 height: 36px;
                 border-radius: 12px;
                 background: Theme.primary.with-alpha(0.2);
-                Text { text: root.data.initials; color: Theme.primary; font-size: 12px; font-weight: 900; }
+                Text { text: root.data.initials; color: Theme.primary; font-size: 13px; font-weight: 900; }
             }
             VerticalLayout {
                 alignment: center;
                 Text { text: root.data.name; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
-                Text { text: root.data.orders; color: Theme.text-muted; font-size: 11px; }
+                Text { text: root.data.orders; color: Theme.text-muted; font-size: 13px; }
             }
         }
         Rectangle { height: 1px; background: Theme.border; }
         HorizontalLayout {
             VerticalLayout {
-                Text { text: "TOTAL VENDIDO"; color: Theme.text-muted; font-size: 10px; font-weight: 800; }
+                Text { text: "TOTAL VENDIDO"; color: Theme.text-muted; font-size: 12px; font-weight: 800; }
                 Text { text: root.data.sales; color: Theme.text; font-size: 13px; font-family: "Menlo"; }
             }
             VerticalLayout {
-                Text { text: "REPASSE (10%)"; color: Theme.primary; font-size: 10px; font-weight: 800; horizontal-alignment: right; }
+                Text { text: "REPASSE (10%)"; color: Theme.primary; font-size: 12px; font-weight: 800; horizontal-alignment: right; }
                 Text { text: root.data.fee; color: Theme.available; font-size: 16px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; }
             }
         }
@@ -412,7 +416,7 @@ component DialogHeader inherits HorizontalLayout {
     VerticalLayout {
         alignment: center;
         Text { text: root.title; color: Theme.text; font-size: 20px; font-weight: 900; wrap: word-wrap; }
-        if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+        if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
     }
 }
 
@@ -432,6 +436,8 @@ component LabeledRow inherits HorizontalLayout {
 
 component ProductCard inherits Rectangle {
     in property <CxProduct> data;
+    // 1 a 9: atalho Ctrl+número (0 = sem atalho)
+    in property <int> hotkey;
     callback add(bool);
     background: root.data.in-cart > 0 ? Theme.primary.with-alpha(0.1) : (card-touch.has-hover ? Theme.surface-2 : Theme.surface);
     border-radius: 16px;
@@ -448,16 +454,25 @@ component ProductCard inherits Rectangle {
         spacing: 6px;
         HorizontalLayout {
             spacing: 6px;
-            Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 800; wrap: word-wrap; max-height: 36px; overflow: elide; horizontal-stretch: 1; }
+            Text { text: root.data.name; color: Theme.text; font-size: 15px; font-weight: 800; wrap: word-wrap; max-height: 40px; overflow: elide; horizontal-stretch: 1; }
+            if root.hotkey > 0: Rectangle {
+                height: 22px;
+                width: 22px;
+                border-radius: 5px;
+                border-width: 1px;
+                border-color: Theme.border;
+                background: Theme.bg;
+                Text { text: root.hotkey; color: Theme.text-muted; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
+            }
             if root.data.code != "": Rectangle {
                 height: 18px;
                 width: ct.preferred-width + 8px;
                 border-radius: 4px;
                 background: Theme.surface-2;
-                ct := Text { text: "#" + root.data.code; color: Theme.text-muted; font-size: 9px; font-family: "Menlo"; }
+                ct := Text { text: "#" + root.data.code; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; }
             }
         }
-        if root.data.description != "": Text { text: root.data.description; color: Theme.text-muted; font-size: 10px; overflow: elide; }
+        if root.data.description != "": Text { text: root.data.description; color: Theme.text-muted; font-size: 12px; overflow: elide; }
         Rectangle { vertical-stretch: 1; }
         Rectangle { height: 1px; background: Theme.border.with-alpha(0.6); }
 
@@ -473,9 +488,9 @@ component ProductCard inherits Rectangle {
                     border-color: Theme.border;
                     VerticalLayout {
                         alignment: center;
-                        Text { text: "UNIDADE"; color: unit-touch.has-hover ? Theme.primary-text : Theme.text-muted; font-size: 9px; font-weight: 800; horizontal-alignment: center; }
-                        Text { text: root.data.price; color: unit-touch.has-hover ? Theme.primary-text : Theme.available; font-size: 11px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: center; }
-                        if root.data.units > 0: Text { text: "(" + root.data.units + "x)"; color: unit-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 800; horizontal-alignment: center; }
+                        Text { text: "UNIDADE"; color: unit-touch.has-hover ? Theme.primary-text : Theme.text-muted; font-size: 11px; font-weight: 800; horizontal-alignment: center; }
+                        Text { text: root.data.price; color: unit-touch.has-hover ? Theme.primary-text : Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: center; }
+                        if root.data.units > 0: Text { text: "(" + root.data.units + "x)"; color: unit-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 11px; font-weight: 800; horizontal-alignment: center; }
                     }
                     unit-touch := TouchArea { mouse-cursor: pointer; clicked => { root.add(false); } }
                 }
@@ -491,18 +506,18 @@ component ProductCard inherits Rectangle {
                             alignment: center;
                             spacing: 3px;
                             Icon { source: @image-url("icons/package.svg"); tint: box-touch.has-hover ? Theme.primary-text : Theme.primary; width: 10px; height: 10px; }
-                            Text { text: root.data.box-label; color: box-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 900; }
+                            Text { text: root.data.box-label; color: box-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 11px; font-weight: 900; }
                         }
-                        Text { text: root.data.box-price; color: box-touch.has-hover ? Theme.primary-text : Theme.text; font-size: 11px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: center; }
-                        if root.data.boxes > 0: Text { text: "(" + root.data.boxes + " cx)"; color: box-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 900; horizontal-alignment: center; }
+                        Text { text: root.data.box-price; color: box-touch.has-hover ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: center; }
+                        if root.data.boxes > 0: Text { text: "(" + root.data.boxes + " cx)"; color: box-touch.has-hover ? Theme.primary-text : Theme.primary; font-size: 11px; font-weight: 900; horizontal-alignment: center; }
                     }
                     box-touch := TouchArea { mouse-cursor: pointer; clicked => { root.add(true); } }
                 }
             }
             HorizontalLayout {
-                if root.data.track-stock: Text { text: "Estoque: " + root.data.stock + " un"; color: root.data.low-stock ? Theme.danger : Theme.text-muted; font-size: 9px; font-weight: root.data.low-stock ? 800 : 400; }
+                if root.data.track-stock: Text { text: "Estoque: " + root.data.stock + " un"; color: root.data.low-stock ? Theme.danger : Theme.text-muted; font-size: 11px; font-weight: root.data.low-stock ? 800 : 400; }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: root.data.box-per-unit; color: Theme.available; font-size: 9px; font-family: "Menlo"; }
+                Text { text: root.data.box-per-unit; color: Theme.available; font-size: 11px; font-family: "Menlo"; }
             }
         }
 
@@ -510,7 +525,7 @@ component ProductCard inherits Rectangle {
             alignment: space-between;
             VerticalLayout {
                 alignment: end;
-                if root.data.promo: Text { text: root.data.full-price; color: Theme.text-muted; font-size: 10px; font-weight: 700; stroke: Theme.text-muted; }
+                if root.data.promo: Text { text: root.data.full-price; color: Theme.text-muted; font-size: 12px; font-weight: 700; stroke: Theme.text-muted; }
                 Text { text: root.data.price; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; }
             }
             if root.data.track-stock: VerticalLayout {
@@ -520,7 +535,7 @@ component ProductCard inherits Rectangle {
                     width: st.preferred-width + 10px;
                     border-radius: 6px;
                     background: root.data.low-stock ? Theme.danger.with-alpha(0.15) : Theme.surface-2;
-                    st := Text { text: root.data.stock + " un"; color: root.data.low-stock ? Theme.danger : Theme.text-muted; font-size: 9px; font-weight: 800; }
+                    st := Text { text: root.data.stock + " un"; color: root.data.low-stock ? Theme.danger : Theme.text-muted; font-size: 11px; font-weight: 800; }
                 }
             }
         }
@@ -533,7 +548,7 @@ component ProductCard inherits Rectangle {
         height: 20px;
         border-radius: 10px;
         background: Theme.primary;
-        Text { text: root.data.in-cart; color: Theme.primary-text; font-size: 10px; font-weight: 900; }
+        Text { text: root.data.in-cart; color: Theme.primary-text; font-size: 12px; font-weight: 900; }
     }
 }
 
@@ -555,7 +570,7 @@ component CartRow inherits Rectangle {
             spacing: 2px;
             HorizontalLayout {
                 spacing: 6px;
-                Text { text: root.data.name; color: Theme.text; font-size: 12px; font-weight: 800; overflow: elide; horizontal-stretch: 1; }
+                Text { text: root.data.name; color: Theme.text; font-size: 13px; font-weight: 800; overflow: elide; horizontal-stretch: 1; }
                 Rectangle {
                     height: 16px;
                     width: tag.preferred-width + 8px;
@@ -565,13 +580,13 @@ component CartRow inherits Rectangle {
                         alignment: center;
                         spacing: 3px;
                         if root.data.is-box: Icon { source: @image-url("icons/package.svg"); tint: Theme.primary; width: 10px; height: 10px; y: 3px; }
-                        Text { text: root.data.is-box ? root.data.box-label : "Un"; color: root.data.is-box ? Theme.primary : Theme.text-muted; font-size: 9px; font-weight: 900; vertical-alignment: center; }
+                        Text { text: root.data.is-box ? root.data.box-label : "Un"; color: root.data.is-box ? Theme.primary : Theme.text-muted; font-size: 11px; font-weight: 900; vertical-alignment: center; }
                     }
                 }
             }
-            Text { text: root.data.unit-price; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; }
-            if root.data.options != "": Text { text: root.data.options; color: Theme.occupied; font-size: 10px; font-weight: 700; overflow: elide; }
-            if root.data.promo != "": Text { text: root.data.promo; color: Theme.danger; font-size: 10px; font-weight: 800; overflow: elide; }
+            Text { text: root.data.unit-price; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; }
+            if root.data.options != "": Text { text: root.data.options; color: Theme.occupied; font-size: 12px; font-weight: 700; overflow: elide; }
+            if root.data.promo != "": Text { text: root.data.promo; color: Theme.danger; font-size: 12px; font-weight: 800; overflow: elide; }
         }
         VerticalLayout {
             alignment: center;
@@ -600,7 +615,7 @@ component CartRow inherits Rectangle {
         VerticalLayout {
             alignment: center;
             width: 76px;
-            Text { text: root.data.total; color: Theme.available; font-size: 12px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; }
+            Text { text: root.data.total; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; }
             HorizontalLayout {
                 alignment: end;
                 Icon {
@@ -632,7 +647,7 @@ component PayMethod inherits Rectangle {
         padding-top: 12px;
         spacing: 2px;
         HorizontalLayout { alignment: center; Icon { source: root.icon; tint: root.active ? root.tint : Theme.text-muted; width: 15px; height: 15px; } }
-        Text { text: root.label; color: root.active ? root.tint : Theme.text-muted; font-size: 12px; font-weight: 800; horizontal-alignment: center; }
+        Text { text: root.label; color: root.active ? root.tint : Theme.text-muted; font-size: 13px; font-weight: 800; horizontal-alignment: center; }
     }
     Kbd { x: parent.width - self.width - 4px; y: 4px; text: root.key-label; }
     t := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
@@ -674,7 +689,7 @@ component ModifierPicker inherits Rectangle {
                 VerticalLayout {
                     horizontal-stretch: 1;
                     Text { text: CaixaStore.picker-title; color: Theme.text; font-size: 18px; font-weight: 900; overflow: elide; }
-                    Text { text: "Escolha as opções do pedido"; color: Theme.text-muted; font-size: 12px; }
+                    Text { text: "Escolha as opções do pedido"; color: Theme.text-muted; font-size: 13px; }
                 }
                 CxButton { icon: @image-url("icons/x.svg"); min-height: 34px; width: 34px; clicked => { CaixaStore.picker-cancel(); } }
             }
@@ -692,7 +707,7 @@ component ModifierPicker inherits Rectangle {
                             Text {
                                 text: group.rule;
                                 color: group.missing ? Theme.danger : group.required ? Theme.primary : Theme.text-muted;
-                                font-size: 10px;
+                                font-size: 12px;
                                 font-weight: 800;
                             }
                         }
@@ -715,8 +730,8 @@ component ModifierPicker inherits Rectangle {
                                     VerticalLayout {
                                         alignment: center;
                                         horizontal-stretch: 1;
-                                        Text { text: opt.name; color: opt.selected ? Theme.primary : Theme.text; font-size: 12px; font-weight: 800; wrap: word-wrap; }
-                                        if opt.price != "": Text { text: opt.price; color: Theme.available; font-size: 10px; font-family: "Menlo"; }
+                                        Text { text: opt.name; color: opt.selected ? Theme.primary : Theme.text; font-size: 13px; font-weight: 800; wrap: word-wrap; }
+                                        if opt.price != "": Text { text: opt.price; color: Theme.available; font-size: 12px; font-family: "Menlo"; }
                                     }
                                     if opt.selected: VerticalLayout { alignment: center; Icon { source: @image-url("icons/check.svg"); tint: Theme.primary; } }
                                 }
@@ -734,7 +749,7 @@ component ModifierPicker inherits Rectangle {
             VerticalLayout {
                 padding: 16px;
                 spacing: 8px;
-                if CaixaStore.picker-error != "": Text { text: CaixaStore.picker-error; color: Theme.danger; font-size: 12px; font-weight: 800; wrap: word-wrap; }
+                if CaixaStore.picker-error != "": Text { text: CaixaStore.picker-error; color: Theme.danger; font-size: 13px; font-weight: 800; wrap: word-wrap; }
                 CxButton {
                     text: "Adicionar · " + CaixaStore.picker-total;
                     bg: Theme.primary;
@@ -771,6 +786,13 @@ component QuickSale inherits Rectangle {
                 search-input.select-all();
                 return accept;
             }
+            // Ctrl+1..9 adiciona o produto da posição na grade (a busca pode estar com o foco)
+            if (event.modifiers.control || event.modifiers.meta) && event.text.character-count == 1 && event.text.is-float() {
+                if event.text.to-float() >= 1 && event.text.to-float() <= CaixaStore.products.length {
+                    CaixaStore.add-product(CaixaStore.products[Math.round(event.text.to-float()) - 1].id, false);
+                }
+                return accept;
+            }
             if event.modifiers.control || event.modifiers.alt || event.modifiers.meta { return reject; }
             if event.text == Key.F8 { CaixaStore.emit-nfce = !CaixaStore.emit-nfce; CaixaStore.recompute(); return accept; }
             if event.text == Key.F12 { CaixaStore.finish-sale(); return accept; }
@@ -804,7 +826,7 @@ component QuickSale inherits Rectangle {
                                 Text { text: "Venda Rápida de Balcão (PDV Tela Cheia)"; color: Theme.text; font-size: 18px; font-weight: 900; vertical-alignment: center; }
                                 VerticalLayout { alignment: center; Badge { text: "PDV EXPRESSO"; tint: Theme.available; } }
                             }
-                            Text { text: "Atendimento ágil direto no balcão sem necessidade de abrir mesa"; color: Theme.text-muted; font-size: 12px; }
+                            Text { text: "Atendimento ágil direto no balcão sem necessidade de abrir mesa"; color: Theme.text-muted; font-size: 13px; }
                         }
                     }
                     VerticalLayout {
@@ -824,7 +846,7 @@ component QuickSale inherits Rectangle {
                     padding-right: 24px;
                     spacing: 10px;
                     VerticalLayout { alignment: center; Icon { source: @image-url("icons/check-circle.svg"); tint: Theme.available; } }
-                    Text { text: CaixaStore.success-text; color: Theme.available; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                    Text { text: CaixaStore.success-text; color: Theme.available; font-size: 13px; font-weight: 800; vertical-alignment: center; }
                     if CaixaStore.success-change != "": VerticalLayout {
                         alignment: center;
                         Rectangle {
@@ -834,14 +856,14 @@ component QuickSale inherits Rectangle {
                             background: Theme.available.with-alpha(0.2);
                             border-width: 1px;
                             border-color: Theme.available.with-alpha(0.4);
-                            chg := Text { text: "Troco: " + CaixaStore.success-change; color: Theme.text; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
+                            chg := Text { text: "Troco: " + CaixaStore.success-change; color: Theme.text; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
                         }
                     }
                     Rectangle { horizontal-stretch: 1; }
                     Text {
                         text: "Dispensar";
                         color: Theme.available;
-                        font-size: 12px;
+                        font-size: 13px;
                         vertical-alignment: center;
                         TouchArea { mouse-cursor: pointer; clicked => { CaixaStore.dismiss-success(); } }
                     }
@@ -872,7 +894,7 @@ component QuickSale inherits Rectangle {
                             horizontal-stretch: 1;
                             text: st.text;
                             color: st.kind == "authorized" ? Theme.available : st.kind == "error" ? Theme.danger : Theme.primary;
-                            font-size: 12px;
+                            font-size: 13px;
                             font-weight: 800;
                             overflow: elide;
                         }
@@ -880,7 +902,7 @@ component QuickSale inherits Rectangle {
                             icon: @image-url("icons/printer.svg");
                             text: "Reimprimir";
                             min-height: 24px;
-                            font-size: 11px;
+                            font-size: 13px;
                             bg: transparent;
                             fg: Theme.text-muted;
                             clicked => { CaixaStore.nfce-reprint(st.order-number); }
@@ -889,7 +911,7 @@ component QuickSale inherits Rectangle {
                             icon: @image-url("icons/rotate-ccw.svg");
                             text: "Tentar de novo";
                             min-height: 24px;
-                            font-size: 11px;
+                            font-size: 13px;
                             bg: transparent;
                             fg: Theme.danger;
                             clicked => { CaixaStore.nfce-retry(st.order-number); }
@@ -898,7 +920,7 @@ component QuickSale inherits Rectangle {
                             icon: @image-url("icons/x.svg");
                             min-height: 24px;
                             width: 28px;
-                            font-size: 11px;
+                            font-size: 13px;
                             bg: transparent;
                             fg: Theme.text-muted;
                             clicked => { CaixaStore.nfce-dismiss(st.order-number); }
@@ -923,8 +945,8 @@ component QuickSale inherits Rectangle {
                                     width: 100%;
                                     y: (parent.height - self.height) / 2;
                                     text <=> CaixaStore.search;
-                                    placeholder: "Digite iniciais (ex: HEIN, AGUA), código (#5001) ou bipe o código de barras + Enter...";
-                                    font-size: 14px;
+                                    placeholder: "Nome, código (#5001) ou bipe o código de barras · 3* antes = 3 unidades";
+                                    font-size: 16px;
                                     edited(text) => { CaixaStore.search-edited(text); }
                                     accepted => { CaixaStore.search-enter(); }
                                     // Na busca vazia (logo após bipar) Shift+A..D escolhe a forma de pagamento
@@ -950,22 +972,31 @@ component QuickSale inherits Rectangle {
                                 }
                             }
                             Flickable {
-                                height: 34px;
+                                height: 42px;
                                 content-width: chips.preferred-width;
                                 chips := HorizontalLayout {
                                     spacing: 6px;
+                                    if CaixaStore.has-top: CxButton {
+                                        icon: @image-url("../../assets/icons/star.svg");
+                                        text: "Mais vendidos";
+                                        min-height: 40px;
+                                        font-size: 14px;
+                                        bg: CaixaStore.category == "TOP" ? Theme.primary : Theme.surface-2;
+                                        fg: CaixaStore.category == "TOP" ? Theme.primary-text : Theme.text-muted;
+                                        clicked => { CaixaStore.pick-category("TOP"); }
+                                    }
                                     CxButton {
                                         text: CaixaStore.all-label;
-                                        min-height: 32px;
-                                        font-size: 12px;
+                                        min-height: 40px;
+                                        font-size: 14px;
                                         bg: CaixaStore.category == "ALL" ? Theme.primary : Theme.surface-2;
                                         fg: CaixaStore.category == "ALL" ? Theme.primary-text : Theme.text-muted;
                                         clicked => { CaixaStore.pick-category("ALL"); }
                                     }
                                     for cat in CaixaStore.categories: CxButton {
                                         text: cat.label;
-                                        min-height: 32px;
-                                        font-size: 12px;
+                                        min-height: 40px;
+                                        font-size: 14px;
                                         bg: CaixaStore.category == cat.id ? Theme.primary : Theme.surface-2;
                                         fg: CaixaStore.category == cat.id ? Theme.primary-text : Theme.text-muted;
                                         clicked => { CaixaStore.pick-category(cat.id); }
@@ -986,7 +1017,7 @@ component QuickSale inherits Rectangle {
                         if !CaixaStore.quick-loading && CaixaStore.products.length == 0: VerticalLayout {
                             alignment: center;
                             HorizontalLayout { alignment: center; Icon { source: @image-url("icons/package.svg"); tint: Theme.text-muted; width: 40px; height: 40px; } }
-                            Text { text: "Nenhum produto encontrado."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+                            Text { text: "Nenhum produto encontrado."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
                         }
                         Flickable {
                             content-height: ceil(CaixaStore.products.length / parent.cols) * (parent.card-h + parent.gap) + 32px;
@@ -996,6 +1027,7 @@ component QuickSale inherits Rectangle {
                                 width: grid-area.card-w;
                                 height: grid-area.card-h;
                                 data: p;
+                                hotkey: i < 9 ? i + 1 : 0;
                                 add(is-box) => { CaixaStore.add-product(p.id, is-box); }
                             }
                         }
@@ -1015,14 +1047,14 @@ component QuickSale inherits Rectangle {
                             HorizontalLayout {
                                 padding-left: 16px;
                                 padding-right: 16px;
-                                Text { text: "ITENS DA VENDA (" + CaixaStore.cart-count + ")"; color: Theme.text; font-size: 12px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                                Text { text: "ITENS DA VENDA (" + CaixaStore.cart-count + ")"; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
                                 if CaixaStore.cart.length > 0: VerticalLayout {
                                     alignment: center;
                                     CxButton {
                                         icon: @image-url("icons/trash.svg");
                                         text: "Limpar";
                                         min-height: 26px;
-                                        font-size: 11px;
+                                        font-size: 13px;
                                         bg: transparent;
                                         hover-bg: Theme.danger.with-alpha(0.1);
                                         fg: Theme.danger;
@@ -1039,7 +1071,7 @@ component QuickSale inherits Rectangle {
                                 spacing: 8px;
                                 padding: 24px;
                                 HorizontalLayout { alignment: center; IconBox { icon: @image-url("icons/zap.svg"); tint: Theme.text-muted; size: 48px; } }
-                                Text { text: "Clique nos produtos ao lado para adicionar à venda rápida."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+                                Text { text: "Clique nos produtos ao lado para adicionar à venda rápida."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; wrap: word-wrap; }
                             }
                             Flickable {
                                 content-height: cart-list.preferred-height;
@@ -1074,12 +1106,12 @@ component QuickSale inherits Rectangle {
                                     VerticalLayout {
                                         spacing: 4px;
                                         FieldLabel { text: "DESCONTO (R$)"; }
-                                        CxInput { text <=> CaixaStore.discount; placeholder: "0,00"; mono: true; font-size: 12px; edited => { CaixaStore.recompute(); } }
+                                        CxInput { text <=> CaixaStore.discount; placeholder: "0,00"; mono: true; font-size: 13px; edited => { CaixaStore.recompute(); } }
                                     }
                                     VerticalLayout {
                                         spacing: 4px;
                                         FieldLabel { text: "CLIENTE (OPCIONAL)"; }
-                                        CxInput { text <=> CaixaStore.customer; placeholder: "Nome ou CPF"; font-size: 12px; }
+                                        CxInput { text <=> CaixaStore.customer; placeholder: "Nome ou CPF"; font-size: 13px; }
                                     }
                                 }
                                 VerticalLayout {
@@ -1103,37 +1135,56 @@ component QuickSale inherits Rectangle {
                                         spacing: 8px;
                                         HorizontalLayout {
                                             spacing: 8px;
-                                            Text { text: "Valor Entregue:"; color: Theme.text-muted; font-size: 11px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
+                                            Text { text: "Valor Entregue:"; color: Theme.text-muted; font-size: 13px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
                                             CxInput {
                                                 width: 130px;
                                                 text <=> CaixaStore.tendered;
                                                 placeholder: CaixaStore.total-placeholder;
                                                 mono: true;
                                                 weight: 800;
-                                                font-size: 12px;
+                                                font-size: 13px;
                                                 align: right;
                                                 edited => { CaixaStore.recompute(); }
                                             }
                                         }
-                                        HorizontalLayout {
-                                            alignment: end;
-                                            spacing: 4px;
-                                            for v in ["20", "50", "100"]: CxButton {
-                                                text: "R$" + v;
-                                                min-height: 24px;
-                                                font-size: 10px;
-                                                clicked => { CaixaStore.tendered = v; CaixaStore.recompute(); }
+                                        // Teclado numérico na tela (toque) com notas comuns e "Exato"
+                                        GridLayout {
+                                            spacing: 6px;
+                                            Row {
+                                                CxButton { text: "7"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("7"); } }
+                                                CxButton { text: "8"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("8"); } }
+                                                CxButton { text: "9"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("9"); } }
+                                                CxButton { text: "R$ 50"; min-height: 44px; font-size: 14px; weight: 800; fg: Theme.available; clicked => { CaixaStore.tendered = "50"; CaixaStore.recompute(); } }
                                             }
-                                            CxButton {
-                                                text: "Exato";
-                                                min-height: 24px;
-                                                font-size: 10px;
-                                                fg: Theme.primary;
-                                                clicked => { CaixaStore.tendered = ""; CaixaStore.shortcut("exactCash"); }
+                                            Row {
+                                                CxButton { text: "4"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("4"); } }
+                                                CxButton { text: "5"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("5"); } }
+                                                CxButton { text: "6"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("6"); } }
+                                                CxButton { text: "R$ 100"; min-height: 44px; font-size: 14px; weight: 800; fg: Theme.available; clicked => { CaixaStore.tendered = "100"; CaixaStore.recompute(); } }
+                                            }
+                                            Row {
+                                                CxButton { text: "1"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("1"); } }
+                                                CxButton { text: "2"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("2"); } }
+                                                CxButton { text: "3"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("3"); } }
+                                                CxButton { text: "R$ 20"; min-height: 44px; font-size: 14px; weight: 800; fg: Theme.available; clicked => { CaixaStore.tendered = "20"; CaixaStore.recompute(); } }
+                                            }
+                                            Row {
+                                                CxButton { text: "00"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("00"); } }
+                                                CxButton { text: "0"; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad("0"); } }
+                                                CxButton { text: ","; min-height: 44px; font-size: 19px; weight: 800; clicked => { CaixaStore.keypad(","); } }
+                                                CxButton { icon: @image-url("../../assets/icons/delete.svg"); min-height: 44px; fg: Theme.text-muted; clicked => { CaixaStore.keypad("back"); } }
                                             }
                                         }
+                                        CxButton {
+                                            text: "Exato (sem troco)";
+                                            min-height: 40px;
+                                            font-size: 14px;
+                                            weight: 800;
+                                            fg: Theme.primary;
+                                            clicked => { CaixaStore.tendered = ""; CaixaStore.shortcut("exactCash"); }
+                                        }
                                         if CaixaStore.change-label != "": HorizontalLayout {
-                                            Text { text: "Troco a Devolver:"; color: Theme.primary; font-size: 12px; font-weight: 900; horizontal-stretch: 1; }
+                                            Text { text: "Troco a Devolver:"; color: Theme.primary; font-size: 13px; font-weight: 900; horizontal-stretch: 1; }
                                             Text { text: CaixaStore.change-label; color: Theme.primary; font-size: 14px; font-weight: 900; font-family: "Menlo"; }
                                         }
                                     }
@@ -1143,7 +1194,7 @@ component QuickSale inherits Rectangle {
                                         alignment: end;
                                         horizontal-stretch: 1;
                                         FieldLabel { text: "TOTAL A PAGAR"; }
-                                        if CaixaStore.has-discount: Text { text: CaixaStore.subtotal-label; color: Theme.text-muted; font-size: 10px; stroke: Theme.text-muted; }
+                                        if CaixaStore.has-discount: Text { text: CaixaStore.subtotal-label; color: Theme.text-muted; font-size: 12px; stroke: Theme.text-muted; }
                                     }
                                     Text { text: CaixaStore.total-label; color: Theme.available; font-size: 26px; font-weight: 900; font-family: "Menlo"; }
                                 }
@@ -1158,7 +1209,7 @@ component QuickSale inherits Rectangle {
                                         HorizontalLayout {
                                             spacing: 8px;
                                             VerticalLayout { alignment: center; Icon { source: @image-url("icons/file-text.svg"); tint: CaixaStore.emit-nfce ? Theme.available : Theme.text-muted; } }
-                                            Text { text: "Emitir NFC-e"; color: Theme.text; font-size: 12px; font-weight: 900; vertical-alignment: center; }
+                                            Text { text: "Emitir NFC-e"; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; }
                                             VerticalLayout { alignment: center; Kbd { text: "F8"; } }
                                             Rectangle { horizontal-stretch: 1; }
                                             VerticalLayout { alignment: center; Toggle { on: CaixaStore.emit-nfce; } }
@@ -1167,11 +1218,11 @@ component QuickSale inherits Rectangle {
                                             text <=> CaixaStore.nfce-doc;
                                             placeholder: "CPF/CNPJ na nota (opcional)";
                                             mono: true;
-                                            font-size: 12px;
+                                            font-size: 13px;
                                             error: CaixaStore.nfce-doc-error != "";
                                             edited => { CaixaStore.recompute(); }
                                         }
-                                        if CaixaStore.emit-nfce && CaixaStore.nfce-doc-error != "": Text { text: CaixaStore.nfce-doc-error; color: Theme.danger; font-size: 10px; font-weight: 800; wrap: word-wrap; }
+                                        if CaixaStore.emit-nfce && CaixaStore.nfce-doc-error != "": Text { text: CaixaStore.nfce-doc-error; color: Theme.danger; font-size: 12px; font-weight: 800; wrap: word-wrap; }
                                     }
                                     TouchArea {
                                         height: 42px;
@@ -1196,7 +1247,7 @@ component QuickSale inherits Rectangle {
                                     Text {
                                         text: (CaixaStore.emit-nfce ? "Imprimir comprovante se a NFC-e falhar" : "Imprimir comprovante térmico");
                                         color: Theme.text-muted;
-                                        font-size: 12px;
+                                        font-size: 13px;
                                         vertical-alignment: center;
                                         horizontal-stretch: 1;
                                     }
@@ -1283,7 +1334,7 @@ export component CaixaAreaPage inherits Rectangle {
                                 }
                                 Rectangle { horizontal-stretch: 1; }
                             }
-                            Text { text: "Controle de suprimento, sangria, recebimentos e repasse de comissões (10%)"; color: Theme.text-muted; font-size: 12px; overflow: elide; }
+                            Text { text: "Controle de suprimento, sangria, recebimentos e repasse de comissões (10%)"; color: Theme.text-muted; font-size: 13px; overflow: elide; }
                         }
                         if CaixaStore.is-open: VerticalLayout {
                             alignment: center;
@@ -1323,7 +1374,7 @@ export component CaixaAreaPage inherits Rectangle {
                             spacing: 14px;
                             HorizontalLayout { alignment: center; IconBox { icon: @image-url("icons/unlock.svg"); tint: Theme.primary; size: 64px; } }
                             Text { text: "Abrir Turno de Caixa"; color: Theme.text; font-size: 20px; font-weight: 900; horizontal-alignment: center; }
-                            Text { text: "Inicie as operações informando o fundo de troco inicial disponível na gaveta."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+                            Text { text: "Inicie as operações informando o fundo de troco inicial disponível na gaveta."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; wrap: word-wrap; }
                             VerticalLayout {
                                 spacing: 4px;
                                 FieldLabel { text: "FUNDO DE TROCO INICIAL (R$) *"; }
@@ -1363,7 +1414,7 @@ export component CaixaAreaPage inherits Rectangle {
                             CxButton {
                                 icon: @image-url("icons/rotate-ccw.svg");
                                 text: "Fechou o caixa anterior com erro de digitação? Reabrir último turno";
-                                font-size: 12px;
+                                font-size: 13px;
                                 bg: transparent;
                                 hover-bg: Theme.primary.with-alpha(0.1);
                                 fg: Theme.primary;
@@ -1417,7 +1468,7 @@ export component CaixaAreaPage inherits Rectangle {
                                 padding: 20px;
                                 spacing: 8px;
                                 Text { text: "AÇÕES DE CAIXA"; color: Theme.text; font-size: 13px; font-weight: 900; }
-                                Text { text: "Operador: " + CaixaStore.opened-by; color: Theme.text-muted; font-size: 12px; }
+                                Text { text: "Operador: " + CaixaStore.opened-by; color: Theme.text-muted; font-size: 13px; }
                                 CxButton {
                                     icon: @image-url("icons/zap-fill.svg");
                                     text: "NOVA VENDA DE BALCÃO";
@@ -1480,7 +1531,7 @@ export component CaixaAreaPage inherits Rectangle {
                                         VerticalLayout { alignment: center; Badge { text: "FIM DE EXPEDIENTE"; tint: Theme.primary; } }
                                         Rectangle { horizontal-stretch: 1; }
                                     }
-                                    Text { text: "Totalização das taxas de serviço arrecadadas no turno para repasse aos garçons"; color: Theme.text-muted; font-size: 12px; overflow: elide; }
+                                    Text { text: "Totalização das taxas de serviço arrecadadas no turno para repasse aos garçons"; color: Theme.text-muted; font-size: 13px; overflow: elide; }
                                 }
                                 VerticalLayout {
                                     alignment: center;
@@ -1494,7 +1545,7 @@ export component CaixaAreaPage inherits Rectangle {
                                             padding-left: 16px;
                                             padding-right: 16px;
                                             spacing: 10px;
-                                            Text { text: "TOTAL 10% DO TURNO:"; color: Theme.text-muted; font-size: 11px; font-weight: 800; vertical-alignment: center; }
+                                            Text { text: "TOTAL 10% DO TURNO:"; color: Theme.text-muted; font-size: 13px; font-weight: 800; vertical-alignment: center; }
                                             Text { text: CaixaStore.fee-total; color: Theme.available; font-size: 18px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
                                         }
                                     }
@@ -1507,7 +1558,7 @@ export component CaixaAreaPage inherits Rectangle {
                                 border-width: 1px;
                                 border-color: Theme.border;
                                 background: Theme.bg.with-alpha(0.5);
-                                Text { text: "Nenhum valor de taxa de serviço (10%) acumulado neste turno ainda."; color: Theme.text-muted; font-size: 12px; }
+                                Text { text: "Nenhum valor de taxa de serviço (10%) acumulado neste turno ainda."; color: Theme.text-muted; font-size: 13px; }
                             }
                             if CaixaStore.waiters.length > 0: Rectangle {
                                 property <int> cols: 3;
@@ -1534,7 +1585,7 @@ export component CaixaAreaPage inherits Rectangle {
                             if CaixaStore.payments.length == 0: Text {
                                 text: "Nenhum pagamento registrado ainda neste turno.";
                                 color: Theme.text-muted;
-                                font-size: 12px;
+                                font-size: 13px;
                                 horizontal-alignment: center;
                                 min-height: 48px;
                                 vertical-alignment: center;
@@ -1561,13 +1612,13 @@ export component CaixaAreaPage inherits Rectangle {
                                                     width: pg.preferred-width + 12px;
                                                     border-radius: 7px;
                                                     background: Theme.available.with-alpha(0.12);
-                                                    pg := Text { text: "PAGAMENTO"; color: Theme.available; font-size: 10px; font-weight: 800; }
+                                                    pg := Text { text: "PAGAMENTO"; color: Theme.available; font-size: 12px; font-weight: 800; }
                                                 }
                                             }
-                                            Text { text: p.place + " • " + p.method; color: Theme.text; font-size: 12px; font-weight: 600; vertical-alignment: center; }
-                                            if p.notes != "": Text { text: "(" + p.notes + ")"; color: Theme.text-muted; font-size: 12px; font-italic: true; vertical-alignment: center; overflow: elide; }
+                                            Text { text: p.place + " • " + p.method; color: Theme.text; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+                                            if p.notes != "": Text { text: "(" + p.notes + ")"; color: Theme.text-muted; font-size: 13px; font-italic: true; vertical-alignment: center; overflow: elide; }
                                             Rectangle { horizontal-stretch: 1; }
-                                            Text { text: "+ " + p.amount; color: Theme.available; font-size: 12px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
+                                            Text { text: "+ " + p.amount; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
                                         }
                                     }
                                 }
@@ -1634,7 +1685,7 @@ export component CaixaAreaPage inherits Rectangle {
                         Text {
                             text: "Conte o dinheiro em espécie na gaveta. Na próxima etapa você verá a conferência do sistema e poderá voltar para corrigir se houver qualquer erro de digitação.";
                             color: Theme.text-muted;
-                            font-size: 12px;
+                            font-size: 13px;
                             wrap: word-wrap;
                         }
                     }
@@ -1704,7 +1755,7 @@ export component CaixaAreaPage inherits Rectangle {
                         VerticalLayout { alignment: center; Icon { source: @image-url("icons/check-circle.svg"); tint: Theme.available; width: 20px; height: 20px; } }
                         VerticalLayout {
                             Text { text: "Caixa 100% Exato!"; color: Theme.available; font-size: 13px; font-weight: 800; }
-                            Text { text: "O valor digitado bateu com o esperado pelo sistema."; color: Theme.available; font-size: 11px; }
+                            Text { text: "O valor digitado bateu com o esperado pelo sistema."; color: Theme.available; font-size: 13px; }
                         }
                     }
                 }
@@ -1730,7 +1781,7 @@ export component CaixaAreaPage inherits Rectangle {
                         Text {
                             text: "O valor digitado (" + CaixaStore.check-counted + ") é diferente do esperado (" + CaixaStore.check-expected + ").";
                             color: Theme.text;
-                            font-size: 12px;
+                            font-size: 13px;
                             wrap: word-wrap;
                         }
                         Rectangle {
@@ -1743,7 +1794,7 @@ export component CaixaAreaPage inherits Rectangle {
                                 Text {
                                     text: "Errou a digitação de alguma nota ou moeda? Clique em \"Voltar e Corrigir Valor\" abaixo para ajustar a contagem antes de fechar.";
                                     color: Theme.text;
-                                    font-size: 12px;
+                                    font-size: 13px;
                                     font-weight: 800;
                                     wrap: word-wrap;
                                 }
@@ -1809,14 +1860,14 @@ export component CaixaAreaPage inherits Rectangle {
                                 spacing: 6px;
                                 horizontal-stretch: 1;
                                 VerticalLayout { alignment: center; Icon { source: @image-url("icons/users.svg"); tint: Theme.primary; } }
-                                Text { text: "REPASSE DE 10% AOS GARÇONS"; color: Theme.primary; font-size: 12px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                                Text { text: "REPASSE DE 10% AOS GARÇONS"; color: Theme.primary; font-size: 13px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
                             }
                             Text { text: "Total: " + CaixaStore.rep-fee-total; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; }
                         }
                         if CaixaStore.rep-waiters.length == 0: Text {
                             text: "Nenhuma comissão acumulada neste turno.";
                             color: Theme.text-muted;
-                            font-size: 11px;
+                            font-size: 13px;
                             font-italic: true;
                         }
                         if CaixaStore.rep-waiters.length > 0: Flickable {
@@ -1836,8 +1887,8 @@ export component CaixaAreaPage inherits Rectangle {
                                         VerticalLayout {
                                             alignment: center;
                                             horizontal-stretch: 1;
-                                            Text { text: w.name; color: Theme.text; font-size: 12px; font-weight: 800; }
-                                            Text { text: w.orders + " • " + w.sales + " em vendas"; color: Theme.text-muted; font-size: 10px; }
+                                            Text { text: w.name; color: Theme.text; font-size: 13px; font-weight: 800; }
+                                            Text { text: w.orders + " • " + w.sales + " em vendas"; color: Theme.text-muted; font-size: 12px; }
                                         }
                                         Text { text: w.fee; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
                                     }

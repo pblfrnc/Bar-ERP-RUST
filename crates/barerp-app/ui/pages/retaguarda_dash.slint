@@ -1,7 +1,7 @@
 // Dashboard & Indicadores (DashboardView.tsx) com a aba Monitoramento Cego (AuditView.tsx).
 
 import { Theme } from "../theme.slint";
-import { RetaguardaStore, RtTopProduct, RtBar, RtWaiter, RtLowMargin, RtAudit } from "retaguarda_store.slint";
+import { RetaguardaStore, RtTopProduct, RtBar, RtDelta, RtWaiter, RtLowMargin, RtAudit } from "retaguarda_store.slint";
 import { RtIcons, RtColors, RIcon, Spinner, RButton, GhostButton, Card, IconBubble, ProgressBar, BackButton } from "retaguarda_widgets.slint";
 
 component MetricCard inherits Rectangle {
@@ -11,6 +11,9 @@ component MetricCard inherits Rectangle {
     in property <string> value;
     in property <color> value-color: Theme.text;
     in property <string> sub;
+    // Comparação com o período anterior (vazia = não mostra)
+    in property <RtDelta> delta;
+    in property <string> compare;
     border-radius: 18px;
     background: Theme.surface;
     border-width: 1px;
@@ -21,11 +24,41 @@ component MetricCard inherits Rectangle {
         HorizontalLayout {
             spacing: 8px;
             VerticalLayout { alignment: center; RIcon { source: root.icon; tint: root.tone; } }
-            Text { text: root.label; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+            Text { text: root.label; color: Theme.text-muted; font-size: 13px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
         }
-        Text { text: root.value; color: root.value-color; font-size: 24px; font-weight: 900; }
-        Text { text: root.sub; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+        Text { text: root.value; color: root.value-color; font-size: 28px; font-weight: 900; }
+        if root.delta.text != "": HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            Rectangle {
+                height: 24px;
+                width: dl.preferred-width + 18px;
+                border-radius: 12px;
+                background: root.delta.sign > 0 ? Theme.available.with-alpha(0.16) : root.delta.sign < 0 ? Theme.danger.with-alpha(0.16) : Theme.surface-2;
+                dl := Text {
+                    text: (root.delta.sign > 0 ? "▲ " : root.delta.sign < 0 ? "▼ " : "") + root.delta.text;
+                    color: root.delta.sign > 0 ? Theme.available : root.delta.sign < 0 ? Theme.danger : Theme.text-muted;
+                    font-size: 13px;
+                    font-weight: 800;
+                }
+            }
+            Text { text: root.compare + " (" + root.delta.prev + ")"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+        }
+        if root.delta.text == "": Text { text: root.sub; color: Theme.text-muted; font-size: 13px; overflow: elide; }
     }
+}
+
+// Botão do seletor de período
+component PeriodButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked;
+    height: 38px;
+    width: pt.preferred-width + 28px;
+    border-radius: 10px;
+    background: root.active ? (Theme.dark ? #334155 : #ffffff) : (pt-touch.has-hover ? Theme.surface-2 : transparent);
+    pt := Text { text: root.text; color: root.active ? Theme.text : Theme.text-muted; font-size: 14px; font-weight: root.active ? 800 : 600; }
+    pt-touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
 }
 
 component Panel inherits Rectangle {
@@ -51,7 +84,7 @@ component Panel inherits Rectangle {
 
 component EmptyText inherits Text {
     color: Theme.text-muted;
-    font-size: 12px;
+    font-size: 13px;
     horizontal-alignment: center;
     vertical-alignment: center;
     min-height: 72px;
@@ -70,13 +103,13 @@ component TopRow inherits VerticalLayout {
                 height: 22px;
                 border-radius: 11px;
                 background: Theme.surface-2;
-                Text { text: "#" + root.item.rank; color: Theme.text; font-size: 10px; font-weight: 700; }
+                Text { text: "#" + root.item.rank; color: Theme.text; font-size: 12px; font-weight: 700; }
             }
         }
-        Text { text: root.item.name; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; overflow: elide; }
-        Text { text: "(" + root.item.station + ")"; color: Theme.text-muted; font-size: 10px; vertical-alignment: center; }
+        Text { text: root.item.name; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; overflow: elide; }
+        Text { text: "(" + root.item.station + ")"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
         Rectangle { horizontal-stretch: 1; }
-        Text { text: root.item.value; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
+        Text { text: root.item.value; color: Theme.dark ? #fbbf24 : #d97706; font-size: 13px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
     }
     ProgressBar { pct: root.item.pct; tone: Theme.primary; }
 }
@@ -85,45 +118,81 @@ component MethodRow inherits VerticalLayout {
     in property <RtBar> item;
     spacing: 4px;
     HorizontalLayout {
-        Text { text: root.item.label; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
-        Text { text: root.item.value; color: Theme.available; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+        Text { text: root.item.label; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-stretch: 1; }
+        Text { text: root.item.value; color: Theme.available; font-size: 13px; font-weight: 700; font-family: "Menlo"; }
     }
     ProgressBar { pct: root.item.pct; tone: #10b981; }
 }
 
 component HourChart inherits Rectangle {
     in property <[RtBar]> bars;
-    height: 168px;
+    in property <string> top-label;
+    in property <string> mid-label;
+    // Mostra a barra cinza do período anterior ao lado
+    in property <bool> compare;
+    height: 220px;
     HorizontalLayout {
         spacing: 8px;
-        padding-top: 16px;
-        for b in root.bars: VerticalLayout {
-            spacing: 6px;
+        // Eixo dos valores (R$)
+        VerticalLayout {
+            width: 56px;
+            padding-bottom: 22px;
+            Text { text: root.top-label; color: Theme.text-muted; font-size: 12px; horizontal-alignment: right; }
+            Rectangle { vertical-stretch: 1; }
+            Text { text: root.mid-label; color: Theme.text-muted; font-size: 12px; horizontal-alignment: right; }
+            Rectangle { vertical-stretch: 1; }
+            Text { text: "0"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: right; }
+        }
+        Rectangle {
             horizontal-stretch: 1;
-            col := Rectangle {
-                vertical-stretch: 1;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                background: Theme.dark ? #020617 : #f1f5f9;
-                Rectangle {
-                    y: parent.height - self.height;
-                    width: parent.width;
-                    height: parent.height * clamp(b.pct, 0, 100) / 100;
-                    border-top-left-radius: 3px;
-                    border-top-right-radius: 3px;
-                    background: bar-touch.has-hover ? #818cf8 : #6366f1;
-                }
-                bar-touch := TouchArea { }
-                if bar-touch.has-hover: Rectangle {
-                    y: -4px;
-                    width: tip.preferred-width + 10px;
-                    height: 16px;
-                    border-radius: 4px;
-                    background: #1e293b;
-                    tip := Text { text: b.value; color: #ffffff; font-size: 9px; }
+            // Linhas de referência (topo, metade e base)
+            Rectangle { y: 8px; height: 1px; background: Theme.surface-2; }
+            Rectangle { y: 8px + (parent.height - 30px) / 2; height: 1px; background: Theme.surface-2; }
+            Rectangle { y: parent.height - 22px; height: 1px; background: Theme.border; }
+            HorizontalLayout {
+                spacing: 8px;
+                padding-top: 8px;
+                for b in root.bars: VerticalLayout {
+                    spacing: 6px;
+                    horizontal-stretch: 1;
+                    col := Rectangle {
+                        vertical-stretch: 1;
+                        HorizontalLayout {
+                            spacing: 2px;
+                            Rectangle {
+                                Rectangle {
+                                    y: parent.height - self.height;
+                                    width: parent.width;
+                                    height: parent.height * clamp(b.pct, 0, 100) / 100;
+                                    border-top-left-radius: 4px;
+                                    border-top-right-radius: 4px;
+                                    background: bar-touch.has-hover ? #fbbf24 : Theme.primary;
+                                }
+                            }
+                            if root.compare: Rectangle {
+                                Rectangle {
+                                    y: parent.height - self.height;
+                                    width: parent.width;
+                                    height: parent.height * clamp(b.prev, 0, 100) / 100;
+                                    border-top-left-radius: 4px;
+                                    border-top-right-radius: 4px;
+                                    background: Theme.dark ? #475569 : #cbd5e1;
+                                }
+                            }
+                        }
+                        bar-touch := TouchArea { }
+                        if bar-touch.has-hover: Rectangle {
+                            y: -6px;
+                            width: tip.preferred-width + 12px;
+                            height: 20px;
+                            border-radius: 4px;
+                            background: #1e293b;
+                            tip := Text { text: b.value; color: #ffffff; font-size: 12px; }
+                        }
+                    }
+                    Text { text: b.label; color: Theme.text-muted; font-size: 12px; font-weight: 700; horizontal-alignment: center; }
                 }
             }
-            Text { text: b.label; color: Theme.text-muted; font-size: 10px; font-weight: 700; horizontal-alignment: center; }
         }
     }
 }
@@ -154,7 +223,7 @@ component WaiterRow inherits Rectangle {
             alignment: center;
             horizontal-stretch: 1;
             Text { text: root.item.name; color: Theme.text; font-size: 13px; font-weight: 700; overflow: elide; }
-            Text { text: root.item.sub; color: Theme.text-muted; font-size: 10px; }
+            Text { text: root.item.sub; color: Theme.text-muted; font-size: 12px; }
         }
         Text { text: root.item.total; color: Theme.available; font-size: 13px; font-weight: 900; font-family: "Menlo"; vertical-alignment: center; }
     }
@@ -171,7 +240,7 @@ component ActionBadge inherits Rectangle {
     background: root.tone.with-alpha(0.1);
     border-width: 1px;
     border-color: root.tone.with-alpha(0.25);
-    at := Text { text: root.text; color: root.tone-kind == 0 ? Theme.text : root.tone; font-size: 11px; font-weight: 700; overflow: elide; }
+    at := Text { text: root.text; color: root.tone-kind == 0 ? Theme.text : root.tone; font-size: 13px; font-weight: 700; overflow: elide; }
 }
 
 component AuditTable inherits Rectangle {
@@ -197,9 +266,9 @@ component AuditTable inherits Rectangle {
                     padding-left: 16px;
                     padding-right: 16px;
                     spacing: 16px;
-                    Text { width: 170px; text: "DATA/HORA"; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; }
-                    Text { width: 170px; text: "AÇÃO"; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; }
-                    Text { text: "DETALHES"; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; horizontal-stretch: 1; }
+                    Text { width: 170px; text: "DATA/HORA"; color: Theme.text-muted; font-size: 13px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; }
+                    Text { width: 170px; text: "AÇÃO"; color: Theme.text-muted; font-size: 13px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; }
+                    Text { text: "DETALHES"; color: Theme.text-muted; font-size: 13px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; horizontal-stretch: 1; }
                 }
             }
             for log in RetaguardaStore.a-logs: Rectangle {
@@ -224,7 +293,7 @@ component AuditTable inherits Rectangle {
                         alignment: start;
                         VerticalLayout { alignment: center; ActionBadge { text: log.action; tone-kind: log.tone; } }
                     }
-                    Text { text: log.description; color: Theme.text; font-size: 12px; font-family: "Menlo"; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
+                    Text { text: log.description; color: Theme.text; font-size: 13px; font-family: "Menlo"; wrap: word-wrap; vertical-alignment: center; horizontal-stretch: 1; }
                 }
             }
         }
@@ -257,7 +326,7 @@ export component RetaguardaDashboard inherits Rectangle {
                         spacing: 2px;
                         horizontal-stretch: 1;
                         Text { text: "Dashboard & Indicadores"; color: Theme.text; font-size: 20px; font-weight: 900; }
-                        Text { text: "Desempenho operacional, faturamento e produtos líderes de vendas"; color: Theme.text-muted; font-size: 12px; }
+                        Text { text: "Desempenho operacional, faturamento e produtos líderes de vendas"; color: Theme.text-muted; font-size: 13px; }
                     }
                     // Filtro por data (dia local)
                     VerticalLayout {
@@ -283,6 +352,21 @@ export component RetaguardaDashboard inherits Rectangle {
                             }
                             GhostButton { icon: RtIcons.chevron-right; pad: 10px; width: 40px; enabled: !RetaguardaStore.d-is-today; clicked => { RetaguardaStore.d-shift-day(1); } }
                             if !RetaguardaStore.d-is-today: GhostButton { text: "Hoje"; clicked => { RetaguardaStore.d-today(); } }
+                            Rectangle {
+                                height: 46px;
+                                width: periods.preferred-width + 8px;
+                                border-radius: 12px;
+                                background: Theme.dark ? Theme.bg : #e2e8f0;
+                                periods := HorizontalLayout {
+                                    x: 4px;
+                                    spacing: 2px;
+                                    alignment: center;
+                                    PeriodButton { text: "Dia"; active: RetaguardaStore.d-period == 1; clicked => { RetaguardaStore.d-set-period(1); } }
+                                    PeriodButton { text: "7 dias"; active: RetaguardaStore.d-period == 7; clicked => { RetaguardaStore.d-set-period(7); } }
+                                    PeriodButton { text: "30 dias"; active: RetaguardaStore.d-period == 30; clicked => { RetaguardaStore.d-set-period(30); } }
+                                }
+                            }
+                            if !RetaguardaStore.d-audit-tab: GhostButton { icon: RtIcons.download; text: "Exportar"; clicked => { RetaguardaStore.d-export(); } }
                             GhostButton {
                                 icon: RtIcons.refresh;
                                 spin: RetaguardaStore.d-loading;
@@ -340,7 +424,7 @@ export component RetaguardaDashboard inherits Rectangle {
                             spacing: 2px;
                             horizontal-stretch: 1;
                             Text { text: "Auditoria Cega"; color: Theme.text; font-size: 20px; font-weight: 900; }
-                            Text { text: "Histórico seguro de remoção de itens, descontos e ações do sistema"; color: Theme.text-muted; font-size: 12px; }
+                            Text { text: "Histórico seguro de remoção de itens, descontos e ações do sistema"; color: Theme.text-muted; font-size: 13px; }
                         }
                         VerticalLayout { alignment: center; GhostButton { text: "Atualizar"; weight: 700; clicked => { RetaguardaStore.a-refresh(); } } }
                     }
@@ -352,10 +436,10 @@ export component RetaguardaDashboard inherits Rectangle {
                 spacing: 16px;
                 HorizontalLayout {
                     spacing: 14px;
-                    MetricCard { horizontal-stretch: 1; icon: RtIcons.dollar; tone: Theme.available; label: "FATURAMENTO " + RetaguardaStore.d-date-label; value: RetaguardaStore.d-revenue; value-color: Theme.available; sub: "Pagamentos liquidados"; }
-                    MetricCard { horizontal-stretch: 1; icon: RtIcons.receipt; tone: Theme.occupied; label: "COMANDAS PAGAS " + RetaguardaStore.d-date-label; value: RetaguardaStore.d-orders; sub: "Mesas finalizadas " + RetaguardaStore.d-date-label; }
-                    MetricCard { horizontal-stretch: 1; icon: RtIcons.trending-up; tone: Theme.primary; label: "TICKET MÉDIO"; value: RetaguardaStore.d-ticket; value-color: Theme.dark ? #fbbf24 : #d97706; sub: "Gasto médio por mesa"; }
-                    MetricCard { horizontal-stretch: 1; icon: RtIcons.users; tone: Theme.purple; label: "TAXA DE OCUPAÇÃO"; value: RetaguardaStore.d-occupancy; sub: RetaguardaStore.d-occupancy-sub; }
+                    MetricCard { horizontal-stretch: 1; icon: RtIcons.dollar; tone: Theme.available; label: "FATURAMENTO " + RetaguardaStore.d-date-label; value: RetaguardaStore.d-revenue; value-color: Theme.available; sub: "Pagamentos liquidados"; delta: RetaguardaStore.d-delta-revenue; compare: RetaguardaStore.d-compare-label; }
+                    MetricCard { horizontal-stretch: 1; icon: RtIcons.receipt; tone: Theme.occupied; label: "COMANDAS PAGAS " + RetaguardaStore.d-date-label; value: RetaguardaStore.d-orders; sub: "Mesas finalizadas " + RetaguardaStore.d-date-label; delta: RetaguardaStore.d-delta-orders; compare: RetaguardaStore.d-compare-label; }
+                    MetricCard { horizontal-stretch: 1; icon: RtIcons.trending-up; tone: Theme.primary; label: "TICKET MÉDIO"; value: RetaguardaStore.d-ticket; value-color: Theme.dark ? #fbbf24 : #d97706; sub: "Gasto médio por mesa"; delta: RetaguardaStore.d-delta-ticket; compare: RetaguardaStore.d-compare-label; }
+                    MetricCard { horizontal-stretch: 1; icon: RtIcons.users; tone: Theme.purple; label: "OCUPAÇÃO AGORA"; value: RetaguardaStore.d-occupancy; sub: RetaguardaStore.d-occupancy-sub; }
                 }
                 HorizontalLayout {
                     spacing: 16px;
@@ -377,9 +461,20 @@ export component RetaguardaDashboard inherits Rectangle {
                     spacing: 16px;
                     Panel {
                         horizontal-stretch: 1;
-                        title: "Vendas por Hora " + RetaguardaStore.d-date-label + " (Pico)";
+                        title: "Vendas por Hora " + RetaguardaStore.d-date-label + " (R$)";
                         if RetaguardaStore.d-hours.length == 0: EmptyText { text: "Nenhuma venda registrada " + root.lower + "."; min-height: 160px; }
-                        if RetaguardaStore.d-hours.length > 0: HourChart { bars: RetaguardaStore.d-hours; }
+                        if RetaguardaStore.d-hours.length > 0: HourChart {
+                            bars: RetaguardaStore.d-hours;
+                            top-label: RetaguardaStore.d-hours-top;
+                            mid-label: RetaguardaStore.d-hours-mid;
+                            compare: RetaguardaStore.d-compare-label != "";
+                        }
+                        if RetaguardaStore.d-hours.length > 0 && RetaguardaStore.d-compare-label != "": HorizontalLayout {
+                            spacing: 14px;
+                            alignment: end;
+                            HorizontalLayout { spacing: 6px; Rectangle { width: 12px; height: 12px; y: 3px; border-radius: 3px; background: Theme.primary; } Text { text: RetaguardaStore.d-date-label; color: Theme.text-muted; font-size: 13px; } }
+                            HorizontalLayout { spacing: 6px; Rectangle { width: 12px; height: 12px; y: 3px; border-radius: 3px; background: Theme.dark ? #475569 : #cbd5e1; } Text { text: RetaguardaStore.d-compare-label; color: Theme.text-muted; font-size: 13px; } }
+                        }
                     }
                     Panel {
                         horizontal-stretch: 1;
@@ -401,13 +496,13 @@ export component RetaguardaDashboard inherits Rectangle {
                             Text {
                                 text: "Produtos com margem de lucro inferior a 30%. Recomendado revisar preços ou trocar fornecedor.";
                                 color: Theme.text-muted;
-                                font-size: 11px;
+                                font-size: 13px;
                                 wrap: word-wrap;
                             }
                             if RetaguardaStore.d-low.length == 0: Text {
                                 text: "Nenhum produto com margem perigosa!";
                                 color: Theme.available;
-                                font-size: 12px;
+                                font-size: 13px;
                                 font-weight: 700;
                                 horizontal-alignment: center;
                                 min-height: 48px;
@@ -429,7 +524,7 @@ export component RetaguardaDashboard inherits Rectangle {
                                             padding-left: 10px;
                                             padding-right: 8px;
                                             spacing: 8px;
-                                            Text { text: p.name; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
+                                            Text { text: p.name; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; overflow: elide; horizontal-stretch: 1; }
                                             VerticalLayout {
                                                 alignment: center;
                                                 Rectangle {
@@ -437,7 +532,7 @@ export component RetaguardaDashboard inherits Rectangle {
                                                     width: mt.preferred-width + 14px;
                                                     border-radius: 5px;
                                                     background: RtColors.rose.with-alpha(0.1);
-                                                    mt := Text { text: p.margin; color: RtColors.rose; font-size: 10px; font-weight: 700; font-family: "Menlo"; }
+                                                    mt := Text { text: p.margin; color: RtColors.rose; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
                                                 }
                                             }
                                         }

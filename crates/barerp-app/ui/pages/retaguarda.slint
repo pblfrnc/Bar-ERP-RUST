@@ -48,61 +48,106 @@ component MessageBox inherits Rectangle {
     }
 }
 
-// Item do submenu da Retaguarda (acesso direto a cada parte, sem passar pela tela inicial)
-component SubTab inherits Rectangle {
+// Item do menu lateral da Retaguarda (acesso direto a cada parte, sem passar pela tela inicial)
+component SideItem inherits Rectangle {
     in property <image> icon;
     in property <string> text;
     in property <bool> active;
     in property <bool> icon-only;
+    // Selo à direita: "!" (alerta) ou dias da assinatura
+    in property <string> badge;
+    in property <color> badge-tone: Theme.danger;
     callback clicked;
-    height: 36px;
-    width: row.preferred-width + (root.icon-only && !root.active ? 22px : 26px);
-    border-radius: 12px;
+    height: 44px;
+    border-radius: 10px;
     background: root.active ? Theme.primary : (touch.has-hover ? Theme.surface-2 : transparent);
-    row := HorizontalLayout {
-        alignment: center;
-        spacing: 7px;
-        VerticalLayout { alignment: center; RIcon { source: root.icon; tint: root.active ? #020617 : (touch.has-hover ? Theme.text : Theme.text-muted); size: 15px; } }
-        if !root.icon-only || root.active: Text {
+    HorizontalLayout {
+        padding-left: root.icon-only ? 0 : 12px;
+        padding-right: root.icon-only ? 0 : 10px;
+        spacing: 10px;
+        alignment: root.icon-only ? center : stretch;
+        VerticalLayout { alignment: center; RIcon { source: root.icon; tint: root.active ? #020617 : (touch.has-hover ? Theme.text : Theme.text-muted); size: 18px; } }
+        if !root.icon-only: Text {
             text: root.text;
-            color: root.active ? #020617 : (touch.has-hover ? Theme.text : Theme.text-muted);
-            font-size: 12px;
-            font-weight: root.active ? 900 : 700;
+            color: root.active ? #020617 : Theme.text;
+            font-size: 15px;
+            font-weight: root.active ? 900 : 600;
             vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
         }
+        if !root.icon-only && root.badge != "": VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 22px;
+                width: max(22px, bt.preferred-width + 12px);
+                border-radius: 11px;
+                background: root.badge-tone.with-alpha(0.2);
+                bt := Text { text: root.badge; color: root.badge-tone; font-size: 12px; font-weight: 900; }
+            }
+        }
+    }
+    if root.icon-only && root.badge != "": Rectangle {
+        x: parent.width - 14px;
+        y: 6px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: root.badge-tone;
     }
     touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
 }
 
+component SideGroup inherits Text {
+    color: Theme.text-muted;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+}
+
 export component RetaguardaAreaPage inherits Rectangle {
     background: Theme.bg;
-    // Sem espaço para todos os nomes: só o ícone, menos no item aberto
-    property <bool> icons-only: root.width < 1120px;
+    // Janela estreita: o menu lateral fica só com os ícones
+    property <bool> icons-only: root.width < 1100px;
     property <RtView> view: RetaguardaStore.view;
 
-    VerticalLayout {
+    HorizontalLayout {
+        // Menu lateral agrupado
         Rectangle {
-            height: 52px;
+            width: root.icons-only ? 68px : 248px;
             background: Theme.surface;
-            Rectangle { y: parent.height - 1px; height: 1px; background: Theme.surface-2; }
-            HorizontalLayout {
-                padding-left: 16px;
-                padding-right: 16px;
-                spacing: 4px;
+            Rectangle { x: parent.width - 1px; width: 1px; background: Theme.surface-2; }
+            VerticalLayout {
+                padding: 12px;
+                padding-right: 13px;
+                spacing: 2px;
                 alignment: start;
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.settings; text: "Visão Geral"; icon-only: root.icons-only; active: root.view == RtView.hub; clicked => { RetaguardaStore.back(); } } }
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.chart; text: "Métricas"; icon-only: root.icons-only; active: root.view == RtView.dashboard; clicked => { RetaguardaStore.open-dashboard(); } } }
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.shield-check; text: "Equipe"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-staff(); } } }
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.users; text: "Garçons"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-waiters(); } } }
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.credit-card; text: "Clientes (Fiado)"; icon-only: root.icons-only; active: root.view == RtView.customers; clicked => { RetaguardaStore.open-customers(); } } }
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.truck; text: "Fornecedores"; icon-only: root.icons-only; active: root.view == RtView.suppliers; clicked => { RetaguardaStore.open-suppliers(); } } }
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.printer; text: "Impressoras"; icon-only: root.icons-only; active: root.view == RtView.printers; clicked => { RetaguardaStore.open-printers(); } } }
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.smartphone; text: "Conectar Celular"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-connect(); } } }
-                VerticalLayout { alignment: center; SubTab { icon: RtIcons.key; text: "Assinatura"; icon-only: root.icons-only; active: root.view == RtView.subscription; clicked => { RetaguardaStore.open-subscription(); } } }
+                if !root.icons-only: SideGroup { text: "GESTÃO"; }
+                SideItem { icon: RtIcons.settings; text: "Visão geral"; icon-only: root.icons-only; active: root.view == RtView.hub; badge: RetaguardaStore.b-alert-on ? "!" : ""; clicked => { RetaguardaStore.back(); } }
+                SideItem { icon: RtIcons.chart; text: "Painel"; icon-only: root.icons-only; active: root.view == RtView.dashboard; clicked => { RetaguardaStore.open-dashboard(); } }
+                if !root.icons-only: Rectangle { height: 10px; }
+                if !root.icons-only: SideGroup { text: "CADASTROS"; }
+                SideItem { icon: RtIcons.shield-check; text: "Equipe e permissões"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-staff(); } }
+                SideItem { icon: RtIcons.users; text: "Garçons"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-waiters(); } }
+                SideItem { icon: RtIcons.credit-card; text: "Clientes (fiado)"; icon-only: root.icons-only; active: root.view == RtView.customers; clicked => { RetaguardaStore.open-customers(); } }
+                SideItem { icon: RtIcons.truck; text: "Fornecedores"; icon-only: root.icons-only; active: root.view == RtView.suppliers; clicked => { RetaguardaStore.open-suppliers(); } }
+                if !root.icons-only: Rectangle { height: 10px; }
+                if !root.icons-only: SideGroup { text: "CONFIGURAÇÕES"; }
+                SideItem { icon: RtIcons.printer; text: "Impressoras"; icon-only: root.icons-only; active: root.view == RtView.printers; clicked => { RetaguardaStore.open-printers(); } }
+                SideItem { icon: RtIcons.smartphone; text: "Conectar celular"; icon-only: root.icons-only; clicked => { RetaguardaStore.open-connect(); } }
+                SideItem {
+                    icon: RtIcons.key;
+                    text: "Assinatura";
+                    icon-only: root.icons-only;
+                    active: root.view == RtView.subscription;
+                    badge: RetaguardaStore.s-days > 0 && RetaguardaStore.s-days <= 7 ? RetaguardaStore.s-days + "d" : "";
+                    badge-tone: Theme.closing;
+                    clicked => { RetaguardaStore.open-subscription(); }
+                }
             }
         }
         Rectangle {
-            vertical-stretch: 1;
+            horizontal-stretch: 1;
             if root.view == RtView.hub: RetaguardaHub { width: 100%; height: 100%; }
             if root.view == RtView.dashboard: RetaguardaDashboard { width: 100%; height: 100%; }
             if root.view == RtView.printers: RetaguardaPrinters { width: 100%; height: 100%; }

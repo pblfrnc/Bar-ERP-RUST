@@ -22,6 +22,9 @@ export struct MesaCard {
     total: string,           // "R$ 87,50"
     haver: string,           // "Haver R$ 20,00 · Falta R$ 67,50" ou ""
     fee: bool,               // +10% ativo
+    idle: string,            // "42 min" quando a mesa ocupada está sem pedido há 30 min ou mais; "" senão
+    px: float,               // posição na planta do salão (0 a 1)
+    py: float,
 }
 
 export global MesasStore {
@@ -31,6 +34,7 @@ export global MesasStore {
     in property <int> free-count;
     in property <int> occupied-count;
     in property <int> closing-count;
+    in property <int> idle-count;
     in property <int> total-count;
     in property <string> open-revenue: "R$ 0,00";
 
@@ -43,6 +47,14 @@ export global MesasStore {
 
     in property <[MesaCard]> cards;
 
+    // Número digitado direto no mapa (sem clicar na busca); Enter abre a mesa
+    in-out property <string> jump;
+
+    // Planta do salão: mostra as mesas na posição real; em "editar" dá para arrastar
+    in-out property <bool> plan-mode;
+    in-out property <bool> plan-edit;
+    callback move-table(string, float, float);
+
     callback filters-changed();
     callback refresh();
     callback open-history();
@@ -52,11 +64,40 @@ export global MesasStore {
     callback card-select(string);    // clique no cartão: detalhes
     callback card-order(string);     // "Pedido"
     callback card-pay(string);       // "Conta" / "Receber"
+    callback jump-open(int);         // Enter depois de digitar o número
     // Chamado por outras áreas (ex.: Caixa → "Comandas Finalizadas"; Retaguarda → equipe e celulares)
     callback open-order-history();
     callback open-waiters();
     callback open-staff();
     callback open-connect-mobile();
+
+    // Teclas no mapa (chamadas pela janela quando nenhum campo de texto tem o foco)
+    public function key(text: string) -> bool {
+        if (text.character-count == 1 && text.is-float()) {
+            if (self.jump.character-count < 4) {
+                self.jump += text;
+            }
+            return true;
+        }
+        if (self.jump == "") {
+            return false;
+        }
+        if (text == Key.Return) {
+            self.jump-open(Math.round(self.jump.to-float()));
+            self.jump = "";
+            return true;
+        }
+        if (text == Key.Backspace) {
+            // Apaga o último dígito: refaz o número sem ele
+            self.jump = self.jump.character-count <= 1 ? "" : (Math.floor(self.jump.to-float() / 10) + "");
+            return true;
+        }
+        if (text == Key.Escape) {
+            self.jump = "";
+            return true;
+        }
+        return false;
+    }
 }
 
 component StatTile inherits Rectangle {
@@ -86,12 +127,12 @@ component StatTile inherits Rectangle {
         }
         VerticalLayout {
             alignment: center;
-            Text { text: root.label; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.6px; }
+            Text { text: root.label; color: Theme.text-muted; font-size: 13px; font-weight: 800; letter-spacing: 0.6px; }
             HorizontalLayout {
                 spacing: 6px;
                 alignment: start;
                 Text { text: root.value; color: root.value-color; font-size: 20px; font-weight: 900; }
-                if root.extra != "": Text { text: root.extra; color: Theme.text-muted; font-size: 12px; vertical-alignment: bottom; }
+                if root.extra != "": Text { text: root.extra; color: Theme.text-muted; font-size: 13px; vertical-alignment: bottom; }
             }
         }
     }
@@ -103,7 +144,7 @@ component ToolButton inherits Rectangle {
     in property <bool> primary;
     in property <color> icon-color: root.primary ? Theme.primary-text : Theme.primary;
     callback clicked;
-    height: 36px;
+    height: 42px;
     width: row.preferred-width + 24px;
     border-radius: 12px;
     background: root.primary ? (touch.has-hover ? Theme.primary.brighter(0.1) : Theme.primary) : (touch.has-hover ? Theme.border : Theme.surface-2);
@@ -113,7 +154,7 @@ component ToolButton inherits Rectangle {
         spacing: 6px;
         alignment: center;
         Icon { source: root.icon; color: root.icon-color; size: 15px; y: (parent.height - self.height) / 2; }
-        Text { text: root.text; color: root.primary ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: root.primary ? 900 : 700; vertical-alignment: center; }
+        Text { text: root.text; color: root.primary ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: root.primary ? 900 : 700; vertical-alignment: center; }
     }
     touch := TouchArea { clicked => { root.clicked(); } }
 }
@@ -122,11 +163,11 @@ component SectionChip inherits Rectangle {
     in property <string> text;
     in property <bool> active;
     callback clicked;
-    height: 32px;
+    height: 38px;
     width: label.preferred-width + 24px;
     border-radius: 12px;
     background: root.active ? Theme.primary : (touch.has-hover ? Theme.border : Theme.surface-2);
-    label := Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 700; }
+    label := Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: 700; }
     touch := TouchArea { clicked => { root.clicked(); } }
 }
 
@@ -135,11 +176,11 @@ component StatusChip inherits Rectangle {
     in property <bool> active;
     in property <color> tone: Theme.text;
     callback clicked;
-    height: 28px;
+    height: 34px;
     width: label.preferred-width + 20px;
     border-radius: 9px;
     background: root.active ? root.tone.with-alpha(0.18) : transparent;
-    label := Text { text: root.text; color: root.active ? root.tone : Theme.text-muted; font-size: 12px; font-weight: 700; }
+    label := Text { text: root.text; color: root.active ? root.tone : Theme.text-muted; font-size: 13px; font-weight: 700; }
     touch := TouchArea { clicked => { root.clicked(); } }
 }
 
@@ -149,7 +190,7 @@ component ActionButton inherits Rectangle {
     in property <color> tone;
     in property <bool> strong;
     callback clicked;
-    height: 34px;
+    height: 40px;
     horizontal-stretch: 1;
     border-radius: 11px;
     background: root.strong ? Theme.primary : (touch.has-hover ? root.tone : root.tone.with-alpha(0.15));
@@ -160,7 +201,7 @@ component ActionButton inherits Rectangle {
         alignment: center;
         spacing: 5px;
         Icon { source: root.icon; color: root.fg; size: 14px; y: (parent.height - self.height) / 2; }
-        Text { text: root.text; color: root.fg; font-size: 12px; font-weight: root.strong ? 900 : 700; vertical-alignment: center; }
+        Text { text: root.text; color: root.fg; font-size: 13px; font-weight: root.strong ? 900 : 700; vertical-alignment: center; }
     }
     touch := TouchArea { clicked => { root.clicked(); } }
 }
@@ -174,12 +215,16 @@ component MesaTile inherits Rectangle {
 
     property <bool> free: data.status == "AVAILABLE";
     property <bool> closing: data.status == "CLOSING";
+    property <bool> idle: data.idle != "";
+    // Mesa do número digitado no mapa
+    property <bool> picked: MesasStore.jump != "" && data.number == MesasStore.jump.to-float();
     property <color> tone: closing ? Theme.closing : data.status == "OCCUPIED" ? Theme.occupied : data.status == "RESERVED" ? Theme.purple : Theme.available;
 
     border-radius: 18px;
     background: free ? Theme.surface : tone.with-alpha(0.07);
-    border-width: closing ? 2px : 1px;
-    border-color: free ? (body.has-hover ? Theme.border : Theme.surface-2) : tone.with-alpha(body.has-hover ? 0.8 : 0.5);
+    border-width: root.picked ? 4px : closing || root.idle ? 2px : 1px;
+    border-color: root.picked ? Theme.primary : root.idle ? Theme.orange
+        : free ? (body.has-hover ? Theme.border : Theme.surface-2) : tone.with-alpha(body.has-hover ? 0.8 : 0.5);
 
     body := TouchArea { clicked => { if (root.free) { root.open(); } else { root.select(); } } }
 
@@ -197,7 +242,7 @@ component MesaTile inherits Rectangle {
                     Text { text: data.number; color: Theme.text; font-size: 38px; font-weight: 900; }
                     if data.name != "": Text { text: data.name; color: Theme.text; font-size: 15px; font-weight: 700; vertical-alignment: center; overflow: elide; max-width: 130px; }
                 }
-                Text { text: data.section; color: Theme.text-muted; font-size: 12px; overflow: elide; }
+                Text { text: data.section; color: Theme.text-muted; font-size: 13px; overflow: elide; }
             }
             Rectangle {
                 height: 22px;
@@ -210,7 +255,7 @@ component MesaTile inherits Rectangle {
                 badge := Text {
                     text: root.free ? "Livre" : root.closing ? "Fechamento" : data.status == "RESERVED" ? "Reservada" : "Ocupada";
                     color: root.tone;
-                    font-size: 11px;
+                    font-size: 13px;
                     font-weight: 800;
                 }
             }
@@ -228,7 +273,7 @@ component MesaTile inherits Rectangle {
                 background: Theme.surface-2;
                 Icon { source: Icons.users; color: body.has-hover ? Theme.available : Theme.text-muted; size: 22px; }
             }
-            Text { text: "Capacidade: " + data.capacity + " lugares"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+            Text { text: "Capacidade: " + data.capacity + " lugares"; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
         }
 
         if !root.free: VerticalLayout {
@@ -236,17 +281,24 @@ component MesaTile inherits Rectangle {
             spacing: 8px;
             HorizontalLayout {
                 spacing: 6px;
-                Text { text: (data.customer != "" ? data.customer : "Cliente sem nome") + " (" + data.people + "p)"; color: Theme.text; font-size: 12px; font-weight: 600; overflow: elide; horizontal-stretch: 1; vertical-alignment: center; }
+                Text { text: (data.customer != "" ? data.customer : "Cliente sem nome") + " (" + data.people + "p)"; color: Theme.text; font-size: 13px; font-weight: 600; overflow: elide; horizontal-stretch: 1; vertical-alignment: center; }
+                // Tempo de mesa; parada (sem pedido há 30 min ou mais) fica laranja com o tempo sem pedir
                 if data.elapsed != "": Rectangle {
-                    height: 22px;
-                    width: time.preferred-width + 32px;
+                    height: 24px;
+                    width: time.preferred-width + 34px;
                     border-radius: 6px;
-                    background: Theme.surface-2;
+                    background: root.idle ? Theme.orange.with-alpha(0.2) : Theme.surface-2;
                     HorizontalLayout {
                         alignment: center;
                         spacing: 4px;
-                        Icon { source: Icons.clock; color: Theme.primary; size: 12px; y: (parent.height - self.height) / 2; }
-                        time := Text { text: data.elapsed; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                        Icon { source: root.idle ? Icons.hourglass : Icons.clock; color: root.idle ? Theme.orange : Theme.primary; size: 13px; y: (parent.height - self.height) / 2; }
+                        time := Text {
+                            text: root.idle ? data.idle + " sem pedir" : data.elapsed;
+                            color: root.idle ? Theme.orange : Theme.text-muted;
+                            font-size: 13px;
+                            font-weight: root.idle ? 800 : 400;
+                            vertical-alignment: center;
+                        }
                     }
                 }
             }
@@ -259,9 +311,9 @@ component MesaTile inherits Rectangle {
                     padding: 10px;
                     VerticalLayout {
                         horizontal-stretch: 1;
-                        Text { text: "CONSUMO (" + data.items + " ITENS)"; color: Theme.text-muted; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+                        Text { text: "CONSUMO (" + data.items + " ITENS)"; color: Theme.text-muted; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
                         Text { text: data.total; color: Theme.available; font-size: 19px; font-weight: 900; }
-                        if data.haver != "": Text { text: data.haver; color: Theme.occupied; font-size: 10px; font-weight: 700; overflow: elide; }
+                        if data.haver != "": Text { text: data.haver; color: Theme.occupied; font-size: 12px; font-weight: 700; overflow: elide; }
                     }
                     if data.fee: Rectangle {
                         width: 40px;
@@ -269,7 +321,7 @@ component MesaTile inherits Rectangle {
                         y: (parent.height - self.height) / 2;
                         border-radius: 5px;
                         background: Theme.surface-2;
-                        Text { text: "+10%"; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
+                        Text { text: "+10%"; color: Theme.text-muted; font-size: 12px; font-weight: 700; }
                     }
                 }
             }
@@ -287,6 +339,78 @@ component MesaTile inherits Rectangle {
             spacing: 6px;
             ActionButton { text: "Pedido"; icon: Icons.plus; tone: Theme.occupied; clicked => { root.order(); } }
             ActionButton { text: root.closing ? "Receber" : "Conta"; icon: Icons.dollar-sign; tone: Theme.available; strong: root.closing; clicked => { root.pay(); } }
+        }
+    }
+}
+
+// Mesa na planta do salão: compacta, na posição gravada; no modo editar é arrastada com o dedo ou o mouse
+component PlanTile inherits Rectangle {
+    in property <MesaCard> data;
+    in property <bool> editing;
+    // Deslocamento do arrasto em andamento
+    in-out property <length> dx;
+    in-out property <length> dy;
+    callback select();
+    callback open();
+    callback dropped();
+
+    property <bool> free: data.status == "AVAILABLE";
+    property <bool> closing: data.status == "CLOSING";
+    property <bool> idle: data.idle != "";
+    property <bool> picked: MesasStore.jump != "" && data.number == MesasStore.jump.to-float();
+    property <color> tone: closing ? Theme.closing : data.status == "OCCUPIED" ? Theme.occupied : data.status == "RESERVED" ? Theme.purple : Theme.available;
+
+    border-radius: 16px;
+    background: root.free ? Theme.surface : root.tone.with-alpha(0.14);
+    border-width: root.picked ? 4px : 2px;
+    border-color: root.picked ? Theme.primary : root.idle ? Theme.orange : root.tone.with-alpha(root.free ? 0.45 : 0.8);
+    drop-shadow-blur: touch.pressed && root.editing ? 18px : 0px;
+    drop-shadow-color: #0009;
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 2px;
+        HorizontalLayout {
+            spacing: 6px;
+            Text { text: data.number; color: Theme.text; font-size: 30px; font-weight: 900; }
+            Rectangle { horizontal-stretch: 1; }
+            VerticalLayout {
+                alignment: start;
+                Rectangle {
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 6px;
+                    background: root.idle ? Theme.orange : root.tone;
+                }
+            }
+        }
+        if root.free: Text { text: data.capacity + " lugares"; color: Theme.text-muted; font-size: 13px; }
+        if !root.free: Text { text: data.total; color: Theme.available; font-size: 16px; font-weight: 900; overflow: elide; }
+        if !root.free: Text {
+            text: root.idle ? data.idle + " sem pedir" : data.elapsed;
+            color: root.idle ? Theme.orange : Theme.text-muted;
+            font-size: 13px;
+            font-weight: root.idle ? 800 : 400;
+            overflow: elide;
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: root.editing ? move : pointer;
+        moved => {
+            if (root.editing) {
+                root.dx += self.mouse-x - self.pressed-x;
+                root.dy += self.mouse-y - self.pressed-y;
+            }
+        }
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.up && root.editing && (abs(root.dx) > 2px || abs(root.dy) > 2px)) {
+                root.dropped();
+            }
+        }
+        clicked => {
+            if (!root.editing) {
+                if (root.free) { root.open(); } else { root.select(); }
+            }
         }
     }
 }
@@ -327,10 +451,21 @@ export component MesasAreaPage inherits Rectangle {
                     spacing: 8px;
                     LineEdit {
                         horizontal-stretch: 1;
-                        height: 38px;
-                        placeholder-text: "Buscar mesa ou cliente (ex: 2, Mariana)...";
+                        height: 42px;
+                        placeholder-text: "Buscar mesa ou cliente — ou digite o número da mesa e Enter em qualquer lugar";
                         text <=> MesasStore.search;
                         edited => { MesasStore.filters-changed(); }
+                    }
+                    ToolButton {
+                        icon: MesasStore.plan-mode ? Icons.layout-grid : Icons.map;
+                        text: MesasStore.plan-mode ? "Ver em grade" : "Ver planta";
+                        clicked => { MesasStore.plan-mode = !MesasStore.plan-mode; MesasStore.plan-edit = false; }
+                    }
+                    if MesasStore.plan-mode: ToolButton {
+                        icon: MesasStore.plan-edit ? Icons.check : Icons.pencil;
+                        text: MesasStore.plan-edit ? "Pronto" : "Editar planta";
+                        primary: MesasStore.plan-edit;
+                        clicked => { MesasStore.plan-edit = !MesasStore.plan-edit; }
                     }
                     ToolButton { icon: Icons.refresh-cw; text: MesasStore.loading ? "Atualizando..." : "Atualizar"; icon-color: Theme.text-muted; clicked => { MesasStore.refresh(); } }
                     ToolButton { icon: Icons.file-text; text: "Comandas Finalizadas"; clicked => { MesasStore.open-history(); } }
@@ -341,7 +476,7 @@ export component MesasAreaPage inherits Rectangle {
                 HorizontalLayout {
                     spacing: 6px;
                     Flickable {
-                        height: 32px;
+                        height: 38px;
                         horizontal-stretch: 1;
                         content-width: sections-row.preferred-width;
                         sections-row := HorizontalLayout {
@@ -361,7 +496,7 @@ export component MesasAreaPage inherits Rectangle {
                     }
                     Rectangle {
                         width: status-row.preferred-width + 6px;
-                        height: 32px;
+                        height: 38px;
                         border-radius: 11px;
                         background: Theme.bg;
                         border-width: 1px;
@@ -374,6 +509,7 @@ export component MesasAreaPage inherits Rectangle {
                             StatusChip { y: 2px; text: "Livres (" + MesasStore.free-count + ")"; tone: Theme.available; active: MesasStore.status-filter == "AVAILABLE"; clicked => { MesasStore.status-filter = "AVAILABLE"; MesasStore.filters-changed(); } }
                             StatusChip { y: 2px; text: "Ocupadas (" + MesasStore.occupied-count + ")"; tone: Theme.occupied; active: MesasStore.status-filter == "OCCUPIED"; clicked => { MesasStore.status-filter = "OCCUPIED"; MesasStore.filters-changed(); } }
                             StatusChip { y: 2px; text: "Fechando (" + MesasStore.closing-count + ")"; tone: Theme.closing; active: MesasStore.status-filter == "CLOSING"; clicked => { MesasStore.status-filter = "CLOSING"; MesasStore.filters-changed(); } }
+                            StatusChip { y: 2px; text: "Paradas (" + MesasStore.idle-count + ")"; tone: Theme.orange; active: MesasStore.status-filter == "IDLE"; clicked => { MesasStore.status-filter = "IDLE"; MesasStore.filters-changed(); } }
                         }
                     }
                 }
@@ -393,10 +529,45 @@ export component MesasAreaPage inherits Rectangle {
                     spacing: 6px;
                     Icon { source: Icons.layout-grid; color: Theme.text-muted; size: 48px; x: (parent.width - self.width) / 2; }
                     Text { text: "Nenhuma mesa encontrada"; color: Theme.text; font-size: 16px; font-weight: 700; horizontal-alignment: center; }
-                    Text { text: "Tente alterar os filtros ou adicione uma nova mesa."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+                    Text { text: "Tente alterar os filtros ou adicione uma nova mesa."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
                 }
             }
-            Flickable {
+            // Planta do salão (posições de 0 a 1 na área disponível)
+            if MesasStore.plan-mode && MesasStore.cards.length > 0: plan := Rectangle {
+                border-radius: 20px;
+                background: Theme.dark ? #0b1222 : #e2e8f0;
+                border-width: MesasStore.plan-edit ? 2px : 1px;
+                border-color: MesasStore.plan-edit ? Theme.primary : Theme.surface-2;
+                property <length> pw: 136px;
+                property <length> ph: 112px;
+                if MesasStore.plan-edit: Text {
+                    x: 16px;
+                    y: 12px;
+                    text: "Arraste as mesas para a posição real do salão e toque em Pronto";
+                    color: Theme.primary;
+                    font-size: 14px;
+                    font-weight: 700;
+                }
+                for card[i] in MesasStore.cards: PlanTile {
+                    x: 12px + card.px * (plan.width - plan.pw - 24px) + self.dx;
+                    y: 12px + card.py * (plan.height - plan.ph - 24px) + self.dy;
+                    width: plan.pw;
+                    height: plan.ph;
+                    data: card;
+                    editing: MesasStore.plan-edit;
+                    select => { MesasStore.card-select(card.id); }
+                    open => { MesasStore.card-open(card.id); }
+                    dropped => {
+                        MesasStore.move-table(
+                            card.id,
+                            clamp((self.x - 12px) / (plan.width - plan.pw - 24px), 0, 1),
+                            clamp((self.y - 12px) / (plan.height - plan.ph - 24px), 0, 1));
+                        self.dx = 0;
+                        self.dy = 0;
+                    }
+                }
+            }
+            if !MesasStore.plan-mode: Flickable {
                 content-height: ceil(MesasStore.cards.length / root.cols) * (root.tile-h + root.gap);
                 for card[i] in MesasStore.cards: MesaTile {
                     x: mod(i, root.cols) * (root.tile-w + root.gap);
@@ -410,6 +581,26 @@ export component MesasAreaPage inherits Rectangle {
                     pay => { MesasStore.card-pay(card.id); }
                 }
             }
+        }
+    }
+
+    // Número digitado no mapa: "Mesa 12 ↵"
+    if MesasStore.jump != "": Rectangle {
+        x: (root.width - self.width) / 2;
+        y: root.height - self.height - 28px;
+        width: jump-row.preferred-width + 40px;
+        height: 64px;
+        border-radius: 16px;
+        background: Theme.surface;
+        border-width: 3px;
+        border-color: Theme.primary;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #0008;
+        jump-row := HorizontalLayout {
+            alignment: center;
+            spacing: 12px;
+            Text { text: "Mesa " + MesasStore.jump; color: Theme.text; font-size: 28px; font-weight: 900; vertical-alignment: center; }
+            Text { text: "Enter abre · Esc cancela"; color: Theme.text-muted; font-size: 15px; vertical-alignment: center; }
         }
     }
 

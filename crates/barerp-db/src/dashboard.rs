@@ -224,6 +224,85 @@ pub async fn dashboard(db: &Db, day: NaiveDate) -> DbResult<DashboardData> {
     })
 }
 
+/// Números de vários dias de movimento seguidos, terminando em `last_day` (Painel com "7 dias" e "30 dias").
+/// Junta os dias com [`merge`]; a ocupação e os produtos de margem baixa são os de agora.
+pub async fn dashboard_range(db: &Db, last_day: NaiveDate, days: u32) -> DbResult<DashboardData> {
+    let mut list = Vec::with_capacity(days.max(1) as usize);
+    for back in (0..days.max(1)).rev() {
+        list.push(dashboard(db, last_day - chrono::Duration::days(back as i64)).await?);
+    }
+    Ok(merge(list))
+}
+
+/// Soma os números de vários dias (em ordem cronológica). Ticket médio = faturamento / comandas pagas.
+pub fn merge(days: Vec<DashboardData>) -> DashboardData {
+    let mut it = days.into_iter();
+    let Some(mut out) = it.next() else {
+        return DashboardData {
+            today_revenue: 0.0,
+            orders_completed_today: 0,
+            occupied_tables: 0,
+            total_tables: 0,
+            occupancy_rate: 0,
+            average_ticket: 0.0,
+            top_products: Vec::new(),
+            payment_methods_breakdown: Vec::new(),
+            sales_by_hour: Vec::new(),
+            waiter_performance: Vec::new(),
+            low_margin_products: Vec::new(),
+        };
+    };
+    for d in it {
+        out.today_revenue += d.today_revenue;
+        out.orders_completed_today += d.orders_completed_today;
+        // Mesas e margens: vale o dia mais recente (é o estado de agora)
+        out.occupied_tables = d.occupied_tables;
+        out.total_tables = d.total_tables;
+        out.occupancy_rate = d.occupancy_rate;
+        out.low_margin_products = d.low_margin_products;
+        for p in d.top_products {
+            match out.top_products.iter_mut().find(|x| x.name == p.name) {
+                Some(x) => {
+                    x.quantity += p.quantity;
+                    x.total += p.total;
+                }
+                None => out.top_products.push(p),
+            }
+        }
+        for (m, v) in d.payment_methods_breakdown {
+            match out.payment_methods_breakdown.iter_mut().find(|(x, _)| *x == m) {
+                Some((_, total)) => *total += v,
+                None => out.payment_methods_breakdown.push((m, v)),
+            }
+        }
+        for h in d.sales_by_hour {
+            match out.sales_by_hour.iter_mut().find(|x| x.hour == h.hour) {
+                Some(x) => x.total += h.total,
+                None => out.sales_by_hour.push(h),
+            }
+        }
+        for w in d.waiter_performance {
+            match out.waiter_performance.iter_mut().find(|x| x.name == w.name) {
+                Some(x) => {
+                    x.total += w.total;
+                    x.count += w.count;
+                }
+                None => out.waiter_performance.push(w),
+            }
+        }
+    }
+    out.average_ticket =
+        if out.orders_completed_today > 0 { out.today_revenue / out.orders_completed_today as f64 } else { 0.0 };
+    out.top_products.sort_by_key(|p| std::cmp::Reverse(p.quantity));
+    out.top_products.truncate(5);
+    // Horas na ordem do dia de movimento (6h ... 23h, 0h ... 5h)
+    let start = barerp_core::business_day::START_HOUR as i64;
+    let slot = |h: &HourSales| (h.hour.trim_end_matches('h').parse::<i64>().unwrap_or(0) + 24 - start) % 24;
+    out.sales_by_hour.sort_by_key(slot);
+    out.waiter_performance.sort_by(|a, b| b.total.partial_cmp(&a.total).unwrap_or(std::cmp::Ordering::Equal));
+    out
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct AuditEntry {
@@ -250,6 +329,33 @@ pub async fn audit_logs(db: &Db) -> DbResult<Vec<AuditEntry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn day_with(revenue: f64, orders: i64, hours: &[(&str, f64)], top: &[(&str, i64)]) -> DashboardData {
+        let mut d = merge(Vec::new());
+        d.today_revenue = revenue;
+        d.orders_completed_today = orders;
+        d.sales_by_hour = hours.iter().map(|(h, t)| HourSales { hour: h.to_string(), total: *t }).collect();
+        d.top_products =
+            top.iter().map(|(n, q)| TopProduct { name: n.to_string(), quantity: *q, total: 0.0, station: "BAR".into() }).collect();
+        d.payment_methods_breakdown = vec![("PIX".into(), revenue)];
+        d
+    }
+
+    #[test]
+    fn merge_sums_days() {
+        let a = day_with(100.0, 2, &[("22h", 60.0), ("23h", 40.0)], &[("Chopp", 3)]);
+        let b = day_with(200.0, 3, &[("1h", 50.0), ("22h", 150.0)], &[("Fritas", 2), ("Chopp", 1)]);
+        let m = merge(vec![a, b]);
+        assert_eq!(m.today_revenue, 300.0);
+        assert_eq!(m.orders_completed_today, 5);
+        assert_eq!(m.average_ticket, 60.0);
+        assert_eq!(m.payment_methods_breakdown, vec![("PIX".to_string(), 300.0)]);
+        let hours: Vec<(&str, f64)> = m.sales_by_hour.iter().map(|h| (h.hour.as_str(), h.total)).collect();
+        assert_eq!(hours, vec![("22h", 210.0), ("23h", 40.0), ("1h", 50.0)], "madrugada no fim");
+        assert_eq!(m.top_products[0].name, "Chopp");
+        assert_eq!(m.top_products[0].quantity, 4);
+        assert_eq!(merge(Vec::new()).average_ticket, 0.0);
+    }
 
     async fn exec(db: &Db, sql: &str) {
         sqlx::query(sql).execute(db.pool()).await.unwrap();

@@ -40,17 +40,31 @@ pub struct TableCard {
     /// 10% ligado na comanda aberta
     #[sqlx(rename = "feeActive")]
     pub fee_active: Option<bool>,
+    /// Hora do último item lançado na comanda aberta (mesa parada). Fora do JSON: a API dos celulares
+    /// continua igual à do Node.
+    #[sqlx(rename = "lastItemAt")]
+    #[serde(skip)]
+    pub last_item_at: Option<DbTime>,
+    /// Posição na planta do salão (0 a 1 na largura e na altura); `None` = ainda não posicionada.
+    /// Colunas só do app nativo, fora do JSON dos celulares.
+    #[sqlx(rename = "posX")]
+    #[serde(skip)]
+    pub pos_x: Option<f64>,
+    #[sqlx(rename = "posY")]
+    #[serde(skip)]
+    pub pos_y: Option<f64>,
 }
 
 /// Todas as mesas em ordem de número, com a comanda aberta mais recente de cada uma.
 pub async fn list_cards(db: &Db) -> DbResult<Vec<TableCard>> {
     Ok(sqlx::query_as(
-        r#"SELECT t."id", t."number", t."name", t."capacity", t."status", t."section",
+        r#"SELECT t."id", t."number", t."name", t."capacity", t."status", t."section", t."posX", t."posY",
                   t."customerCount", t."customerName", t."openedAt", t."mergedIntoTableId",
                   o."id" AS "orderId", o."waiterName", o."total", o."paidAmount",
                   COALESCE((SELECT SUM(i."quantity") FROM "OrderItem" i WHERE i."orderId" = o."id"), 0) AS "itemCount",
                   (SELECT COUNT(*) FROM "OrderItem" i WHERE i."orderId" = o."id") AS "lineCount",
-                  o."isServiceFeeActive" AS "feeActive"
+                  o."isServiceFeeActive" AS "feeActive",
+                  (SELECT MAX(i."addedAt") FROM "OrderItem" i WHERE i."orderId" = o."id") AS "lastItemAt"
            FROM "Table" t
            LEFT JOIN "Order" o ON o."id" = (
                SELECT o2."id" FROM "Order" o2

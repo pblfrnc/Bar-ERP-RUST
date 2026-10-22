@@ -23,6 +23,25 @@ fn clean(text: Option<&str>) -> Option<String> {
     text.map(str::trim).filter(|t| !t.is_empty()).map(str::to_string)
 }
 
+/// Posição da mesa na planta do salão (0 a 1 na largura e na altura da área do setor).
+pub async fn set_position(db: &Db, id: &str, x: f64, y: f64) -> DbResult<Vec<Event>> {
+    if !(x.is_finite() && y.is_finite()) {
+        return Err(DbError::rule("Posição inválida"));
+    }
+    let changed = sqlx::query(r#"UPDATE "Table" SET "posX" = ?, "posY" = ?, "updatedAt" = ? WHERE "id" = ?"#)
+        .bind(x.clamp(0.0, 1.0))
+        .bind(y.clamp(0.0, 1.0))
+        .bind(DbTime::now())
+        .bind(id)
+        .execute(db.pool())
+        .await?
+        .rows_affected();
+    if changed == 0 {
+        return Err(DbError::not_found("Mesa não encontrada"));
+    }
+    Ok(vec![Event::table(id, "updated")])
+}
+
 /// Nova mesa (livre). Nome padrão "Mesa N", capacidade padrão 4, setor padrão "Salão Principal".
 pub async fn create_table(db: &Db, input: TableInput) -> DbResult<(String, Vec<Event>)> {
     if input.number <= 0 {
@@ -164,6 +183,18 @@ mod tests {
     use super::*;
     use crate::orders::{open_table, OpenTable};
     use crate::tables::list_cards;
+
+    #[tokio::test]
+    async fn floor_plan_position() {
+        let db = Db::open_in_memory().await.unwrap();
+        let (t1, _) = create_table(&db, TableInput { number: 1, capacity: 4, ..Default::default() }).await.unwrap();
+        assert_eq!(list_cards(&db).await.unwrap()[0].pos_x, None);
+        set_position(&db, &t1, 0.25, 1.7).await.unwrap();
+        let card = &list_cards(&db).await.unwrap()[0];
+        assert_eq!((card.pos_x, card.pos_y), (Some(0.25), Some(1.0)), "fica dentro da planta");
+        assert!(set_position(&db, "nao-existe", 0.1, 0.1).await.is_err());
+        assert!(set_position(&db, &t1, f64::NAN, 0.1).await.is_err());
+    }
 
     #[tokio::test]
     async fn crud_and_sections() {

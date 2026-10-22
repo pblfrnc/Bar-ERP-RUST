@@ -114,6 +114,24 @@ pub async fn pdv_products(db: &Db) -> DbResult<Vec<PdvProduct>> {
     .await?)
 }
 
+/// Produtos mais vendidos (ids, do mais para o menos vendido) nos últimos itens lançados, para a grade de
+/// "Mais vendidos" do balcão. Conta pela ordem de gravação em vez da data: as datas antigas do Prisma vêm em
+/// mais de um formato e não comparam direito em SQL.
+pub async fn top_sellers(db: &Db, recent_items: i64, limit: i64) -> DbResult<Vec<String>> {
+    Ok(sqlx::query_scalar(
+        r#"SELECT r."productId"
+           FROM (SELECT i."productId", i."quantity" FROM "OrderItem" i ORDER BY i."rowid" DESC LIMIT ?) r
+           JOIN "Product" p ON p."id" = r."productId" AND p."isActive" = 1
+           GROUP BY r."productId"
+           ORDER BY SUM(r."quantity") DESC, MIN(p."name") ASC
+           LIMIT ?"#,
+    )
+    .bind(recent_items)
+    .bind(limit)
+    .fetch_all(db.pool())
+    .await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +178,19 @@ mod tests {
         assert_eq!(payments.len(), 2);
         assert_eq!(payments[0].place, None, "balcão, gravado por último");
         assert_eq!(payments[1].place.as_deref(), Some("Mesa 7"));
+    }
+
+    #[tokio::test]
+    async fn top_sellers_by_quantity() {
+        use crate::orders::{add_items, open_table, OpenTable};
+        use crate::orders::tests::{fixture, line, noon};
+        let f = fixture().await;
+        let (order, _) = open_table(&f.db, &f.table1, OpenTable::default()).await.unwrap();
+        add_items(&f.db, &order, &[line(&f.caipirinha, 2), line(&f.beer, 5)], noon()).await.unwrap();
+        add_items(&f.db, &order, &[line(&f.caipirinha, 1)], noon()).await.unwrap();
+        assert_eq!(top_sellers(&f.db, 1000, 10).await.unwrap(), vec![f.beer.clone(), f.caipirinha.clone()]);
+        // Só os últimos itens contam: o último lançamento foi uma caipirinha
+        assert_eq!(top_sellers(&f.db, 1, 10).await.unwrap(), vec![f.caipirinha.clone()]);
+        assert_eq!(top_sellers(&f.db, 1000, 1).await.unwrap(), vec![f.beer]);
     }
 }

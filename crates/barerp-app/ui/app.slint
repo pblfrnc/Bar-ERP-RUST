@@ -14,7 +14,7 @@ import { CardapioStore, CardapioAreaPage } from "pages/cardapio.slint";
 import { FiscalStore, FiscalAreaPage } from "pages/fiscal.slint";
 import { KdsStore, KdsAreaPage } from "pages/kds.slint";
 import { MesasStore, MesasAreaPage } from "pages/mesas.slint";
-import { MesasModalStore } from "pages/mesas_modals.slint";
+import { MesasModalStore, MesasModal } from "pages/mesas_modals.slint";
 import { RetaguardaStore, RetaguardaAreaPage, LicenseGate, LicenseInfoModal } from "pages/retaguarda.slint";
 import { UpdateStore, UpdateBanner, UpdateModal } from "pages/update.slint";
 import { ImportLegacyStore, ImportLegacyModal } from "pages/import_legacy.slint";
@@ -49,7 +49,7 @@ component NavTab inherits Rectangle {
                 width: b.preferred-width + 12px;
                 border-radius: 9px;
                 background: root.active ? Theme.primary-text : root.badge-tone.with-alpha(0.2);
-                b := Text { text: root.badge; color: root.active ? Theme.primary : root.badge-tone; font-size: 10px; font-weight: 800; }
+                b := Text { text: root.badge; color: root.active ? Theme.primary : root.badge-tone; font-size: 12px; font-weight: 800; }
             }
         }
     }
@@ -68,7 +68,7 @@ component NavPill inherits Rectangle {
     border-width: 1px;
     border-color: root.tone.with-alpha(0.4);
     opacity: mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.7;
-    t := Text { text: root.text; color: root.solid ? Theme.primary-text : root.tone; font-size: 12px; font-weight: 800; }
+    t := Text { text: root.text; color: root.solid ? Theme.primary-text : root.tone; font-size: 13px; font-weight: 800; }
     TouchArea { clicked => { root.clicked(); } }
 }
 
@@ -88,6 +88,89 @@ component NavIconButton inherits Rectangle {
 }
 
 export struct NavPerms { tables: bool, kds: bool, cash: bool, products: bool, fiscal: bool, settings: bool }
+
+// Lista de atalhos (F1), agrupada por área
+struct ShortcutItem { keys: string, label: string }
+struct ShortcutGroup { title: string, items: [ShortcutItem] }
+
+component ShortcutHelp inherits Rectangle {
+    callback close();
+    property <[ShortcutGroup]> groups: [
+        { title: "Em qualquer tela", items: [
+            { keys: "F1", label: "Mostrar ou esconder esta lista" },
+            { keys: "F2", label: "Venda rápida de balcão" },
+            { keys: "F3", label: "KDS (cozinha e bar)" },
+            { keys: "F11", label: "Tela cheia" },
+            { keys: "Ctrl+A", label: "Abrir o caixa" },
+            { keys: "Ctrl+S", label: "Sangria" },
+            { keys: "Ctrl+Shift+S", label: "Suprimento" },
+            { keys: "Ctrl+F", label: "Fechar o caixa" },
+            { keys: "Ctrl+B", label: "Bloquear a tela (volta com a senha)" },
+        ] },
+        { title: "Venda rápida (PDV)", items: [
+            { keys: "Ctrl+L", label: "Ir para a busca" },
+            { keys: "3*código", label: "Lançar 3 unidades de uma vez" },
+            { keys: "Ctrl+1 … 9", label: "Produto da posição na grade" },
+            { keys: "Shift+A/B/C/D", label: "PIX / Dinheiro / Crédito / Débito" },
+            { keys: "F8", label: "Ligar ou desligar a NFC-e" },
+            { keys: "F12", label: "Concluir a venda" },
+            { keys: "Esc", label: "Fechar a venda rápida" },
+        ] },
+        { title: "Mesas e KDS", items: [
+            { keys: "12 + Enter", label: "Abrir a mesa 12 (no mapa)" },
+            { keys: "1 … 9", label: "KDS: PRONTO na comanda da posição" },
+            { keys: "Backspace", label: "KDS: desfazer o último PRONTO" },
+            { keys: "Esc", label: "KDS: sair do modo cozinha" },
+        ] },
+    ];
+
+    background: Theme.overlay;
+    TouchArea { clicked => { root.close(); } }
+    Rectangle {
+        width: min(860px, root.width - 40px);
+        height: min(help-col.preferred-height, root.height - 40px);
+        border-radius: 20px;
+        background: Theme.surface;
+        border-width: 2px;
+        border-color: Theme.primary;
+        TouchArea { }
+        help-col := VerticalLayout {
+            padding: 24px;
+            spacing: 18px;
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout { alignment: center; Icon { source: Icons.keyboard; color: Theme.primary; size: 24px; } }
+                Text { text: "Atalhos do teclado"; color: Theme.text; font-size: 22px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                Text { text: "F1 ou Esc fecha"; color: Theme.text-muted; font-size: 14px; vertical-alignment: center; }
+            }
+            HorizontalLayout {
+                spacing: 28px;
+                for g in root.groups: VerticalLayout {
+                    horizontal-stretch: 1;
+                    alignment: start;
+                    spacing: 8px;
+                    Text { text: g.title; color: Theme.primary; font-size: 15px; font-weight: 900; }
+                    for it in g.items: HorizontalLayout {
+                        spacing: 10px;
+                        Text { text: it.label; color: Theme.text; font-size: 14px; vertical-alignment: center; horizontal-stretch: 1; wrap: word-wrap; }
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: kb.preferred-width + 14px;
+                                height: 26px;
+                                border-radius: 6px;
+                                border-width: 1px;
+                                border-color: Theme.border;
+                                background: Theme.bg;
+                                kb := Text { text: it.keys; color: Theme.text; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 export component AppWindow inherits Window {
     title: "BarERP Pro";
@@ -136,6 +219,10 @@ export component AppWindow inherits Window {
     in property <string> user-role;
     callback login(string, string);
     callback logout();
+    // Bloqueio da tela (Ctrl+B ou o cadeado da barra): volta com a senha de qualquer operador, na mesma tela
+    in-out property <bool> locked;
+    callback lock();
+    callback unlock(string, string);
     in-out property <bool> password-dialog-open;
     in property <string> password-hint;
     in property <string> password-error;
@@ -143,12 +230,45 @@ export component AppWindow inherits Window {
     callback change-password(string, string, string);
     callback password-dialog-closed();
 
+    // Modo cozinha do KDS: sem barra de abas nem rodapé, com a janela em tela cheia
+    property <bool> kitchen-mode: root.page == Page.kds && KdsStore.focus;
+    // Lista de atalhos (F1)
+    in-out property <bool> help-open;
+    changed kitchen-mode => {
+        if (self.kitchen-mode) {
+            root.full-screen = true;
+        }
+    }
+
     forward-focus: keys;
     keys := FocusScope {
         key-pressed(event) => {
+            if (root.locked) {
+                return reject;
+            }
+            if (root.page != Page.login && (event.modifiers.control || event.modifiers.meta) && (event.text == "b" || event.text == "B")) {
+                root.lock();
+                return accept;
+            }
+            if (root.page != Page.login && event.text == Key.F1) {
+                root.help-open = !root.help-open;
+                return accept;
+            }
+            if (root.help-open && event.text == Key.Escape) {
+                root.help-open = false;
+                return accept;
+            }
             // Tela cheia (F11), como no Electron
             if (event.text == Key.F11) {
                 root.full-screen = !root.full-screen;
+                return accept;
+            }
+            // Número da mesa digitado no mapa (só sem modal aberto)
+            if (root.page == Page.tables && MesasModalStore.modal == MesasModal.none && !RetaguardaStore.g-visible && MesasStore.key(event.text)) {
+                return accept;
+            }
+            // Teclas do KDS (1–9 PRONTO, Backspace desfaz, Esc sai do modo cozinha)
+            if (root.page == Page.kds && !RetaguardaStore.g-visible && KdsStore.key(event.text)) {
                 return accept;
             }
             // Atalhos globais do PC
@@ -203,7 +323,8 @@ export component AppWindow inherits Window {
 
             // Barra Superior de Navegação (Navbar.tsx)
             Rectangle {
-                height: 64px;
+                height: root.kitchen-mode ? 0px : 64px;
+                visible: !root.kitchen-mode;
                 background: Theme.surface;
                 Rectangle { y: parent.height - 1px; height: 1px; background: Theme.surface-2; }
                 HorizontalLayout {
@@ -239,10 +360,10 @@ export component AppWindow inherits Window {
                                     y: 4px;
                                     border-radius: 4px;
                                     background: Theme.primary.with-alpha(0.2);
-                                    Text { text: "PRO"; color: Theme.closing; font-size: 10px; font-weight: 800; }
+                                    Text { text: "PRO"; color: Theme.closing; font-size: 12px; font-weight: 800; }
                                 }
                             }
-                            Text { text: "Controle de Mesas & KDS"; color: Theme.text-muted; font-size: 11px; }
+                            Text { text: "Controle de Mesas & KDS"; color: Theme.text-muted; font-size: 13px; }
                         }
                     }
                     Rectangle { width: 10px; }
@@ -283,7 +404,7 @@ export component AppWindow inherits Window {
                             alignment: center;
                             spacing: 5px;
                             Icon { source: root.server-online ? Icons.wifi : Icons.wifi-off; color: root.server-online ? Theme.available : Theme.danger; size: 13px; y: (parent.height - self.height) / 2; }
-                            if !root.compact: Text { text: root.server-online ? "Online" : "Offline"; color: root.server-online ? Theme.available : Theme.danger; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+                            if !root.compact: Text { text: root.server-online ? "Online" : "Offline"; color: root.server-online ? Theme.available : Theme.danger; font-size: 13px; font-weight: 600; vertical-alignment: center; }
                         }
                     } }
                     // Mensalidade vencendo (últimos 5 dias)
@@ -304,6 +425,8 @@ export component AppWindow inherits Window {
                     NavIconButton { icon: Theme.dark ? Icons.sun : Icons.moon; has-icon: true; clicked => { root.toggle-theme(); } }
                     // Tela cheia
                     NavIconButton { icon: Icons.maximize; has-icon: true; clicked => { root.full-screen = !root.full-screen; } }
+                    // Bloquear a tela (troca de operador sem fechar nada)
+                    NavIconButton { icon: Icons.lock; has-icon: true; clicked => { root.lock(); } }
                     // Operador (nome e perfil em duas linhas, como no Navbar original); clique troca a senha
                     Rectangle {
                         height: 40px;
@@ -316,8 +439,8 @@ export component AppWindow inherits Window {
                             VerticalLayout { alignment: center; Icon { source: Icons.user; color: Theme.text-muted; size: 15px; } }
                             VerticalLayout {
                                 alignment: center;
-                                Text { text: root.user-name; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-alignment: right; overflow: elide; max-width: root.compact ? 90px : 120px; }
-                                Text { text: root.user-role; color: Theme.text-muted; font-size: 10px; horizontal-alignment: right; }
+                                Text { text: root.user-name; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-alignment: right; overflow: elide; max-width: root.compact ? 90px : 120px; }
+                                Text { text: root.user-role; color: Theme.text-muted; font-size: 12px; horizontal-alignment: right; }
                             }
                         }
                         op-touch := TouchArea { clicked => { root.password-dialog-open = true; } }
@@ -364,13 +487,14 @@ export component AppWindow inherits Window {
 
             // Rodapé
             Rectangle {
-                height: 26px;
+                height: root.kitchen-mode ? 0px : 26px;
+                visible: !root.kitchen-mode;
                 background: Theme.surface;
                 HorizontalLayout {
                     padding-left: 20px;
                     padding-right: 20px;
-                    Text { text: root.status-message; color: root.status-error ? Theme.danger : Theme.text-muted; font-size: 12px; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
-                    Text { text: "v" + root.version + " · nativo"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                    Text { text: root.status-message; color: root.status-error ? Theme.danger : Theme.text-muted; font-size: 13px; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                    Text { text: "v" + root.version + " · nativo"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                 }
             }
         }
@@ -406,6 +530,28 @@ export component AppWindow inherits Window {
         if root.page != Page.login && RetaguardaStore.i-visible: LicenseInfoModal {
             width: root.width;
             height: root.height;
+        }
+
+        if root.page != Page.login && root.locked: Rectangle {
+            width: root.width;
+            height: root.height;
+            // Segura os cliques: nada da tela de baixo responde enquanto está bloqueado
+            TouchArea { }
+            LoginPage {
+                width: parent.width;
+                height: parent.height;
+                lock-mode: true;
+                staff: root.staff;
+                error: root.login-error;
+                busy: root.login-busy;
+                submit(user, pin) => { root.unlock(user, pin); }
+            }
+        }
+
+        if root.page != Page.login && root.help-open: ShortcutHelp {
+            width: root.width;
+            height: root.height;
+            close => { root.help-open = false; }
         }
 
         // Licença expirada, bloqueada ou não ativada: trava tudo, inclusive o login (App.tsx)

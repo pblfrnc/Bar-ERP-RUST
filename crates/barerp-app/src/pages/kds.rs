@@ -3,24 +3,31 @@
 //! Os itens vêm de `barerp_db::kds::queue` e são agrupados por comanda (um ticket por mesa), do mais antigo
 //! para o mais novo (FIFO). A tela recarrega ao entrar, a cada 15 s (contingência do original) e na hora em
 //! que chega um evento `kds:*`/`order:*` dos celulares.
+//!
+//! Modo cozinha: as comandas 1–9 da fila têm tecla (PRONTO), Backspace desfaz a última liberada, o total
+//! por produto aparece no alto e um bipe avisa quando entra item novo enquanto a tela está aberta.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
+use chrono::{Local, Utc};
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 use barerp_db::kds::{self, KdsItem};
 
-use crate::ctx::AppCtx;
-use crate::{AppWindow, KdsLine, KdsRow, KdsStore, KdsTicket, MesasStore, Page};
+use crate::ctx::{self, AppCtx, Preferences};
+use crate::{AppWindow, KdsLine, KdsRow, KdsStore, KdsSum, KdsTicket, MesasStore, Page};
 
 #[derive(Default)]
 struct State {
     items: Vec<KdsItem>,
     cols: usize,
     last_load: Option<Instant>,
+    /// Itens já vistos (para o aviso sonoro); `None` antes da primeira carga
+    known: Option<HashSet<String>>,
+    /// Última comanda liberada com PRONTO: itens e o status de antes, para o Desfazer
+    last_ready: Vec<(String, String)>,
 }
 
 thread_local! {
@@ -82,13 +89,33 @@ fn tickets(items: &[KdsItem]) -> Vec<KdsTicket> {
                 place: place.into(),
                 sub: format!("CMD #{} • {customer}", first.order_number).into(),
                 minutes: minutes as i32,
+                index: 0,
                 items: model(lines),
             };
             (oldest.timestamp_millis(), ticket)
         })
         .collect();
     list.sort_by_key(|(oldest, _)| *oldest);
-    list.into_iter().map(|(_, t)| t).collect()
+    list.into_iter()
+        .enumerate()
+        .map(|(i, (_, mut t))| {
+            t.index = if i < 9 { i as i32 + 1 } else { 0 };
+            t
+        })
+        .collect()
+}
+
+/// Total por produto do que ainda falta fazer (pendente ou em preparo), do maior para o menor.
+fn summary(items: &[KdsItem]) -> Vec<KdsSum> {
+    let mut totals: Vec<(String, i64)> = Vec::new();
+    for it in items.iter().filter(|i| i.kds_status == "PENDING" || i.kds_status == "PREPARING") {
+        match totals.iter_mut().find(|(name, _)| *name == it.product_name) {
+            Some((_, qty)) => *qty += it.quantity,
+            None => totals.push((it.product_name.clone(), it.quantity)),
+        }
+    }
+    totals.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    totals.into_iter().map(|(name, qty)| KdsSum { qty: qty as i32, name: name.into() }).collect()
 }
 
 /// Divide os tickets em linhas de `cols` (a última linha completa com espaço vazio).
@@ -101,6 +128,23 @@ fn render(ui: &AppWindow) {
         .map(|chunk| KdsRow { tickets: model(chunk.to_vec()), empty: (cols - chunk.len()) as i32 })
         .collect();
     store.set_rows(model(rows));
+    store.set_summary(model(summary(&items)));
+}
+
+/// Guarda a fila nova e bipa se entrou item que ainda não estava na tela.
+fn store_items(ui: &AppWindow, items: Vec<KdsItem>) {
+    let ids: HashSet<String> = items.iter().map(|i| i.id.clone()).collect();
+    let fresh = with_state(|s| {
+        let fresh = s.known.as_ref().is_some_and(|known| {
+            items.iter().any(|i| i.kds_status == "PENDING" && !known.contains(&i.id))
+        });
+        s.known = Some(ids);
+        s.items = items;
+        fresh
+    });
+    if fresh && ui.global::<KdsStore>().get_sound() {
+        ctx::beep();
+    }
 }
 
 /// Recarrega a fila da praça escolhida (e o contador da aba, que conta todas as praças).
@@ -125,7 +169,7 @@ pub fn refresh(ctx: &AppCtx) {
                 // Ignora a resposta de uma praça que já não está selecionada (cliques rápidos no seletor)
                 Ok((station, _, _)) if station != station_param(&store.get_station()) => {}
                 Ok((_, items, total)) => {
-                    with_state(|s| s.items = items);
+                    store_items(ui, items);
                     render(ui);
                     ui.set_kds_total(total as i32);
                 }
@@ -142,6 +186,33 @@ pub fn refresh_badge(ctx: &AppCtx) {
         if let Ok(items) = result {
             ui.set_kds_total(items.len() as i32);
         }
+    });
+}
+
+/// PRONTO numa comanda: marca os itens da praça como prontos e guarda o status de antes para o Desfazer.
+fn ready_all(c: &AppCtx, order_id: String) {
+    let Some(ui) = c.ui() else { return };
+    let station = station_param(&ui.global::<KdsStore>().get_station());
+    let previous: Vec<(String, String)> = with_state(|s| {
+        s.items
+            .iter()
+            .filter(|i| i.order_id == order_id && i.kds_status != "READY")
+            .map(|i| (i.id.clone(), i.kds_status.clone()))
+            .collect()
+    });
+    let db = c.db.clone();
+    let c2 = c.clone();
+    c.spawn(async move { kds::ready_all(&db, &order_id, station.as_deref()).await }, move |ui, result| match result {
+        Ok(events) => {
+            with_state(|s| s.last_ready = previous);
+            ui.global::<KdsStore>().set_can_undo(true);
+            c2.emit(&events);
+            refresh(&c2);
+        }
+        Err(e) => alert(
+            &c2,
+            if e.to_string().is_empty() { "Erro ao marcar todos como prontos".into() } else { e.to_string() },
+        ),
     });
 }
 
@@ -163,6 +234,7 @@ pub fn bind(ctx: &AppCtx) {
         if let Some(ui) = c.ui() {
             ui.global::<KdsStore>().set_station(station);
         }
+        with_state(|s| s.known = None);
         refresh(&c);
     });
 
@@ -191,24 +263,56 @@ pub fn bind(ctx: &AppCtx) {
         });
     });
 
-    // Marcar todos do ticket como prontos (na praça escolhida)
+    // Marcar todos do ticket como prontos (na praça escolhida), pelo botão ou pela tecla 1–9
     let c = ctx.clone();
-    store.on_ready_all(move |order_id| {
-        let Some(ui) = c.ui() else { return };
-        let station = station_param(&ui.global::<KdsStore>().get_station());
+    store.on_ready_all(move |order_id| ready_all(&c, order_id.to_string()));
+
+    let c = ctx.clone();
+    store.on_ready_index(move |index| {
+        let order = with_state(|s| tickets(&s.items).into_iter().find(|t| t.index == index).map(|t| t.order_id));
+        if let Some(order_id) = order {
+            ready_all(&c, order_id.to_string());
+        }
+    });
+
+    // Desfazer: volta os itens da última comanda liberada ao status de antes
+    let c = ctx.clone();
+    store.on_undo(move || {
+        let previous = with_state(|s| std::mem::take(&mut s.last_ready));
+        if let Some(ui) = c.ui() {
+            ui.global::<KdsStore>().set_can_undo(false);
+        }
+        if previous.is_empty() {
+            return;
+        }
         let db = c.db.clone();
-        let order_id = order_id.to_string();
         let c2 = c.clone();
-        c.spawn(async move { kds::ready_all(&db, &order_id, station.as_deref()).await }, move |_, result| match result {
-            Ok(events) => {
-                c2.emit(&events);
-                refresh(&c2);
-            }
-            Err(e) => alert(
-                &c2,
-                if e.to_string().is_empty() { "Erro ao marcar todos como prontos".into() } else { e.to_string() },
-            ),
-        });
+        c.spawn(
+            async move {
+                let mut events = Vec::new();
+                for (item_id, status) in previous {
+                    events.extend(kds::set_item_status(&db, &item_id, &status).await?.1);
+                }
+                Ok::<_, barerp_db::DbError>(events)
+            },
+            move |_, result| match result {
+                Ok(events) => {
+                    c2.emit(&events);
+                    refresh(&c2);
+                }
+                Err(e) => alert(&c2, format!("Não foi possível desfazer: {e}")),
+            },
+        );
+    });
+
+    let c = ctx.clone();
+    store.on_toggle_sound(move || {
+        let mut prefs = Preferences::load();
+        prefs.kds_sound = !prefs.kds_sound;
+        prefs.save();
+        if let Some(ui) = c.ui() {
+            ui.global::<KdsStore>().set_sound(prefs.kds_sound);
+        }
     });
 
     // Wi-Fi / QR: no PC do caixa o servidor é este app; o botão mostra o QR para os celulares se conectarem
@@ -227,6 +331,9 @@ pub fn bind(ctx: &AppCtx) {
         move || {
             let Some(ui) = c.ui() else { return };
             let open = ui.get_page() == Page::Kds;
+            if open {
+                ui.global::<KdsStore>().set_clock(Local::now().format("%H:%M").to_string().into());
+            }
             let due = with_state(|s| s.last_load.is_none_or(|t| t.elapsed() >= Duration::from_secs(15)));
             if open && (!was_open || due) {
                 refresh(&c);

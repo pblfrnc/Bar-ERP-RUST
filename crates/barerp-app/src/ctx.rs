@@ -126,11 +126,13 @@ pub struct Preferences {
     pub font_scale: FontScale,
     /// "Auto-Impressão de Cozinha" da Retaguarda: imprime a comanda dos pedidos novos neste PC
     pub auto_print_kitchen: bool,
+    /// Aviso sonoro do KDS quando chega item novo
+    pub kds_sound: bool,
 }
 
 impl Default for Preferences {
     fn default() -> Self {
-        Self { dark: true, font_scale: FontScale::Normal, auto_print_kitchen: false }
+        Self { dark: true, font_scale: FontScale::Normal, auto_print_kitchen: false, kds_sound: true }
     }
 }
 
@@ -171,6 +173,7 @@ pub fn apply_preferences(ui: &AppWindow, prefs: Preferences) {
     ui.set_font_scale_label(prefs.font_scale.label().into());
     ui.global::<crate::RetaguardaStore>().set_font_label(prefs.font_scale.multiplier_label().into());
     ui.global::<crate::RetaguardaStore>().set_auto_print_kitchen(prefs.auto_print_kitchen);
+    ui.global::<crate::KdsStore>().set_sound(prefs.kds_sound);
     ZOOM.with(|z| z.set(prefs.font_scale));
     sync_zoom(ui);
 }
@@ -234,4 +237,26 @@ pub fn copy_text(text: &str) {
         }
         let _ = child.wait();
     }
+}
+
+/// Aviso sonoro curto (pedido novo no KDS), sem travar a tela: no Windows o bipe do console (sai na caixa de
+/// som), no macOS um som do sistema e no Linux o som de alerta do PulseAudio, se houver.
+pub fn beep() {
+    std::thread::spawn(|| {
+        #[cfg(windows)]
+        let result = {
+            use std::os::windows::process::CommandExt;
+            std::process::Command::new("powershell")
+                .args(["-NoProfile", "-NonInteractive", "-Command", "[console]::beep(1046,180);[console]::beep(1318,260)"])
+                .creation_flags(0x0800_0000)
+                .status()
+        };
+        #[cfg(target_os = "macos")]
+        let result = std::process::Command::new("afplay").arg("/System/Library/Sounds/Glass.aiff").status();
+        #[cfg(all(unix, not(target_os = "macos")))]
+        let result = std::process::Command::new("paplay").arg("/usr/share/sounds/freedesktop/stereo/bell.oga").status();
+        if let Err(e) = result {
+            tracing::debug!("sem aviso sonoro: {e}");
+        }
+    });
 }

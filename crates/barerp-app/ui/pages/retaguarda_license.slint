@@ -23,7 +23,7 @@ component LinkButton inherits Rectangle {
         spacing: 4px;
         alignment: end;
         VerticalLayout { alignment: center; RIcon { source: root.done ? RtIcons.check : RtIcons.copy; tint: root.done ? Theme.available : root.tone; size: 13px; } }
-        Text { text: root.text; color: root.tone; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+        Text { text: root.text; color: root.tone; font-size: 13px; font-weight: 600; vertical-alignment: center; }
     }
     TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
 }
@@ -46,7 +46,7 @@ component PlanButton inherits Rectangle {
             Text { text: root.title; color: Theme.text; font-size: 14px; font-weight: 900; horizontal-stretch: 1; }
             if root.selected: RIcon { source: RtIcons.check; tint: Theme.primary; }
         }
-        Text { text: root.sub; color: Theme.text-muted; font-size: 10px; }
+        Text { text: root.sub; color: Theme.text-muted; font-size: 12px; }
     }
     if root.highlight: Rectangle {
         x: parent.width - self.width - 8px;
@@ -55,7 +55,7 @@ component PlanButton inherits Rectangle {
         width: pop.preferred-width + 12px;
         border-radius: 9px;
         background: Theme.primary;
-        pop := Text { text: "POPULAR"; color: #020617; font-size: 9px; font-weight: 900; }
+        pop := Text { text: "POPULAR"; color: #020617; font-size: 11px; font-weight: 900; }
     }
     touch := TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.s-set-months(root.months); } }
 }
@@ -89,7 +89,7 @@ export component RetaguardaSubscription inherits Rectangle {
                             Text { text: "Minha Assinatura & Licença"; color: Theme.text; font-size: 20px; font-weight: 900; vertical-alignment: center; }
                             VerticalLayout { alignment: center; Badge { text: "REGULARIZADA"; tone: Theme.available; } }
                         }
-                        Text { text: "Identificador do computador, dias restantes e solicitação de renovação antecipada."; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        Text { text: "Identificador do computador, dias restantes e solicitação de renovação antecipada."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                     }
                     VerticalLayout {
                         alignment: center;
@@ -121,7 +121,7 @@ export component RetaguardaSubscription inherits Rectangle {
                     Text {
                         text: RetaguardaStore.s-sync-message;
                         color: RetaguardaStore.s-sync-ok ? (Theme.dark ? #a7f3d0 : #065f46) : (Theme.dark ? #fde68a : #92400e);
-                        font-size: 12px;
+                        font-size: 13px;
                         font-weight: 500;
                         wrap: word-wrap;
                         horizontal-stretch: 1;
@@ -150,8 +150,8 @@ export component RetaguardaSubscription inherits Rectangle {
                             VerticalLayout {
                                 alignment: center;
                                 horizontal-stretch: 1;
-                                Text { text: "STATUS DA LICENÇA"; color: Theme.text-muted; font-size: 10px; font-weight: 900; }
-                                Text { text: RetaguardaStore.s-status-label; color: Theme.available; font-size: 12px; font-weight: 700; }
+                                Text { text: "STATUS DA LICENÇA"; color: Theme.text-muted; font-size: 12px; font-weight: 900; }
+                                Text { text: RetaguardaStore.s-status-label; color: Theme.available; font-size: 13px; font-weight: 700; }
                             }
                             VerticalLayout {
                                 alignment: center;
@@ -171,7 +171,7 @@ export component RetaguardaSubscription inherits Rectangle {
                                         Text {
                                             text: RetaguardaStore.s-soon ? "EXPIRA EM BREVE" : "OPERAÇÃO LIBERADA";
                                             color: RetaguardaStore.s-soon ? (Theme.dark ? #fcd34d : #b45309) : (Theme.dark ? #6ee7b7 : #047857);
-                                            font-size: 11px;
+                                            font-size: 13px;
                                             font-weight: 900;
                                             vertical-alignment: center;
                                         }
@@ -181,7 +181,7 @@ export component RetaguardaSubscription inherits Rectangle {
                         }
                         VerticalLayout {
                             spacing: 2px;
-                            Text { text: "TEMPO RESTANTE:"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+                            Text { text: "TEMPO RESTANTE:"; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
                             HorizontalLayout {
                                 spacing: 8px;
                                 alignment: start;
@@ -194,14 +194,14 @@ export component RetaguardaSubscription inherits Rectangle {
                         HorizontalLayout {
                             spacing: 6px;
                             VerticalLayout { alignment: center; RIcon { source: RtIcons.calendar; tint: Theme.text-muted; size: 14px; } }
-                            Text { text: "Vencimento:"; color: Theme.text-muted; font-size: 12px; horizontal-stretch: 1; vertical-alignment: center; }
-                            Text { text: RetaguardaStore.s-expiration; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                            Text { text: "Vencimento:"; color: Theme.text-muted; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: RetaguardaStore.s-expiration; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                         }
                         if RetaguardaStore.s-client != "": HorizontalLayout {
                             spacing: 6px;
                             VerticalLayout { alignment: center; RIcon { source: RtIcons.building; tint: Theme.text-muted; size: 14px; } }
-                            Text { text: "Estabelecimento:"; color: Theme.text-muted; font-size: 12px; horizontal-stretch: 1; vertical-alignment: center; }
-                            Text { text: RetaguardaStore.s-client; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                            Text { text: "Estabelecimento:"; color: Theme.text-muted; font-size: 13px; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: RetaguardaStore.s-client; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                         }
                     }
                 }
@@ -217,12 +217,12 @@ export component RetaguardaSubscription inherits Rectangle {
                             VerticalLayout {
                                 alignment: center;
                                 horizontal-stretch: 1;
-                                Text { text: "TERMINAL ATUAL"; color: Theme.text-muted; font-size: 10px; font-weight: 900; }
-                                Text { text: "Identificador de Hardware"; color: Theme.text; font-size: 12px; font-weight: 700; }
+                                Text { text: "TERMINAL ATUAL"; color: Theme.text-muted; font-size: 12px; font-weight: 900; }
+                                Text { text: "Identificador de Hardware"; color: Theme.text; font-size: 13px; font-weight: 700; }
                             }
                             VerticalLayout { alignment: center; Badge { text: "Hash Único"; tone: Theme.text-muted; } }
                         }
-                        Text { text: "Este identificador vincula este computador à sua licença no servidor da Software House."; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        Text { text: "Este identificador vincula este computador à sua licença no servidor da Software House."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                         Rectangle {
                             border-radius: 16px;
                             background: Theme.bg;
@@ -232,10 +232,10 @@ export component RetaguardaSubscription inherits Rectangle {
                                 padding: 14px;
                                 spacing: 4px;
                                 HorizontalLayout {
-                                    Text { text: "MACHINE ID:"; color: Theme.text-muted; font-size: 10px; font-weight: 700; horizontal-stretch: 1; }
-                                    Text { text: "Clique para copiar"; color: RtColors.indigo; font-size: 9px; }
+                                    Text { text: "MACHINE ID:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
+                                    Text { text: "Clique para copiar"; color: RtColors.indigo; font-size: 11px; }
                                 }
-                                Mono { text: RetaguardaStore.s-machine; color: RtColors.indigo; font-size: 12px; font-weight: 900; }
+                                Mono { text: RetaguardaStore.s-machine; color: RtColors.indigo; font-size: 13px; font-weight: 900; }
                             }
                             TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.s-copy-id(); } }
                         }
@@ -266,7 +266,7 @@ export component RetaguardaSubscription inherits Rectangle {
                             alignment: center;
                             horizontal-stretch: 1;
                             Text { text: "Renovação & Pagamento Antecipado"; color: Theme.text; font-size: 15px; font-weight: 900; }
-                            Text { text: "Pague meses com antecedência e garanta a operação contínua do seu bar sem bloqueios."; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                            Text { text: "Pague meses com antecedência e garanta a operação contínua do seu bar sem bloqueios."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                         }
                         VerticalLayout { alignment: center; Badge { text: "💡 Os dias são cumulativos"; tone: Theme.primary; pill: true; } }
                     }
@@ -282,11 +282,11 @@ export component RetaguardaSubscription inherits Rectangle {
                             VerticalLayout {
                                 spacing: 4px;
                                 horizontal-stretch: 1;
-                                Text { text: "Garantia de Acúmulo de Dias:"; color: Theme.text; font-size: 12px; font-weight: 700; }
+                                Text { text: "Garantia de Acúmulo de Dias:"; color: Theme.text; font-size: 13px; font-weight: 700; }
                                 Text {
                                     text: "Ao pagar 1 ou mais meses antecipadamente, os novos dias são somados ao final da sua validade atual. Você nunca perde os " + RetaguardaStore.s-days + " dias que já possui!";
                                     color: Theme.text-muted;
-                                    font-size: 12px;
+                                    font-size: 13px;
                                     wrap: word-wrap;
                                 }
                             }
@@ -294,7 +294,7 @@ export component RetaguardaSubscription inherits Rectangle {
                     }
                     VerticalLayout {
                         spacing: 12px;
-                        Text { text: "SELECIONE QUANTOS MESES DESEJA RENOVAR ADIANTADO:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; }
+                        Text { text: "SELECIONE QUANTOS MESES DESEJA RENOVAR ADIANTADO:"; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
                         HorizontalLayout {
                             spacing: 12px;
                             PlanButton { horizontal-stretch: 1; months: 1; title: "+1 Mês"; sub: "30 dias adicionais"; }
@@ -314,7 +314,7 @@ export component RetaguardaSubscription inherits Rectangle {
                             VerticalLayout {
                                 spacing: 2px;
                                 horizontal-stretch: 1;
-                                Text { text: "PROJEÇÃO DA NOVA VALIDADE:"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+                                Text { text: "PROJEÇÃO DA NOVA VALIDADE:"; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
                                 HorizontalLayout {
                                     spacing: 6px;
                                     alignment: start;
@@ -331,7 +331,7 @@ export component RetaguardaSubscription inherits Rectangle {
                                     background: Theme.surface;
                                     border-width: 1px;
                                     border-color: Theme.surface-2;
-                                    ma := Text { text: RetaguardaStore.s-months + (RetaguardaStore.s-months == 1 ? " mês adicionado" : " meses adicionados"); color: Theme.text-muted; font-size: 11px; }
+                                    ma := Text { text: RetaguardaStore.s-months + (RetaguardaStore.s-months == 1 ? " mês adicionado" : " meses adicionados"); color: Theme.text-muted; font-size: 13px; }
                                 }
                             }
                         }
@@ -348,8 +348,8 @@ export component RetaguardaSubscription inherits Rectangle {
                             HorizontalLayout {
                                 spacing: 8px;
                                 VerticalLayout { alignment: center; RIcon { source: RtIcons.credit-card; tint: RtColors.indigo; } }
-                                Text { text: "CHAVE PIX PARA RENOVAÇÃO:"; color: Theme.text; font-size: 12px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
-                                Text { text: "Titular: " + RetaguardaStore.s-dev-name; color: Theme.text-muted; font-size: 10px; font-weight: 700; vertical-alignment: center; }
+                                Text { text: "CHAVE PIX PARA RENOVAÇÃO:"; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                                Text { text: "Titular: " + RetaguardaStore.s-dev-name; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
                             }
                             Rectangle {
                                 border-radius: 12px;
@@ -359,7 +359,7 @@ export component RetaguardaSubscription inherits Rectangle {
                                 HorizontalLayout {
                                     padding: 10px;
                                     spacing: 8px;
-                                    Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 12px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+                                    Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
                                     RButton {
                                         icon: RetaguardaStore.s-copied-pix ? RtIcons.check : RtIcons.copy;
                                         text: RetaguardaStore.s-copied-pix ? "Copiada!" : "Copiar Chave PIX";
@@ -411,8 +411,8 @@ export component RetaguardaSubscription inherits Rectangle {
                             VerticalLayout {
                                 alignment: center;
                                 horizontal-stretch: 1;
-                                Text { text: "ATIVAÇÃO OFFLINE (SEM INTERNET)"; color: Theme.text; font-size: 12px; font-weight: 900; }
-                                Text { text: "Recebeu uma chave de ativação offline do desenvolvedor? Clique para inserir."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                                Text { text: "ATIVAÇÃO OFFLINE (SEM INTERNET)"; color: Theme.text; font-size: 13px; font-weight: 900; }
+                                Text { text: "Recebeu uma chave de ativação offline do desenvolvedor? Clique para inserir."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                             }
                             VerticalLayout { alignment: center; RIcon { source: RetaguardaStore.s-offline-open ? RtIcons.chevron-up : RtIcons.chevron-down; tint: Theme.text-muted; } }
                         }
@@ -424,11 +424,11 @@ export component RetaguardaSubscription inherits Rectangle {
                         VerticalLayout {
                             padding: 20px;
                             spacing: 12px;
-                            Text { text: "Cole a Chave de Ativação Offline:"; color: Theme.text; font-size: 12px; font-weight: 700; }
+                            Text { text: "Cole a Chave de Ativação Offline:"; color: Theme.text; font-size: 13px; font-weight: 700; }
                             RInput {
                                 text <=> RetaguardaStore.s-offline-key;
                                 mono: true;
-                                font-size: 12px;
+                                font-size: 13px;
                                 placeholder: "Ex: EXP-20261231-XXXXXXXX-YYYYYYYY";
                                 accepted => { RetaguardaStore.s-activate-offline(); }
                             }
@@ -442,7 +442,7 @@ export component RetaguardaSubscription inherits Rectangle {
                                     Text {
                                         text: RetaguardaStore.s-offline-message;
                                         color: RetaguardaStore.s-offline-ok ? Theme.available : Theme.danger;
-                                        font-size: 12px;
+                                        font-size: 13px;
                                         font-weight: 700;
                                         wrap: word-wrap;
                                     }
@@ -478,14 +478,14 @@ export component RetaguardaSubscription inherits Rectangle {
                         alignment: center;
                         horizontal-stretch: 1;
                         spacing: 2px;
-                        Text { text: "SOFTWARE HOUSE & DESENVOLVEDOR"; color: Theme.text-muted; font-size: 10px; font-weight: 900; }
+                        Text { text: "SOFTWARE HOUSE & DESENVOLVEDOR"; color: Theme.text-muted; font-size: 12px; font-weight: 900; }
                         Text { text: RetaguardaStore.s-dev-name; color: Theme.text; font-size: 14px; font-weight: 700; }
                         HorizontalLayout {
                             spacing: 4px;
                             alignment: start;
-                            Text { text: "WhatsApp:"; color: Theme.text-muted; font-size: 11px; }
-                            Text { text: "(47) 97400-2560"; color: Theme.available; font-size: 11px; font-weight: 600; }
-                            Text { text: "• Suporte técnico, renovações e customizações."; color: Theme.text-muted; font-size: 11px; }
+                            Text { text: "WhatsApp:"; color: Theme.text-muted; font-size: 13px; }
+                            Text { text: "(47) 97400-2560"; color: Theme.available; font-size: 13px; font-weight: 600; }
+                            Text { text: "• Suporte técnico, renovações e customizações."; color: Theme.text-muted; font-size: 13px; }
                         }
                     }
                     VerticalLayout {
@@ -590,7 +590,7 @@ export component LicenseGate inherits Rectangle {
                             padding: 14px;
                             spacing: 10px;
                             VerticalLayout { alignment: start; RIcon { source: RtIcons.alert; tint: RtColors.rose; size: 18px; } }
-                            Text { text: RetaguardaStore.g-error; color: RtColors.rose; font-size: 12px; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
+                            Text { text: RetaguardaStore.g-error; color: RtColors.rose; font-size: 13px; font-weight: 600; wrap: word-wrap; horizontal-stretch: 1; }
                         }
                     }
                     // ID da máquina
@@ -603,7 +603,7 @@ export component LicenseGate inherits Rectangle {
                             padding: 16px;
                             spacing: 6px;
                             HorizontalLayout {
-                                Text { text: "ID DA SUA MÁQUINA (HARDWARE)"; color: Theme.text-muted; font-size: 11px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
+                                Text { text: "ID DA SUA MÁQUINA (HARDWARE)"; color: Theme.text-muted; font-size: 13px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
                                 LinkButton { text: RetaguardaStore.g-copied-id ? "Copiado!" : "Copiar ID"; done: RetaguardaStore.g-copied-id; clicked => { RetaguardaStore.g-copy-id(); } }
                             }
                             Rectangle {
@@ -622,7 +622,7 @@ export component LicenseGate inherits Rectangle {
                                     }
                                 }
                             }
-                            Text { text: "Envie este ID junto com o comprovante no WhatsApp do desenvolvedor."; color: Theme.text-muted; font-size: 11px; horizontal-alignment: center; wrap: word-wrap; }
+                            Text { text: "Envie este ID junto com o comprovante no WhatsApp do desenvolvedor."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; wrap: word-wrap; }
                         }
                     }
                     // PIX
@@ -637,10 +637,10 @@ export component LicenseGate inherits Rectangle {
                             HorizontalLayout {
                                 spacing: 8px;
                                 VerticalLayout { alignment: center; RIcon { source: RtIcons.qr-code; tint: RtColors.indigo; size: 18px; } }
-                                Text { text: "Chave PIX para Renovação:"; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
+                                Text { text: "Chave PIX para Renovação:"; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
                                 LinkButton { text: RetaguardaStore.g-copied-pix ? "Copiado!" : "Copiar PIX"; done: RetaguardaStore.g-copied-pix; clicked => { RetaguardaStore.g-copy-pix(); } }
                             }
-                            Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 12px; font-weight: 700; }
+                            Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 13px; font-weight: 700; }
                         }
                     }
                     VerticalLayout {
@@ -680,7 +680,7 @@ export component LicenseGate inherits Rectangle {
                         HorizontalLayout {
                             spacing: 6px;
                             VerticalLayout { alignment: center; RIcon { source: RtIcons.key; tint: Theme.text-muted; size: 14px; } }
-                            Text { text: "Recebeu uma chave de ativação offline?"; color: Theme.text-muted; font-size: 12px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: "Recebeu uma chave de ativação offline?"; color: Theme.text-muted; font-size: 13px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
                             VerticalLayout { alignment: center; RIcon { source: RetaguardaStore.g-offline-open ? RtIcons.chevron-up : RtIcons.chevron-down; tint: Theme.text-muted; } }
                         }
                             TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.g-offline-open = !RetaguardaStore.g-offline-open; } }
@@ -690,7 +690,7 @@ export component LicenseGate inherits Rectangle {
                             RInput {
                                 text <=> RetaguardaStore.g-offline-key;
                                 mono: true;
-                                font-size: 12px;
+                                font-size: 13px;
                                 focus-color: RtColors.indigo;
                                 placeholder: "Cole a chave offline aqui (Ex: EXP-2026...)";
                                 accepted => { RetaguardaStore.g-activate-offline(); }
@@ -715,15 +715,15 @@ export component LicenseGate inherits Rectangle {
                         HorizontalLayout {
                             spacing: 6px;
                             VerticalLayout { alignment: center; RIcon { source: RtIcons.globe; tint: Theme.text-muted; size: 13px; } }
-                            Text { text: "Endereço do Servidor de Ativação"; color: Theme.text-muted; font-size: 11px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
+                            Text { text: "Endereço do Servidor de Ativação"; color: Theme.text-muted; font-size: 13px; font-weight: 600; horizontal-stretch: 1; vertical-alignment: center; }
                             VerticalLayout { alignment: center; RIcon { source: RetaguardaStore.g-server-open ? RtIcons.chevron-up : RtIcons.chevron-down; tint: Theme.text-muted; size: 14px; } }
                         }
                             TouchArea { mouse-cursor: pointer; clicked => { RetaguardaStore.g-server-open = !RetaguardaStore.g-server-open; } }
                         }
                         if RetaguardaStore.g-server-open: VerticalLayout {
                             spacing: 6px;
-                            RInput { text <=> RetaguardaStore.g-server-url; mono: true; font-size: 12px; focus-color: RtColors.indigo; placeholder: "https://seu-painel.onrender.com"; }
-                            Text { text: "URL da nuvem (Render) da Software House."; color: Theme.text-muted; font-size: 10px; }
+                            RInput { text <=> RetaguardaStore.g-server-url; mono: true; font-size: 13px; focus-color: RtColors.indigo; placeholder: "https://seu-painel.onrender.com"; }
+                            Text { text: "URL da nuvem (Render) da Software House."; color: Theme.text-muted; font-size: 12px; }
                         }
                     }
                 }
@@ -756,7 +756,7 @@ export component LicenseInfoModal inherits Rectangle {
                     alignment: center;
                     horizontal-stretch: 1;
                     Text { text: "Aviso de Mensalidade"; color: Theme.text; font-size: 17px; font-weight: 700; }
-                    Text { text: "Vence em " + RetaguardaStore.i-days + (RetaguardaStore.i-days == 1 ? " dia" : " dias"); color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 600; }
+                    Text { text: "Vence em " + RetaguardaStore.i-days + (RetaguardaStore.i-days == 1 ? " dia" : " dias"); color: Theme.dark ? #fbbf24 : #d97706; font-size: 13px; font-weight: 600; }
                 }
                 VerticalLayout {
                     alignment: center;
@@ -774,7 +774,7 @@ export component LicenseInfoModal inherits Rectangle {
             Text {
                 text: "Para evitar interrupções no funcionamento do Bar ERP, efetue o pagamento da sua mensalidade via PIX e envie o comprovante.";
                 color: Theme.text-muted;
-                font-size: 12px;
+                font-size: 13px;
                 wrap: word-wrap;
             }
             Rectangle {
@@ -785,8 +785,8 @@ export component LicenseInfoModal inherits Rectangle {
                 VerticalLayout {
                     padding: 14px;
                     spacing: 4px;
-                    Text { text: "CHAVE PIX DO DESENVOLVEDOR:"; color: Theme.text; font-size: 11px; font-weight: 700; }
-                    Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 12px; font-weight: 700; }
+                    Text { text: "CHAVE PIX DO DESENVOLVEDOR:"; color: Theme.text; font-size: 13px; font-weight: 700; }
+                    Mono { text: RetaguardaStore.s-pix; color: Theme.text; font-size: 13px; font-weight: 700; }
                 }
             }
             Rectangle {
@@ -797,8 +797,8 @@ export component LicenseInfoModal inherits Rectangle {
                 VerticalLayout {
                     padding: 12px;
                     spacing: 4px;
-                    Text { text: "ID DESTE COMPUTADOR:"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
-                    Mono { text: RetaguardaStore.s-machine; color: Theme.text; font-size: 12px; font-weight: 700; }
+                    Text { text: "ID DESTE COMPUTADOR:"; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
+                    Mono { text: RetaguardaStore.s-machine; color: Theme.text; font-size: 13px; font-weight: 700; }
                 }
             }
             RButton {

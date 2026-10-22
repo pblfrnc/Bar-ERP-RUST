@@ -20,7 +20,7 @@ export component Pill inherits Rectangle {
     t := Text {
         text: root.text;
         color: root.solid ? Theme.primary-text : root.tone;
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 800;
         font-family: root.mono ? "Menlo" : "";
     }
@@ -35,7 +35,7 @@ export component Btn inherits Rectangle {
     in property <color> fill: Theme.surface-2;
     in property <bool> enabled: true;
     in property <bool> busy;
-    in property <length> font-size: 12px;
+    in property <length> font-size: 13px;
     in property <int> weight: 700;
     in property <length> h: 36px;
     callback clicked;
@@ -87,7 +87,7 @@ export component CloseX inherits Rectangle {
 // Rótulo de campo em maiúsculas
 export component FieldLabel inherits Text {
     color: Theme.text-muted;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 800;
     letter-spacing: 0.4px;
 }
@@ -95,7 +95,7 @@ export component FieldLabel inherits Text {
 // Dica pequena abaixo do campo
 export component Hint inherits Text {
     color: Theme.text-muted;
-    font-size: 10px;
+    font-size: 12px;
     wrap: word-wrap;
 }
 
@@ -155,7 +155,7 @@ export component MiniChip inherits Rectangle {
     t := Text {
         text: root.text;
         color: root.active ? Theme.primary-text : Theme.text;
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 700;
         font-family: root.mono ? "Menlo" : "";
     }
@@ -184,7 +184,7 @@ export component Card inherits Rectangle {
                 horizontal-stretch: 1;
                 alignment: center;
                 Text { text: root.title; color: Theme.text; font-size: 15px; font-weight: 900; wrap: word-wrap; }
-                if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
             }
         }
         @children
@@ -206,7 +206,7 @@ export component Notice inherits Rectangle {
         width: parent.width - 24px;
         text: root.text;
         color: root.tone;
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 600;
         wrap: word-wrap;
     }
@@ -282,7 +282,7 @@ export component Sheet inherits Rectangle {
                         alignment: center;
                         spacing: 2px;
                         Text { text: root.title; color: Theme.text; font-size: 18px; font-weight: 900; overflow: elide; }
-                        if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        if root.subtitle != "": Text { text: root.subtitle; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                     }
                     CloseX { y: (parent.height - self.height) / 2; clicked => { root.close(); } }
                 }

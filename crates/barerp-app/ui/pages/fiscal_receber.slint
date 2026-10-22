@@ -31,8 +31,8 @@ export component ReceberNota inherits Rectangle {
                     padding: 18px;
                     spacing: 6px;
                     HorizontalLayout { spacing: 8px; VerticalLayout { alignment: center; Icon { source: FiscalIcons.scan; color: Theme.occupied; size: 16px; } } Text { text: "Fluxo de Entrada em 2 Etapas:"; color: Theme.occupied; font-size: 13px; font-weight: 900; horizontal-stretch: 1; } }
-                    Text { text: "1º Bip (Aqui): Confirma o recebimento fiscal na SEFAZ e baixa o XML. O estoque não é alterado ainda."; color: Theme.text; font-size: 12px; wrap: word-wrap; }
-                    Text { text: "2º Bip (Na Conferência): Feito ao descarregar as caixas e conferir os itens recebidos com a DANFE impressa. É neste momento que os produtos e custos entram no estoque."; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                    Text { text: "1º Bip (Aqui): Confirma o recebimento fiscal na SEFAZ e baixa o XML. O estoque não é alterado ainda."; color: Theme.text; font-size: 13px; wrap: word-wrap; }
+                    Text { text: "2º Bip (Na Conferência): Feito ao descarregar as caixas e conferir os itens recebidos com a DANFE impressa. É neste momento que os produtos e custos entram no estoque."; color: Theme.text; font-size: 13px; wrap: word-wrap; }
                 }
             }
             FxCard {
@@ -64,7 +64,7 @@ export component ReceberNota inherits Rectangle {
                             clicked => { FiscalStore.rb-bipar(); }
                         }
                     }
-                    Text { text: "Pressione Enter após bipar para registro imediato. O leitor USB já faz isso automaticamente."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                    Text { text: "Pressione Enter após bipar para registro imediato. O leitor USB já faz isso automaticamente."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                     HorizontalLayout {
                         alignment: start;
                         FxButton { text: "Fazer Upload de Arquivo XML (Manual)"; icone: FiscalIcons.file-text; clicked => { FiscalStore.importar(""); } }
@@ -80,7 +80,7 @@ export component ReceberNota inherits Rectangle {
                             padding: 16px;
                             spacing: 6px;
                             if !FiscalStore.rb-resultado.ok: Text { text: "Erro no Bip"; color: Theme.danger; font-size: 14px; font-weight: 900; }
-                            if !FiscalStore.rb-resultado.ok: Text { text: FiscalStore.rb-resultado.erro; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                            if !FiscalStore.rb-resultado.ok: Text { text: FiscalStore.rb-resultado.erro; color: Theme.text; font-size: 13px; wrap: word-wrap; }
                             if FiscalStore.rb-resultado.ok: HorizontalLayout {
                                 spacing: 12px;
                                 Text {
@@ -100,14 +100,14 @@ export component ReceberNota inherits Rectangle {
                             if FiscalStore.rb-resultado.ok: Text {
                                 text: FiscalStore.rb-resultado.emitente + " — NF " + FiscalStore.rb-resultado.nf + (FiscalStore.rb-resultado.xml ? " — " + FiscalStore.rb-resultado.valor : "");
                                 color: Theme.text;
-                                font-size: 12px;
+                                font-size: 13px;
                                 font-weight: 700;
                                 wrap: word-wrap;
                             }
                             if FiscalStore.rb-resultado.ok && !FiscalStore.rb-resultado.xml: Text {
                                 text: "A SEFAZ recebeu o manifesto e está consolidando o XML oficial com a Focus NFe (~30s a 1 min). A nota já foi salva com segurança no seu histórico.";
                                 color: Theme.text-muted;
-                                font-size: 11px;
+                                font-size: 13px;
                                 wrap: word-wrap;
                             }
                         }
@@ -149,16 +149,16 @@ export component ReceberNota inherits Rectangle {
                                         spacing: 10px;
                                         alignment: start;
                                         FxBadge { text: n.rotulo; cor: n.estado == 2 ? FxCor.verde : n.estado == 1 ? FxCor.azul : FxCor.ambar; }
-                                        Text { text: "NF " + n.nf; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                                        Text { text: "NF " + n.nf; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                                     }
                                     Text { text: n.emitente; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
-                                    Text { text: n.chave-curta; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; }
+                                    Text { text: n.chave-curta; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; }
                                 }
                                 VerticalLayout {
                                     alignment: center;
                                     spacing: 2px;
                                     Text { text: n.valor; color: n.estado == 1 && n.valor == "Aguardando SEFAZ..." ? Theme.occupied : Theme.text; font-size: 14px; font-weight: 900; horizontal-alignment: right; }
-                                    Text { text: n.data; color: Theme.text-muted; font-size: 11px; horizontal-alignment: right; }
+                                    Text { text: n.data; color: Theme.text-muted; font-size: 13px; horizontal-alignment: right; }
                                 }
                                 if n.estado == 1: VerticalLayout {
                                     alignment: center;

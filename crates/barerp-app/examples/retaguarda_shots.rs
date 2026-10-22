@@ -151,6 +151,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             LowMarginProduct { id: "p2".into(), name: "Red Bull 250ml".into(), margin: 24, price: 15.0, cost: 11.4 },
         ],
     };
+    // Mesmo dia da semana passada, para a comparação dos indicadores e a barra cinza do gráfico
+    let mut before = dash.clone();
+    before.today_revenue = 3912.8;
+    before.orders_completed_today = 35;
+    before.average_ticket = 122.1;
+    for (h, v) in before.sales_by_hour.iter_mut().zip([90.0, 410.0, 720.0, 860.0, 1010.0, 820.0, 2.8]) {
+        h.total = v;
+    }
+
     let audit = vec![
         RtAudit { when: "19/10/2026, 22:41:07".into(), action: "CANCEL_ITEM".into(), description: "Item cancelado: 2x Heineken Long Neck (Comanda #41, Mesa 7) por Administrador".into(), tone: 1 },
         RtAudit { when: "19/10/2026, 21:58:30".into(), action: "APPLY_DISCOUNT".into(), description: "Desconto de R$ 10,00 na Comanda #39 (Mesa 3)".into(), tone: 2 },
@@ -184,7 +193,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         store.set_g_visible(false);
         preview::hub(&ui, &license(3, "ACTIVE", true), &menu, categories.clone(), &backup);
         save(&window, &out.join(format!("r1-hub-{suffix}.png")))?;
-        preview::dashboard(&ui, day, &dash);
+        preview::dashboard(&ui, day, &dash, Some(&before));
         save(&window, &out.join(format!("r2-dashboard-{suffix}.png")))?;
         preview::audit(&ui, audit.clone());
         save(&window, &out.join(format!("r3-auditoria-{suffix}.png")))?;

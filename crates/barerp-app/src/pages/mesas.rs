@@ -69,6 +69,19 @@ pub(crate) fn table_title(card: &TableCard) -> String {
     card.name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| format!("Mesa {}", card.number))
 }
 
+/// Mesa ocupada sem pedido novo há este tempo aparece como "parada".
+const IDLE_MINUTES: i64 = 30;
+
+/// Minutos sem pedido de uma mesa ocupada (desde o último item, ou desde a abertura se não pediu nada).
+fn idle_minutes(card: &TableCard) -> Option<i64> {
+    if card.status != "OCCUPIED" {
+        return None;
+    }
+    let since = card.last_item_at.or(card.opened_at)?;
+    let mins = (Utc::now() - since.0).num_minutes();
+    (mins >= IDLE_MINUTES).then_some(mins)
+}
+
 fn haver_label(total: f64, paid: f64) -> String {
     if paid > 0.0 {
         format!("Haver {} · Falta {}", brl(paid), brl((total - paid).max(0.0)))
@@ -93,6 +106,12 @@ fn card_view(c: &TableCard) -> MesaCard {
         total: brl(total).into(),
         haver: haver_label(total, c.paid_amount.unwrap_or(0.0)).into(),
         fee: c.fee_active.unwrap_or(false),
+        idle: idle_minutes(c)
+            .map(|m| if m < 60 { format!("{m} min") } else { format!("{}h {}m", m / 60, m % 60) })
+            .unwrap_or_default()
+            .into(),
+        px: c.pos_x.unwrap_or(-1.0) as f32,
+        py: c.pos_y.unwrap_or(-1.0) as f32,
     }
 }
 
@@ -111,6 +130,7 @@ fn render(ui: &AppWindow, s: &State) {
     store.set_free_count(available as i32);
     store.set_occupied_count(occupied as i32);
     store.set_closing_count(closing as i32);
+    store.set_idle_count(cards.iter().filter(|c| idle_minutes(c).is_some()).count() as i32);
     store.set_total_count(total as i32);
     store.set_open_revenue(brl(open_revenue).into());
 
@@ -128,7 +148,11 @@ fn render(ui: &AppWindow, s: &State) {
     let visible: Vec<MesaCard> = cards
         .iter()
         .filter(|c| section == "ALL" || c.section == section.as_str())
-        .filter(|c| status == "ALL" || c.status == status.as_str())
+        .filter(|c| match status.as_str() {
+            "ALL" => true,
+            "IDLE" => idle_minutes(c).is_some(),
+            other => c.status == other,
+        })
         .filter(|c| {
             query.is_empty()
                 || c.number.to_string().contains(&query)
@@ -136,6 +160,15 @@ fn render(ui: &AppWindow, s: &State) {
                 || c.customer_name.as_deref().is_some_and(|n| n.to_lowercase().contains(&query))
         })
         .map(card_view)
+        .enumerate()
+        .map(|(i, mut card)| {
+            // Mesa ainda sem lugar na planta: fileiras de 6, na ordem do número
+            if card.px < 0.0 || card.py < 0.0 {
+                card.px = (i % 6) as f32 / 5.0;
+                card.py = ((i / 6) as f32 / 4.0).min(1.0);
+            }
+            card
+        })
         .collect();
     store.set_cards(model(visible));
 }
@@ -523,6 +556,50 @@ pub fn bind(ctx: &AppCtx) {
         move |id| {
             focus_table(&id);
             load_details(&ctx);
+        }
+    });
+    // Planta do salão: mesa solta depois do arrasto (já aparece no lugar novo; grava em seguida)
+    store.on_move_table({
+        let ctx = ctx.clone();
+        move |id, x, y| {
+            with_state(|s| {
+                if let Some(card) = s.cards.iter_mut().find(|c| c.id == id.as_str()) {
+                    card.pos_x = Some(x as f64);
+                    card.pos_y = Some(y as f64);
+                }
+            });
+            if let Some(ui) = ctx.ui() {
+                with_state(|s| render(&ui, s));
+            }
+            let db = ctx.db.clone();
+            let id = id.to_string();
+            let c = ctx.clone();
+            ctx.spawn(
+                async move { table_admin::set_position(&db, &id, x as f64, y as f64).await },
+                move |_, result| match result {
+                    Ok(events) => c.emit(&events),
+                    Err(e) => c.status(format!("Não foi possível salvar a posição da mesa: {e}"), true),
+                },
+            );
+        }
+    });
+    // Número digitado no mapa + Enter: mesa livre abre, ocupada mostra o detalhe
+    store.on_jump_open({
+        let ctx = ctx.clone();
+        move |number| {
+            let Some(ui) = ctx.ui() else { return };
+            let found = with_state(|s| s.cards.iter().find(|c| c.number == number as i64).map(|c| (c.id.clone(), c.status.clone())));
+            match found {
+                Some((id, status)) if status == "AVAILABLE" => show_open_table(&ctx, &id),
+                Some((id, _)) => {
+                    focus_table(&id);
+                    load_details(&ctx);
+                }
+                None => {
+                    ui.set_status_error(true);
+                    ui.set_status_message(format!("Mesa {number} não existe").into());
+                }
+            }
         }
     });
     store.on_card_order({

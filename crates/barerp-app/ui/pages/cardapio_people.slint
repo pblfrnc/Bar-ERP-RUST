@@ -25,7 +25,7 @@ component StatCard inherits Rectangle {
         VerticalLayout {
             horizontal-stretch: 1;
             alignment: center;
-            Text { text: root.label; color: Theme.text-muted; font-size: 11px; font-weight: 800; letter-spacing: 0.4px; }
+            Text { text: root.label; color: Theme.text-muted; font-size: 13px; font-weight: 800; letter-spacing: 0.4px; }
             Text { text: root.value; color: root.tone; font-size: 24px; font-weight: 900; }
         }
         Rectangle {
@@ -86,7 +86,7 @@ component PageHeader inherits Rectangle {
             horizontal-stretch: 1;
             alignment: center;
             Text { text: root.title; color: Theme.text; font-size: 20px; font-weight: 900; }
-            Text { text: root.subtitle; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+            Text { text: root.subtitle; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
         }
         if root.extra != "": VerticalLayout {
             alignment: center;
@@ -98,7 +98,7 @@ component PageHeader inherits Rectangle {
                 weight: 800;
                 clicked => { root.extra-act(); }
             }
-            Text { text: "Uso exclusivo do desenvolvedor"; color: Theme.danger; font-size: 10px; horizontal-alignment: right; }
+            Text { text: "Uso exclusivo do desenvolvedor"; color: Theme.danger; font-size: 12px; horizontal-alignment: right; }
         }
         Btn {
             y: (parent.height - self.height) / 2;
@@ -131,7 +131,7 @@ component SupplierCard inherits Rectangle {
                 spacing: 6px;
                 alignment: start;
                 Text { text: root.data.title; color: Theme.text; font-size: 14px; font-weight: 900; vertical-alignment: center; }
-                if root.data.razao != "": Text { text: root.data.razao; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                if root.data.razao != "": Text { text: root.data.razao; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                 if root.data.document != "": Pill { y: (parent.height - self.height) / 2; text: root.data.document; tone: Theme.available; mono: true; }
                 if root.data.products != "": Pill { y: (parent.height - self.height) / 2; text: root.data.products; }
             }
@@ -144,7 +144,7 @@ component SupplierCard inherits Rectangle {
                     Text {
                         text: root.data.phone;
                         color: wa.has-hover ? Theme.available : Theme.text;
-                        font-size: 12px;
+                        font-size: 13px;
                         vertical-alignment: center;
                         wa := TouchArea { clicked => { CardapioStore.sup-whatsapp(root.data.id); } }
                     }
@@ -152,12 +152,12 @@ component SupplierCard inherits Rectangle {
                 if root.data.email != "": HorizontalLayout {
                     spacing: 4px;
                     Icon { source: CardapioIcons.mail; color: Theme.occupied; size: 12px; y: (parent.height - self.height) / 2; }
-                    Text { text: root.data.email; color: Theme.text; font-size: 12px; vertical-alignment: center; }
+                    Text { text: root.data.email; color: Theme.text; font-size: 13px; vertical-alignment: center; }
                 }
-                if root.data.contact != "": Text { text: "Contato: " + root.data.contact; color: Theme.text-muted; font-size: 12px; }
-                if root.data.city != "": Text { text: root.data.city; color: Theme.text-muted; font-size: 12px; }
+                if root.data.contact != "": Text { text: "Contato: " + root.data.contact; color: Theme.text-muted; font-size: 13px; }
+                if root.data.city != "": Text { text: root.data.city; color: Theme.text-muted; font-size: 13px; }
             }
-            if root.data.notes != "": Text { text: "\"" + root.data.notes + "\""; color: Theme.text-muted; font-size: 11px; font-italic: true; wrap: word-wrap; }
+            if root.data.notes != "": Text { text: "\"" + root.data.notes + "\""; color: Theme.text-muted; font-size: 13px; font-italic: true; wrap: word-wrap; }
         }
         Btn {
             y: (parent.height - self.height) / 2;
@@ -251,7 +251,7 @@ export component SuppliersScreen inherits Rectangle {
                 Text {
                     text: "Fornecedores são cadastrados manualmente pelo botão acima ou importados automaticamente ao bipar XMLs de compra da SEFAZ.";
                     color: Theme.text-muted;
-                    font-size: 12px;
+                    font-size: 13px;
                     horizontal-alignment: center;
                     wrap: word-wrap;
                 }
@@ -282,13 +282,13 @@ component CustomerRow inherits Rectangle {
             HorizontalLayout {
                 spacing: 12px;
                 alignment: start;
-                if root.data.phone != "": Text { text: root.data.phone; color: Theme.text-muted; font-size: 10px; }
-                if root.data.document != "": Text { text: "Doc: " + root.data.document; color: Theme.text-muted; font-size: 10px; }
+                if root.data.phone != "": Text { text: root.data.phone; color: Theme.text-muted; font-size: 12px; }
+                if root.data.document != "": Text { text: "Doc: " + root.data.document; color: Theme.text-muted; font-size: 12px; }
             }
         }
         VerticalLayout {
             alignment: center;
-            Text { text: "SALDO DEVEDOR"; color: root.data.owes ? Theme.danger : Theme.available; font-size: 10px; font-weight: 800; horizontal-alignment: right; }
+            Text { text: "SALDO DEVEDOR"; color: root.data.owes ? Theme.danger : Theme.available; font-size: 12px; font-weight: 800; horizontal-alignment: right; }
             Text { text: root.data.debt; color: root.data.owes ? Theme.danger : Theme.available; font-size: 14px; font-weight: 900; font-family: "Menlo"; horizontal-alignment: right; }
         }
         if root.data.owes: Btn {

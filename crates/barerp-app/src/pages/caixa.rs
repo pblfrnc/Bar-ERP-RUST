@@ -32,6 +32,8 @@ struct CartItem {
 
 struct Picker {
     product_id: String,
+    /// Quantidade pedida na busca ("3*código")
+    qty: i64,
     groups: Vec<(String, ModifierGroup)>,
     selected: Vec<Vec<bool>>,
     show_errors: bool,
@@ -66,6 +68,8 @@ struct State {
     products: Vec<PdvProduct>,
     categories: Vec<Category>,
     promotions: Vec<Promotion>,
+    /// Mais vendidos (ids, do mais vendido para o menos), para a aba "Mais vendidos"
+    top: Vec<String>,
     cart: Vec<CartItem>,
     picker: Option<Picker>,
     nfce: Vec<NfceEntry>,
@@ -75,6 +79,10 @@ struct State {
 thread_local! {
     static STATE: RefCell<State> = RefCell::new(State::default());
 }
+
+/// "Mais vendidos": conta os últimos itens lançados e mostra os primeiros desta lista.
+const TOP_RECENT_ITEMS: i64 = 5000;
+const TOP_LIMIT: i64 = 15;
 
 fn with_state<R>(f: impl FnOnce(&mut State) -> R) -> R {
     STATE.with(|s| f(&mut s.borrow_mut()))
@@ -182,7 +190,9 @@ pub fn bind(ctx: &AppCtx) {
         render_quick(&c);
     });
     let c = ctx.clone();
-    store.on_add_product(move |id, is_box| add_product(&c, id.as_str(), is_box, false));
+    store.on_add_product(move |id, is_box| add_product(&c, id.as_str(), is_box, false, 1));
+    let c = ctx.clone();
+    store.on_keypad(move |key| keypad(&c, key.as_str()));
     let c = ctx.clone();
     store.on_cart_qty(move |key, delta| {
         with_state(|s| {
@@ -582,7 +592,8 @@ fn quick_open(ctx: &AppCtx) {
         s.submitting = false;
     });
     store.set_search(SharedString::new());
-    store.set_category("ALL".into());
+    // Abre nos mais vendidos (sem histórico de vendas, a lista mostra todos)
+    store.set_category("TOP".into());
     store.set_discount(SharedString::new());
     store.set_customer(SharedString::new());
     store.set_tendered(SharedString::new());
@@ -612,17 +623,20 @@ fn load_catalog(ctx: &AppCtx) {
             let products = caixa_db::pdv_products(&db).await?;
             let categories = catalog::categories(&db).await?;
             let promotions = catalog::promotions(&db).await?;
-            Ok::<_, barerp_db::DbError>((products, categories, promotions))
+            let top = caixa_db::top_sellers(&db, TOP_RECENT_ITEMS, TOP_LIMIT).await?;
+            Ok::<_, barerp_db::DbError>((products, categories, promotions, top))
         },
         move |ui, result| {
             let store = ui.global::<CaixaStore>();
             store.set_quick_loading(false);
             match result {
-                Ok((products, categories, promotions)) => {
+                Ok((products, categories, promotions, top)) => {
+                    store.set_has_top(!top.is_empty());
                     with_state(|s| {
                         s.products = products;
                         s.categories = categories;
                         s.promotions = promotions;
+                        s.top = top;
                         s.quick_loaded = true;
                     });
                     render_quick(&c);
@@ -698,13 +712,30 @@ fn matches_search(p: &PdvProduct, raw: &str) -> bool {
         || p.description.as_deref().is_some_and(|d| d.to_lowercase().contains(raw))
 }
 
+/// "3*7891000" → (3, "7891000"): quantidade antes do asterisco, como nos PDVs de supermercado.
+fn split_qty(raw: &str) -> (i64, &str) {
+    if let Some((n, rest)) = raw.split_once('*') {
+        if let Ok(qty) = n.trim().parse::<i64>() {
+            if (1..=999).contains(&qty) {
+                return (qty, rest.trim());
+            }
+        }
+    }
+    (1, raw)
+}
+
 fn filtered_ids(store: &CaixaStore) -> Vec<String> {
     let category = store.get_category().to_string();
-    let raw = store.get_search().trim().to_lowercase();
+    let search = store.get_search().trim().to_lowercase();
+    let (_, raw) = split_qty(&search);
     with_state(|s| {
+        // Mais vendidos na ordem de venda; com busca digitada (ou sem histórico) vale o cardápio todo
+        if category == "TOP" && raw.is_empty() && !s.top.is_empty() {
+            return s.top.iter().filter(|id| s.products.iter().any(|p| &p.id == *id)).cloned().collect();
+        }
         s.products
             .iter()
-            .filter(|p| (category == "ALL" || p.category_id == category) && matches_search(p, &raw))
+            .filter(|p| (category == "ALL" || category == "TOP" || p.category_id == category) && matches_search(p, raw))
             .map(|p| p.id.clone())
             .collect()
     })
@@ -827,32 +858,32 @@ fn cart_key(product_id: &str, is_box: bool, options: &[(String, String, f64)]) -
     format!("{product_id}|{}|{}", if is_box { "BOX" } else { "UNIT" }, ids.join(","))
 }
 
-fn add_line(ctx: &AppCtx, product_id: &str, is_box: bool, options: Vec<(String, String, f64)>) {
+fn add_line(ctx: &AppCtx, product_id: &str, is_box: bool, options: Vec<(String, String, f64)>, qty: i64) {
     with_state(|s| {
         let Some(p) = s.products.iter().find(|p| p.id == product_id) else { return };
         let is_box = is_box && p.sells_box();
         let options = if is_box { Vec::new() } else { options };
         let key = cart_key(product_id, is_box, &options);
         if let Some(item) = s.cart.iter_mut().find(|i| i.key == key) {
-            item.qty += 1;
+            item.qty += qty;
             return;
         }
         let notes = is_box.then(|| format!("Caixa Fechada ({} un)", p.box_units()));
-        s.cart.push(CartItem { key, product_id: product_id.to_string(), is_box, options, qty: 1, notes });
+        s.cart.push(CartItem { key, product_id: product_id.to_string(), is_box, options, qty, notes });
     });
     render_quick(ctx);
 }
 
 /// Produto com adicionais abre a escolha antes do carrinho. Pelo leitor só abre se houver pergunta
 /// obrigatória, para não travar a venda (opcionais: tocar no produto).
-fn add_product(ctx: &AppCtx, product_id: &str, is_box: bool, from_scanner: bool) {
+fn add_product(ctx: &AppCtx, product_id: &str, is_box: bool, from_scanner: bool, qty: i64) {
     let needs_picker = with_state(|s| {
         s.products.iter().find(|p| p.id == product_id).is_some_and(|p| {
             !(is_box && p.sells_box()) && if from_scanner { p.has_required_modifiers } else { p.has_modifiers }
         })
     });
     if !needs_picker {
-        add_line(ctx, product_id, is_box, Vec::new());
+        add_line(ctx, product_id, is_box, Vec::new(), qty);
         return;
     }
     let db = ctx.db.clone();
@@ -861,11 +892,11 @@ fn add_product(ctx: &AppCtx, product_id: &str, is_box: bool, from_scanner: bool)
     ctx.spawn(async move { catalog::product_modifiers(&db, &pid).await.map(|g| (pid, g)) }, move |ui, result| match result {
         Ok((pid, groups)) if !groups.is_empty() => {
             let selected = groups.iter().map(|(_, g)| vec![false; g.options.len()]).collect();
-            with_state(|s| s.picker = Some(Picker { product_id: pid, groups, selected, show_errors: false }));
+            with_state(|s| s.picker = Some(Picker { product_id: pid, qty, groups, selected, show_errors: false }));
             ui.global::<CaixaStore>().set_picker_visible(true);
             render_picker(&c);
         }
-        Ok((pid, _)) => add_line(&c, &pid, false, Vec::new()),
+        Ok((pid, _)) => add_line(&c, &pid, false, Vec::new(), qty),
         Err(e) => alert(ui, e.to_string()),
     });
 }
@@ -985,18 +1016,18 @@ fn picker_confirm(ctx: &AppCtx) {
                 g.options.iter().zip(sel).filter(|(_, on)| **on).map(|(o, _)| (o.id.clone(), o.name.clone(), o.price))
             })
             .collect();
-        let pid = p.product_id.clone();
+        let (pid, qty) = (p.product_id.clone(), p.qty);
         s.picker = None;
-        Some(Some((pid, options)))
+        Some(Some((pid, options, qty)))
     });
     match outcome {
-        Some(Some((pid, options))) => {
+        Some(Some((pid, options, qty))) => {
             if let Some(ui) = ctx.ui() {
                 let store = ui.global::<CaixaStore>();
                 store.set_picker_visible(false);
                 store.set_focus_search_tick(store.get_focus_search_tick() + 1);
             }
-            add_line(ctx, &pid, false, options);
+            add_line(ctx, &pid, false, options, qty);
         }
         Some(None) => render_picker(ctx),
         None => {}
@@ -1011,11 +1042,12 @@ fn search_enter(ctx: &AppCtx) {
     if with_state(|s| s.picker.is_some()) {
         return;
     }
-    let raw = store.get_search().trim().to_lowercase();
+    let search = store.get_search().trim().to_lowercase();
+    let (qty, raw) = split_qty(&search);
     if raw.is_empty() {
         return;
     }
-    let clean = raw.strip_prefix('#').unwrap_or(&raw).to_string();
+    let clean = raw.strip_prefix('#').unwrap_or(raw).to_string();
     let same = |v: &Option<String>| v.as_deref().is_some_and(|x| x.to_lowercase() == raw || x.to_lowercase() == clean);
     let hit = with_state(|s| {
         if let Some(p) = s.products.iter().find(|p| p.has_box_price && same(&p.box_ean)) {
@@ -1026,8 +1058,28 @@ fn search_enter(ctx: &AppCtx) {
     let hit = hit.or_else(|| filtered_ids(&store).first().map(|id| (id.clone(), false)));
     if let Some((id, is_box)) = hit {
         store.set_search(SharedString::new());
-        add_product(ctx, &id, is_box, true);
+        add_product(ctx, &id, is_box, true, qty);
     }
+}
+
+/// Teclado numérico na tela para o valor entregue em dinheiro.
+fn keypad(ctx: &AppCtx, key: &str) {
+    let Some(ui) = ctx.ui() else { return };
+    let store = ui.global::<CaixaStore>();
+    let mut text = store.get_tendered().to_string();
+    match key {
+        "back" => {
+            text.pop();
+        }
+        "clear" => text.clear(),
+        "," if text.contains(',') => {}
+        "," if text.is_empty() => text.push_str("0,"),
+        // Até duas casas depois da vírgula
+        _ if text.split_once(',').is_some_and(|(_, cents)| cents.len() + key.len() > 2) => {}
+        _ => text.push_str(key),
+    }
+    store.set_tendered(text.into());
+    render_quick(ctx);
 }
 
 fn finish_sale(ctx: &AppCtx) {
@@ -1266,6 +1318,15 @@ mod tests {
         assert_eq!(parse_amount("10abc"), Some(10.0));
         assert_eq!(parse_amount("abc"), None);
         assert_eq!(parse_amount(""), None);
+    }
+
+    #[test]
+    fn quantity_prefix() {
+        assert_eq!(split_qty("3*7891000"), (3, "7891000"));
+        assert_eq!(split_qty("12 * hein"), (12, "hein"));
+        assert_eq!(split_qty("hein"), (1, "hein"));
+        assert_eq!(split_qty("0*hein"), (1, "0*hein"));
+        assert_eq!(split_qty("x*hein"), (1, "x*hein"));
     }
 
     #[test]

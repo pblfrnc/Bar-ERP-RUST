@@ -1,4 +1,6 @@
-// Página "kds": port completo do KdsView.tsx (fila de produção do bar e da cozinha).
+// Página "kds": fila de produção do bar e da cozinha (KdsView.tsx), com o modo de cozinha:
+// tela cheia sem a barra do ERP, cabeçalho da comanda colorido pelo tempo de espera, total por item na
+// fila, botão PRONTO por comanda (teclas 1–9), desfazer (Backspace) e aviso sonoro de pedido novo.
 // O estado e os callbacks ficam no global `KdsStore`, ligado em `src/pages/kds.rs` com
 // `ui.global::<KdsStore>()`. Os itens chegam agrupados por comanda (um "ticket" por mesa), do mais
 // antigo para o mais novo, e já divididos em linhas conforme a largura da tela (`cols`).
@@ -8,8 +10,11 @@ import { Icons, Icon } from "../icons.slint";
 
 // status: PENDING | PREPARING | READY
 export struct KdsLine { id: string, qty: int, name: string, station: string, notes: string, status: string }
-export struct KdsTicket { order-id: string, place: string, sub: string, minutes: int, items: [KdsLine] }
+// index: posição na fila (1 a 9 têm atalho de teclado; 0 = sem atalho)
+export struct KdsTicket { order-id: string, place: string, sub: string, minutes: int, index: int, items: [KdsLine] }
 export struct KdsRow { tickets: [KdsTicket], empty: int }
+// Total de um produto ainda por fazer (pendente ou em preparo), somando todas as comandas
+export struct KdsSum { qty: int, name: string }
 
 export global KdsStore {
     in-out property <string> status;
@@ -20,6 +25,15 @@ export global KdsStore {
     in property <bool> loading;
     in property <bool> connected: true;
     in property <[KdsRow]> rows;
+    in property <[KdsSum]> summary;
+    // Hora atual (HH:MM) para a cozinha
+    in property <string> clock;
+    // Modo cozinha: esconde a barra de abas e o rodapé do ERP
+    in-out property <bool> focus;
+    // Aviso sonoro quando chega item novo (lembrado entre aberturas)
+    in property <bool> sound: true;
+    // Há uma comanda liberada que dá para voltar
+    in property <bool> can-undo;
     // Aviso (alert do original)
     in-out property <string> alert-text;
 
@@ -27,9 +41,30 @@ export global KdsStore {
     callback set-station(string);
     callback advance(string, string);
     callback ready-all(string);
+    // PRONTO pela tecla 1–9 (posição na fila)
+    callback ready-index(int);
+    callback undo();
+    callback toggle-sound();
     // Quantos tickets cabem por linha (a página avisa quando a largura muda)
     callback cols-changed(int);
     callback open-connect();
+
+    // Teclas do KDS, chamadas pela janela quando a página está aberta
+    public function key(text: string) -> bool {
+        if (text == Key.Escape && self.focus) {
+            self.focus = false;
+            return true;
+        }
+        if (text == Key.Backspace && self.can-undo) {
+            self.undo();
+            return true;
+        }
+        if (text.character-count == 1 && text.is-float() && text.to-float() >= 1) {
+            self.ready-index(Math.round(text.to-float()));
+            return true;
+        }
+        return false;
+    }
 }
 
 component StationButton inherits Rectangle {
@@ -37,226 +72,214 @@ component StationButton inherits Rectangle {
     in property <image> icon;
     in property <bool> active;
     callback clicked;
-    height: 32px;
-    width: row.preferred-width + 24px;
+    height: 40px;
+    width: row.preferred-width + 28px;
     border-radius: 9px;
     background: root.active ? Theme.primary : transparent;
     row := HorizontalLayout {
         alignment: center;
         spacing: 6px;
-        if root.icon.width > 0: VerticalLayout { alignment: center; Icon { source: root.icon; size: 14px; color: root.active ? Theme.primary-text : (touch.has-hover ? Theme.text : Theme.text-muted); } }
+        if root.icon.width > 0: VerticalLayout { alignment: center; Icon { source: root.icon; size: 16px; color: root.active ? Theme.primary-text : (touch.has-hover ? Theme.text : Theme.text-muted); } }
         Text {
             text: root.text;
             color: root.active ? Theme.primary-text : (touch.has-hover ? Theme.text : Theme.text-muted);
-            font-size: 12px;
-            font-weight: 700;
+            font-size: 15px;
+            font-weight: root.active ? 900 : 700;
             vertical-alignment: center;
         }
     }
     touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
 }
 
-// Botão de ação de um item (Iniciar Preparo / Marcar Pronto! / Marcar Entregue)
-component ItemAction inherits Rectangle {
+// Botão da barra (Desfazer, Som, Tela cheia), com a tecla ao lado
+component BarButton inherits Rectangle {
     in property <string> text;
     in property <image> icon;
-    in property <color> bg;
-    in property <color> fg;
-    in property <color> icon-color: root.fg;
-    in property <color> hover-bg;
-    in property <color> hover-fg: root.fg;
-    in property <color> outline: transparent;
-    in property <int> weight: 700;
+    in property <string> kbd;
+    in property <color> tone: Theme.text;
+    in property <bool> enabled: true;
     callback clicked;
-    height: 32px;
-    border-radius: 11px;
-    border-width: root.outline == transparent ? 0 : 1px;
-    border-color: root.outline;
-    background: touch.has-hover ? root.hover-bg : root.bg;
-    HorizontalLayout {
+    height: 44px;
+    width: row.preferred-width + 28px;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: root.tone == Theme.text ? Theme.border : root.tone.with-alpha(0.4);
+    background: touch.has-hover && root.enabled ? Theme.border : Theme.surface-2;
+    opacity: root.enabled ? 1 : 0.45;
+    row := HorizontalLayout {
         alignment: center;
-        spacing: 5px;
-        VerticalLayout { alignment: center; Icon { source: root.icon; size: 14px; color: touch.has-hover ? root.hover-fg : root.icon-color; } }
-        Text { text: root.text; color: touch.has-hover ? root.hover-fg : root.fg; font-size: 12px; font-weight: root.weight; vertical-alignment: center; }
+        spacing: 8px;
+        VerticalLayout { alignment: center; Icon { source: root.icon; size: 18px; color: root.tone; } }
+        if root.text != "": Text { text: root.text; color: root.tone; font-size: 15px; font-weight: 700; vertical-alignment: center; }
+        if root.kbd != "": VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: k.preferred-width + 12px;
+                height: 22px;
+                border-radius: 6px;
+                border-width: 1px;
+                border-color: Theme.border;
+                background: Theme.bg;
+                k := Text { text: root.kbd; color: Theme.text-muted; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
+            }
+        }
     }
-    touch := TouchArea { mouse-cursor: pointer; clicked => { root.clicked(); } }
+    touch := TouchArea { mouse-cursor: root.enabled ? pointer : default; clicked => { if root.enabled { root.clicked(); } } }
 }
 
-component KdsItemCard inherits Rectangle {
+// Uma linha da comanda: quantidade, produto, observação e o botão do próximo passo
+// (iniciar preparo → pronto → entregue)
+component KdsItemRow inherits Rectangle {
     in property <KdsLine> item;
     property <bool> ready: root.item.status == "READY";
     property <bool> preparing: root.item.status == "PREPARING";
-    border-radius: 16px;
-    border-width: 1px;
-    background: root.ready ? Theme.available.with-alpha(0.08) : root.preparing ? Theme.orange.with-alpha(0.08) : Theme.bg.with-alpha(0.6);
-    border-color: root.ready ? Theme.available.with-alpha(0.35) : root.preparing ? Theme.orange.with-alpha(0.45) : Theme.surface-2;
+    property <color> step-tone: root.ready ? Theme.available : root.preparing ? Theme.available : Theme.orange;
 
-    VerticalLayout {
-        padding: 12px;
-        spacing: 8px;
-        HorizontalLayout {
-            spacing: 8px;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 12px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        spacing: 10px;
+        VerticalLayout {
             alignment: start;
-            VerticalLayout {
+            Text {
+                min-width: 40px;
+                text: root.item.qty + "x";
+                color: root.ready ? Theme.text-muted : Theme.primary;
+                font-size: 22px;
+                font-weight: 900;
+                font-family: "Menlo";
+            }
+        }
+        VerticalLayout {
+            spacing: 4px;
+            horizontal-stretch: 1;
+            alignment: start;
+            Text {
+                text: root.item.name;
+                color: root.ready ? Theme.text-muted : Theme.text;
+                font-size: 18px;
+                font-weight: 800;
+                wrap: word-wrap;
+            }
+            HorizontalLayout {
+                spacing: 6px;
                 alignment: start;
-                Rectangle {
-                    width: qty.preferred-width + 16px;
-                    height: 26px;
-                    border-radius: 8px;
-                    background: Theme.surface;
-                    border-width: 1px;
-                    border-color: Theme.surface-2;
-                    qty := Text { text: root.item.qty + "x"; color: Theme.primary; font-size: 16px; font-weight: 900; font-family: "Menlo"; }
+                Text { text: root.item.station; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
+                if root.preparing: Text { text: "• em preparo"; color: Theme.orange; font-size: 13px; font-weight: 800; }
+                if root.ready: Text { text: "• pronto, aguardando entrega"; color: Theme.available; font-size: 13px; font-weight: 800; }
+            }
+            // Observações com destaque
+            if root.item.notes != "": Rectangle {
+                border-radius: 8px;
+                background: Theme.dark ? #422006 : #fef3c7;
+                VerticalLayout {
+                    padding: 6px;
+                    padding-left: 8px;
+                    Text { text: "⚠ " + root.item.notes; color: Theme.dark ? #fcd34d : #92400e; font-size: 15px; font-weight: 800; wrap: word-wrap; }
                 }
             }
-            VerticalLayout {
-                spacing: 2px;
-                horizontal-stretch: 1;
-                Text { text: root.item.name; color: Theme.text; font-size: 14px; font-weight: 900; wrap: word-wrap; }
-                Text { text: root.item.station; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+        }
+        VerticalLayout {
+            alignment: start;
+            step := Rectangle {
+                width: 44px;
+                height: 44px;
+                border-radius: 10px;
+                border-width: 2px;
+                border-color: root.step-tone.with-alpha(0.6);
+                background: root.preparing ? (step-touch.has-hover ? #34d399 : #10b981)
+                    : step-touch.has-hover ? root.step-tone.with-alpha(0.3) : root.step-tone.with-alpha(0.1);
+                Icon {
+                    source: root.ready ? Icons.check-check : root.preparing ? Icons.check : Icons.flame;
+                    size: 22px;
+                    color: root.preparing ? #022c22 : root.step-tone;
+                }
+                step-touch := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => {
+                        KdsStore.advance(root.item.id, root.ready ? "DELIVERED" : root.preparing ? "READY" : "PREPARING");
+                    }
+                }
             }
-        }
-
-        // Observações com destaque
-        if root.item.notes != "": Rectangle {
-            border-radius: 8px;
-            background: Theme.primary.with-alpha(0.1);
-            border-width: 1px;
-            border-color: Theme.primary.with-alpha(0.3);
-            VerticalLayout {
-                padding: 6px;
-                Text { text: "⚠️ Obs: " + root.item.notes; color: Theme.dark ? #fcd34d : #92400e; font-size: 12px; font-weight: 700; wrap: word-wrap; }
-            }
-        }
-
-        Rectangle { height: 1px; background: Theme.surface-2; }
-
-        if root.item.status == "PENDING": ItemAction {
-            text: "Iniciar Preparo";
-            icon: Icons.flame;
-            bg: Theme.orange.with-alpha(0.12);
-            fg: Theme.orange;
-            outline: Theme.orange.with-alpha(0.3);
-            hover-bg: Theme.orange;
-            hover-fg: Theme.dark ? #020617 : #ffffff;
-            clicked => { KdsStore.advance(root.item.id, "PREPARING"); }
-        }
-        if root.preparing: ItemAction {
-            text: "Marcar Pronto!";
-            icon: Icons.circle-check;
-            weight: 900;
-            bg: #10b981;
-            hover-bg: #34d399;
-            fg: #020617;
-            clicked => { KdsStore.advance(root.item.id, "READY"); }
-        }
-        if root.ready: ItemAction {
-            text: "Marcar Entregue";
-            icon: Icons.check-check;
-            bg: Theme.surface-2.with-alpha(0.6);
-            hover-bg: Theme.surface-2;
-            fg: Theme.text;
-            icon-color: Theme.available;
-            outline: Theme.border;
-            clicked => { KdsStore.advance(root.item.id, "DELIVERED"); }
         }
     }
+    Rectangle { y: 0; height: 1px; background: Theme.surface-2; }
 }
 
 component TicketCard inherits Rectangle {
     in property <KdsTicket> ticket;
-    property <bool> alert: root.ticket.minutes >= 15;
-    property <bool> warning: root.ticket.minutes >= 8 && !root.alert;
-    property <color> timer-tone: root.alert ? Theme.danger : root.warning ? Theme.primary : Theme.text-muted;
+    // Verde até 5 min, âmbar até 15 min, vermelho depois
+    property <bool> late: root.ticket.minutes >= 15;
+    property <bool> warn: root.ticket.minutes >= 5 && !root.late;
+    property <color> head-bg: root.late ? Theme.danger : root.warn ? Theme.closing : (Theme.dark ? #064e3b : #d1fae5);
+    property <color> head-fg: root.late ? #ffffff : root.warn ? #1c1917 : (Theme.dark ? #d1fae5 : #064e3b);
 
     background: Theme.surface;
-    border-radius: 24px;
-    border-width: 1px;
-    border-color: Theme.surface-2;
+    border-radius: 16px;
+    border-width: 2px;
+    border-color: root.late ? Theme.danger : root.warn ? Theme.closing : Theme.border;
     clip: true;
 
     VerticalLayout {
-        // Cabeçalho do ticket
+        // Cabeçalho: mesa, comanda e tempo de espera
         Rectangle {
             vertical-stretch: 0;
-            background: Theme.bg.with-alpha(0.8);
-            VerticalLayout {
-                padding: 14px;
+            background: root.head-bg;
+            HorizontalLayout {
+                padding: 12px;
+                padding-left: 14px;
+                spacing: 8px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 1px;
+                    Text { text: root.ticket.place; color: root.head-fg; font-size: 24px; font-weight: 900; overflow: elide; }
+                    Text { text: root.ticket.sub; color: root.head-fg; opacity: 0.85; font-size: 14px; overflow: elide; }
+                }
                 HorizontalLayout {
-                    spacing: 8px;
-                    VerticalLayout {
-                        horizontal-stretch: 1;
-                        spacing: 1px;
-                        Text { text: root.ticket.place; color: Theme.text; font-size: 18px; font-weight: 900; overflow: elide; }
-                        Text { text: root.ticket.sub; color: Theme.text-muted; font-size: 12px; overflow: elide; }
-                    }
-                    VerticalLayout {
-                        alignment: center;
-                        Rectangle {
-                            width: timer.preferred-width + 20px;
-                            height: 28px;
-                            border-radius: 11px;
-                            border-width: 1px;
-                            background: root.alert || root.warning ? root.timer-tone.with-alpha(0.15) : Theme.surface-2.with-alpha(0.6);
-                            border-color: root.alert || root.warning ? root.timer-tone.with-alpha(0.4) : Theme.border;
-                            opacity: root.alert ? (mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.55) : 1;
-                            timer := HorizontalLayout {
-                                alignment: center;
-                                spacing: 4px;
-                                VerticalLayout { alignment: center; Icon { source: Icons.clock; size: 14px; color: root.alert || root.warning ? root.timer-tone : Theme.text; } }
-                                Text {
-                                    text: root.ticket.minutes + " min";
-                                    color: root.alert || root.warning ? root.timer-tone : Theme.text;
-                                    font-size: 12px;
-                                    font-weight: root.alert ? 900 : root.warning ? 700 : 500;
-                                    font-family: "Menlo";
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
-                    }
+                    spacing: 6px;
+                    opacity: root.late ? (mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.6) : 1;
+                    VerticalLayout { alignment: center; Icon { source: Icons.clock; size: 22px; color: root.head-fg; } }
+                    Text { text: root.ticket.minutes + " min"; color: root.head-fg; font-size: 22px; font-weight: 900; vertical-alignment: center; }
                 }
             }
         }
-        Rectangle { height: 1px; vertical-stretch: 0; background: Theme.surface-2; }
 
-        // Itens do ticket (rolam a partir de ~384px, como o max-h-96 do original)
+        // Itens da comanda (rolam a partir de ~420px)
         items-box := Flickable {
             vertical-stretch: 1;
-            preferred-height: min(items-col.preferred-height, 384px);
+            preferred-height: min(items-col.preferred-height, 420px);
             content-height: items-col.preferred-height;
             items-col := VerticalLayout {
                 width: items-box.width;
-                padding: 14px;
-                spacing: 10px;
-                for it in root.ticket.items: KdsItemCard { item: it; }
+                for it in root.ticket.items: KdsItemRow { item: it; }
             }
         }
 
-        Rectangle { height: 1px; vertical-stretch: 0; background: Theme.surface-2; }
-        // Rodapé: todos prontos
+        // Rodapé: PRONTO libera a comanda inteira (tecla com a posição na fila)
         Rectangle {
             vertical-stretch: 0;
-            background: Theme.bg.with-alpha(0.8);
             VerticalLayout {
                 padding: 12px;
-                all-ready := Rectangle {
-                    height: 40px;
+                Rectangle {
+                    height: 58px;
                     border-radius: 12px;
-                    border-width: 1px;
-                    border-color: all-touch.has-hover ? #059669 : Theme.border;
-                    background: all-touch.has-hover ? #059669 : Theme.surface-2.with-alpha(0.7);
+                    background: all-touch.has-hover ? #34d399 : #10b981;
                     HorizontalLayout {
                         alignment: center;
-                        spacing: 6px;
-                        VerticalLayout { alignment: center; Icon { source: Icons.check-check; size: 16px; color: all-touch.has-hover ? (Theme.dark ? #020617 : #ffffff) : Theme.text; } }
-                        Text {
-                            text: "TUDO PRONTO NESTA MESA";
-                            color: all-touch.has-hover ? (Theme.dark ? #020617 : #ffffff) : Theme.text;
-                            font-size: 12px;
-                            font-weight: 900;
-                            letter-spacing: 0.6px;
-                            vertical-alignment: center;
+                        spacing: 10px;
+                        VerticalLayout { alignment: center; Icon { source: Icons.check-check; size: 24px; color: #022c22; } }
+                        Text { text: "PRONTO"; color: #022c22; font-size: 19px; font-weight: 900; letter-spacing: 0.6px; vertical-alignment: center; }
+                        if root.ticket.index > 0: VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 26px;
+                                height: 26px;
+                                border-radius: 6px;
+                                background: #022c22;
+                                Text { text: root.ticket.index; color: #a7f3d0; font-size: 15px; font-weight: 900; font-family: "Menlo"; }
+                            }
                         }
                     }
                     all-touch := TouchArea { mouse-cursor: pointer; clicked => { KdsStore.ready-all(root.ticket.order-id); } }
@@ -269,61 +292,55 @@ component TicketCard inherits Rectangle {
 export component KdsAreaPage inherits Rectangle {
     background: Theme.bg;
 
-    // Colunas do grid do original: 1 / 2 (md) / 3 (lg) / 4 (xl), medidas na largura da área
-    property <int> cols: grid.width >= 1180px ? 4 : grid.width >= 860px ? 3 : grid.width >= 560px ? 2 : 1;
+    // Colunas conforme a largura da área (o modo cozinha em tela cheia cabe 5)
+    property <int> cols: grid.width >= 1380px ? 5 : grid.width >= 1100px ? 4 : grid.width >= 820px ? 3 : grid.width >= 540px ? 2 : 1;
     changed cols => { KdsStore.cols-changed(self.cols); }
     init => { KdsStore.cols-changed(self.cols); }
 
     VerticalLayout {
-        padding: 20px;
-        padding-bottom: 12px;
-        spacing: 16px;
-
-        // Barra superior: título, contagem e seletor de estação
+        // Barra superior: título, contagem, praça, desfazer, som, relógio e tela cheia
         Rectangle {
-            border-radius: 16px;
+            vertical-stretch: 0;
             background: Theme.surface;
-            border-width: 1px;
-            border-color: Theme.surface-2;
+            Rectangle { y: parent.height - 1px; height: 1px; background: Theme.surface-2; }
             HorizontalLayout {
-                padding: 16px;
+                padding: 10px;
+                padding-left: 20px;
+                padding-right: 20px;
                 spacing: 12px;
                 Rectangle {
-                    width: 40px;
-                    height: 40px;
+                    width: 42px;
+                    height: 42px;
+                    y: (parent.height - self.height) / 2;
                     border-radius: 12px;
-                    background: Theme.primary.with-alpha(0.2);
-                    border-width: 1px;
-                    border-color: Theme.primary.with-alpha(0.3);
-                    Icon { source: Icons.chef-hat; color: Theme.primary; size: 24px; }
+                    background: Theme.primary;
+                    Icon { source: KdsStore.station == "BAR" ? Icons.beer : Icons.chef-hat; color: Theme.primary-text; size: 24px; }
                 }
                 VerticalLayout {
                     alignment: center;
-                    spacing: 2px;
-                    horizontal-stretch: 1;
-                    HorizontalLayout {
-                        spacing: 8px;
-                        alignment: start;
-                        Text { text: "KDS • Fila de Produção"; color: Theme.text; font-size: 18px; font-weight: 900; vertical-alignment: center; }
-                        VerticalLayout {
-                            alignment: center;
-                            Rectangle {
-                                height: 20px;
-                                width: count-text.preferred-width + 16px;
-                                border-radius: 10px;
-                                background: Theme.primary;
-                                count-text := Text { text: KdsStore.count + " pedidos"; color: Theme.primary-text; font-size: 11px; font-weight: 700; font-family: "Menlo"; }
-                            }
-                        }
+                    Text {
+                        text: KdsStore.station == "BAR" ? "Bar" : KdsStore.station == "KITCHEN" ? "Cozinha" : "Produção";
+                        color: Theme.text;
+                        font-size: 22px;
+                        font-weight: 900;
                     }
-                    Text { text: "Atualização em tempo real para equipe de Bar e Cozinha"; color: Theme.text-muted; font-size: 12px; }
                 }
-
-                // Seletor de estação: Todas, Bar, Cozinha
                 VerticalLayout {
                     alignment: center;
                     Rectangle {
-                        height: 40px;
+                        height: 26px;
+                        width: count-text.preferred-width + 18px;
+                        border-radius: 13px;
+                        background: Theme.primary;
+                        count-text := Text { text: KdsStore.count + (KdsStore.count == 1 ? " item" : " itens"); color: Theme.primary-text; font-size: 14px; font-weight: 800; }
+                    }
+                }
+
+                // Seletor de praça
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 48px;
                         width: stations.preferred-width + 8px;
                         border-radius: 12px;
                         background: Theme.bg;
@@ -333,106 +350,158 @@ export component KdsAreaPage inherits Rectangle {
                             x: 4px;
                             spacing: 2px;
                             alignment: center;
-                            StationButton { text: "Todas as Estações"; active: KdsStore.station == "ALL"; clicked => { KdsStore.set-station("ALL"); } }
-                            StationButton { text: "Barman / Bebidas"; icon: Icons.beer; active: KdsStore.station == "BAR"; clicked => { KdsStore.set-station("BAR"); } }
-                            StationButton { text: "Cozinha / Petiscos"; icon: Icons.chef-hat; active: KdsStore.station == "KITCHEN"; clicked => { KdsStore.set-station("KITCHEN"); } }
+                            StationButton { text: "Todas"; active: KdsStore.station == "ALL"; clicked => { KdsStore.set-station("ALL"); } }
+                            StationButton { text: "Bar"; icon: Icons.beer; active: KdsStore.station == "BAR"; clicked => { KdsStore.set-station("BAR"); } }
+                            StationButton { text: "Cozinha"; icon: Icons.chef-hat; active: KdsStore.station == "KITCHEN"; clicked => { KdsStore.set-station("KITCHEN"); } }
                         }
                     }
                 }
+                Rectangle { horizontal-stretch: 1; }
 
+                VerticalLayout {
+                    alignment: center;
+                    BarButton {
+                        text: "Desfazer";
+                        icon: Icons.undo-2;
+                        kbd: "⌫";
+                        enabled: KdsStore.can-undo;
+                        clicked => { KdsStore.undo(); }
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    BarButton {
+                        text: KdsStore.sound ? "Som" : "Mudo";
+                        icon: KdsStore.sound ? Icons.bell : Icons.bell-off;
+                        tone: KdsStore.sound ? Theme.available : Theme.text-muted;
+                        clicked => { KdsStore.toggle-sound(); }
+                    }
+                }
                 // Status Wi-Fi (servidor dos celulares) e QR de conexão
                 VerticalLayout {
                     alignment: center;
-                    Rectangle {
-                        height: 38px;
-                        width: wifi-row.preferred-width + 24px;
-                        border-radius: 12px;
-                        border-width: 1px;
-                        background: KdsStore.connected ? Theme.available.with-alpha(wifi-touch.has-hover ? 0.18 : 0.1) : Theme.danger.with-alpha(wifi-touch.has-hover ? 0.18 : 0.1);
-                        border-color: KdsStore.connected ? Theme.available.with-alpha(0.35) : Theme.danger.with-alpha(0.45);
-                        opacity: KdsStore.connected ? 1 : (mod(animation-tick() / 1ms, 1600) < 800 ? 1 : 0.6);
-                        wifi-row := HorizontalLayout {
-                            alignment: center;
-                            spacing: 6px;
-                            if KdsStore.connected: VerticalLayout {
-                                alignment: center;
-                                Rectangle {
-                                    width: 8px;
-                                    height: 8px;
-                                    border-radius: 4px;
-                                    background: Theme.available;
-                                    opacity: mod(animation-tick() / 1ms, 2000) < 1000 ? 1 : 0.4;
-                                }
-                            }
-                            if !KdsStore.connected: VerticalLayout { alignment: center; Icon { source: Icons.wifi-off; size: 14px; color: Theme.danger; } }
-                            Text {
-                                text: KdsStore.connected ? "Wi-Fi OK" : "Conectar (QR/IP)";
-                                color: KdsStore.connected ? Theme.available : Theme.danger;
-                                font-size: 11px;
-                                font-weight: KdsStore.connected ? 700 : 800;
-                                vertical-alignment: center;
-                            }
-                            if KdsStore.connected: VerticalLayout { alignment: center; Icon { source: Icons.qr-code; size: 14px; color: Theme.available; opacity: 0.7; } }
-                        }
-                        wifi-touch := TouchArea { mouse-cursor: pointer; clicked => { KdsStore.open-connect(); } }
+                    BarButton {
+                        text: KdsStore.connected ? "" : "Conectar";
+                        icon: KdsStore.connected ? Icons.wifi : Icons.wifi-off;
+                        tone: KdsStore.connected ? Theme.available : Theme.danger;
+                        clicked => { KdsStore.open-connect(); }
                     }
                 }
-
                 VerticalLayout {
                     alignment: center;
                     Rectangle {
-                        width: 40px;
-                        height: 40px;
+                        width: 44px;
+                        height: 44px;
                         border-radius: 12px;
                         border-width: 1px;
                         border-color: Theme.border;
                         background: refresh-touch.has-hover ? Theme.border : Theme.surface-2;
                         Icon {
                             source: Icons.refresh-cw;
-                            size: 16px;
+                            size: 18px;
                             color: Theme.text;
                             transform-rotation: KdsStore.loading ? mod(animation-tick() / 1ms, 1000) / 1000 * 360deg : 0deg;
                         }
                         refresh-touch := TouchArea { mouse-cursor: pointer; clicked => { KdsStore.refresh(); } }
                     }
                 }
+                if KdsStore.clock != "": Text {
+                    text: KdsStore.clock;
+                    color: Theme.text;
+                    font-size: 26px;
+                    font-weight: 900;
+                    font-family: "Menlo";
+                    vertical-alignment: center;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    BarButton {
+                        text: KdsStore.focus ? "Sair" : "Tela cheia";
+                        icon: KdsStore.focus ? Icons.minimize : Icons.maximize;
+                        kbd: KdsStore.focus ? "Esc" : "";
+                        clicked => { KdsStore.focus = !KdsStore.focus; }
+                    }
+                }
+            }
+        }
+
+        // Total por produto na fila, para preparar em lote
+        if KdsStore.summary.length > 0: Rectangle {
+            vertical-stretch: 0;
+            height: 54px;
+            background: Theme.dark ? #0b1222 : Theme.surface-2;
+            Rectangle { y: parent.height - 1px; height: 1px; background: Theme.surface-2; }
+            Flickable {
+                x: 20px;
+                width: parent.width - 40px;
+                content-width: sum-row.preferred-width;
+                sum-row := HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    Text { text: "NA FILA"; color: Theme.text-muted; font-size: 13px; font-weight: 800; letter-spacing: 0.6px; vertical-alignment: center; }
+                    for s in KdsStore.summary: VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            height: 36px;
+                            width: chip.preferred-width + 26px;
+                            border-radius: 18px;
+                            background: Theme.surface-2;
+                            border-width: 1px;
+                            border-color: Theme.border;
+                            chip := HorizontalLayout {
+                                alignment: center;
+                                spacing: 5px;
+                                Text { text: s.qty + "x"; color: Theme.primary; font-size: 16px; font-weight: 900; vertical-alignment: center; }
+                                Text { text: s.name; color: Theme.text; font-size: 16px; font-weight: 700; vertical-alignment: center; }
+                            }
+                        }
+                    }
+                }
             }
         }
 
         // Grade de comandas (tickets de produção)
-        grid := Rectangle {
+        Rectangle {
             vertical-stretch: 1;
-            if KdsStore.rows.length == 0: Rectangle {
-                border-radius: 24px;
-                background: Theme.surface.with-alpha(0.6);
-                border-width: 1px;
-                border-color: Theme.surface-2;
-                VerticalLayout {
-                    alignment: center;
-                    spacing: 4px;
-                    HorizontalLayout { alignment: center; Icon { source: Icons.circle-check; color: Theme.available.with-alpha(0.8); size: 64px; } }
-                    Rectangle { height: 8px; }
-                    Text { text: "Tudo limpo! Sem pedidos na fila"; color: Theme.text; font-size: 18px; font-weight: 700; horizontal-alignment: center; }
-                    Text { text: "Novos pedidos lançados pelos garçons aparecerão aqui instantaneamente."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+            grid := Rectangle {
+                x: 20px;
+                y: 16px;
+                width: parent.width - 40px;
+                height: parent.height - 16px;
+                if KdsStore.rows.length == 0: Rectangle {
+                    height: parent.height - 16px;
+                    y: 0;
+                    border-radius: 24px;
+                    background: Theme.surface.with-alpha(0.6);
+                    border-width: 1px;
+                    border-color: Theme.surface-2;
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        HorizontalLayout { alignment: center; Icon { source: Icons.circle-check; color: Theme.available.with-alpha(0.8); size: 72px; } }
+                        Rectangle { height: 8px; }
+                        Text { text: "Tudo limpo! Sem pedidos na fila"; color: Theme.text; font-size: 22px; font-weight: 800; horizontal-alignment: center; }
+                        Text { text: "Os pedidos novos aparecem aqui na hora, com aviso sonoro."; color: Theme.text-muted; font-size: 15px; horizontal-alignment: center; }
+                    }
                 }
-            }
-            if KdsStore.rows.length > 0: Flickable {
-                content-height: rows-col.preferred-height;
-                rows-col := VerticalLayout {
-                    width: grid.width;
-                    spacing: 16px;
-                    padding-bottom: 20px;
-                    for row in KdsStore.rows: HorizontalLayout {
-                        spacing: 16px;
-                        alignment: stretch;
-                        for t in row.tickets: TicketCard {
-                            ticket: t;
-                            horizontal-stretch: 1;
-                            width: (grid.width - (root.cols - 1) * 16px) / root.cols;
-                        }
-                        // Completa a última linha para os tickets manterem a largura da coluna
-                        if row.empty > 0: Rectangle {
-                            width: row.empty * ((grid.width - (root.cols - 1) * 16px) / root.cols + 16px) - 16px;
+                if KdsStore.rows.length > 0: Flickable {
+                    content-height: rows-col.preferred-height;
+                    rows-col := VerticalLayout {
+                        width: grid.width;
+                        spacing: 14px;
+                        padding-bottom: 20px;
+                        for row in KdsStore.rows: HorizontalLayout {
+                            spacing: 14px;
+                            alignment: stretch;
+                            for t in row.tickets: TicketCard {
+                                ticket: t;
+                                horizontal-stretch: 1;
+                                width: (grid.width - (root.cols - 1) * 14px) / root.cols;
+                            }
+                            // Completa a última linha para os tickets manterem a largura da coluna
+                            if row.empty > 0: Rectangle {
+                                width: row.empty * ((grid.width - (root.cols - 1) * 14px) / root.cols + 14px) - 14px;
+                            }
                         }
                     }
                 }
@@ -445,7 +514,7 @@ export component KdsAreaPage inherits Rectangle {
         background: Theme.overlay;
         TouchArea { }
         Rectangle {
-            width: min(420px, parent.width - 40px);
+            width: min(440px, parent.width - 40px);
             height: alert-col.preferred-height;
             border-radius: 20px;
             background: Theme.surface;
@@ -456,17 +525,17 @@ export component KdsAreaPage inherits Rectangle {
                 spacing: 16px;
                 HorizontalLayout {
                     spacing: 10px;
-                    VerticalLayout { alignment: start; Icon { source: Icons.circle-alert; color: Theme.danger; size: 22px; } }
-                    Text { text: KdsStore.alert-text; color: Theme.text; font-size: 14px; wrap: word-wrap; horizontal-stretch: 1; }
+                    VerticalLayout { alignment: start; Icon { source: Icons.circle-alert; color: Theme.danger; size: 24px; } }
+                    Text { text: KdsStore.alert-text; color: Theme.text; font-size: 16px; wrap: word-wrap; horizontal-stretch: 1; }
                 }
                 HorizontalLayout {
                     alignment: end;
                     Rectangle {
-                        width: 90px;
-                        height: 38px;
+                        width: 100px;
+                        height: 46px;
                         border-radius: 12px;
                         background: ok-touch.has-hover ? Theme.primary.brighter(0.1) : Theme.primary;
-                        Text { text: "OK"; color: Theme.primary-text; font-size: 13px; font-weight: 800; }
+                        Text { text: "OK"; color: Theme.primary-text; font-size: 16px; font-weight: 800; }
                         ok-touch := TouchArea { mouse-cursor: pointer; clicked => { KdsStore.alert-text = ""; } }
                     }
                 }

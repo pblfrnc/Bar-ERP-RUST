@@ -27,7 +27,7 @@ component Bloco inherits FxCard {
 
 component Dica inherits Text {
     color: Theme.text-muted;
-    font-size: 11px;
+    font-size: 13px;
     wrap: word-wrap;
 }
 
@@ -40,9 +40,9 @@ component Passo inherits HorizontalLayout {
         height: 22px;
         border-radius: 11px;
         background: Theme.closing.with-alpha(0.2);
-        Text { text: root.n; color: Theme.closing; font-size: 11px; font-weight: 900; }
+        Text { text: root.n; color: Theme.closing; font-size: 13px; font-weight: 900; }
     }
-    Text { text: root.texto; color: Theme.text; font-size: 12px; wrap: word-wrap; horizontal-stretch: 1; }
+    Text { text: root.texto; color: Theme.text; font-size: 13px; wrap: word-wrap; horizontal-stretch: 1; }
 }
 
 export component ConfiguracoesFiscais inherits Rectangle {
@@ -96,7 +96,7 @@ export component ConfiguracoesFiscais inherits Rectangle {
                             font-weight: 900;
                             horizontal-stretch: 1;
                         }
-                        if FiscalStore.cfg-validacao.ambiente != "": Text { text: FiscalStore.cfg-validacao.ambiente; color: Theme.text-muted; font-size: 12px; font-weight: 700; }
+                        if FiscalStore.cfg-validacao.ambiente != "": Text { text: FiscalStore.cfg-validacao.ambiente; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
                     }
                     if FiscalStore.cfg-validacao.ok: HorizontalLayout {
                         spacing: 16px;
@@ -141,7 +141,7 @@ export component ConfiguracoesFiscais inherits Rectangle {
                         Text { text: FiscalStore.cfg-validacao.erro; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
                         if FiscalStore.cfg-validacao.erro-token: VerticalLayout {
                             spacing: 4px;
-                            Text { text: "Verifique:"; color: Theme.text; font-size: 12px; font-weight: 800; }
+                            Text { text: "Verifique:"; color: Theme.text; font-size: 13px; font-weight: 800; }
                             Dica { text: "• O token deve ser do mesmo ambiente (Homologação ou Produção) configurado acima"; }
                             Dica { text: "• Copie o token da sua conta em app.focusnfe.com.br → API → Token"; }
                             Dica { text: "• Não adicione espaços ou caracteres extras no token"; }
@@ -154,7 +154,7 @@ export component ConfiguracoesFiscais inherits Rectangle {
                 diag := VerticalLayout {
                     padding: 18px;
                     spacing: 8px;
-                    Text { text: FiscalStore.cfg-diagnostico; color: Theme.text; font-size: 11px; font-family: "Menlo"; wrap: word-wrap; }
+                    Text { text: FiscalStore.cfg-diagnostico; color: Theme.text; font-size: 13px; font-family: "Menlo"; wrap: word-wrap; }
                 }
             }
 
@@ -186,9 +186,9 @@ export component ConfiguracoesFiscais inherits Rectangle {
                         HorizontalLayout {
                             spacing: 8px;
                             FxLabel { text: "CNPJ"; horizontal-stretch: 1; }
-                            if FiscalStore.cfg-buscando-cnpj: Text { text: "Buscando dados..."; color: Theme.occupied; font-size: 11px; font-weight: 700; }
-                            if FiscalStore.cfg-cnpj-valido == 1: Text { text: "CNPJ Válido"; color: Theme.available; font-size: 11px; font-weight: 800; }
-                            if FiscalStore.cfg-cnpj-valido == 0: Text { text: "CNPJ Inválido"; color: Theme.danger; font-size: 11px; font-weight: 800; }
+                            if FiscalStore.cfg-buscando-cnpj: Text { text: "Buscando dados..."; color: Theme.occupied; font-size: 13px; font-weight: 700; }
+                            if FiscalStore.cfg-cnpj-valido == 1: Text { text: "CNPJ Válido"; color: Theme.available; font-size: 13px; font-weight: 800; }
+                            if FiscalStore.cfg-cnpj-valido == 0: Text { text: "CNPJ Inválido"; color: Theme.danger; font-size: 13px; font-weight: 800; }
                         }
                         FxInput {
                             text <=> FiscalStore.cfg-cnpj;
@@ -197,7 +197,7 @@ export component ConfiguracoesFiscais inherits Rectangle {
                             error: root.cnpj-invalido;
                             edited(t) => { FiscalStore.cfg-cnpj-editado(t); }
                         }
-                        if root.cnpj-invalido: Text { text: "⚠ Dígitos verificadores incorretos. Verifique o CNPJ."; color: Theme.danger; font-size: 11px; }
+                        if root.cnpj-invalido: Text { text: "⚠ Dígitos verificadores incorretos. Verifique o CNPJ."; color: Theme.danger; font-size: 13px; }
                     }
                     FxField { horizontal-stretch: 1; label: "INSCRIÇÃO ESTADUAL (IE)"; FxInput { text <=> FiscalStore.cfg-ie; placeholder: "Ex: ISENTO ou Número"; } }
                 }
@@ -305,7 +305,7 @@ export component ConfiguracoesFiscais inherits Rectangle {
                         spacing: 6px;
                         FxLabel { text: "ARQUIVO .PFX / .P12"; }
                         FxButton { text: FiscalStore.cfg-cert-arquivo == "" ? "Escolher arquivo..." : "Trocar arquivo"; icone: FiscalIcons.upload; clicked => { FiscalStore.cfg-escolher-cert(); } }
-                        if FiscalStore.cfg-cert-arquivo != "": Text { text: FiscalStore.cfg-cert-arquivo; color: Theme.available; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+                        if FiscalStore.cfg-cert-arquivo != "": Text { text: FiscalStore.cfg-cert-arquivo; color: Theme.available; font-size: 13px; font-weight: 700; wrap: word-wrap; }
                     }
                     FxField {
                         horizontal-stretch: 1;

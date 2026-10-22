@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS "Table" (
     "openedAt" DATETIME,
     "mergedIntoTableId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "updatedAt" DATETIME NOT NULL,
+    "posX" REAL,
+    "posY" REAL
 );
 CREATE TABLE IF NOT EXISTS "Order" (
     "id" TEXT NOT NULL PRIMARY KEY,

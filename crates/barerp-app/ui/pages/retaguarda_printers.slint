@@ -26,7 +26,7 @@ component PrinterChoice inherits Rectangle {
         Text {
             text: root.name;
             color: root.selected ? (Theme.dark ? #fbbf24 : #b45309) : Theme.text;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 700;
             vertical-alignment: center;
             overflow: elide;
@@ -47,7 +47,7 @@ component PrinterField inherits VerticalLayout {
     property <length> chip-w: (root.width - (root.cols - 1) * root.gap) / root.cols;
     property <int> count: RetaguardaStore.p-detected.length + 1;
     spacing: 6px;
-    Text { text: root.label; color: Theme.text; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+    Text { text: root.label; color: Theme.text; font-size: 13px; font-weight: 700; wrap: word-wrap; }
     RInput { text <=> root.value; placeholder: root.placeholder; mono: true; }
     if RetaguardaStore.p-detected.length > 0: Rectangle {
         height: ceil(root.count / root.cols) * (32px + root.gap) - root.gap;
@@ -85,7 +85,7 @@ component PaperOption inherits Rectangle {
         padding: 16px;
         spacing: 4px;
         Text { text: root.title; color: root.selected ? (Theme.dark ? #fbbf24 : #d97706) : Theme.text; font-size: 16px; font-weight: 900; }
-        Text { text: root.sub; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+        Text { text: root.sub; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
     }
     if root.selected: RIcon { x: parent.width - 26px; y: 10px; source: RtIcons.circle-check; tint: Theme.primary; }
     touch := TouchArea { mouse-cursor: pointer; clicked => { root.picked(); } }
@@ -102,8 +102,8 @@ component RangeRow inherits VerticalLayout {
     in-out property <float> value;
     spacing: 4px;
     HorizontalLayout {
-        Text { text: root.label; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
-        Text { text: root.value-text; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+        Text { text: root.label; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-stretch: 1; }
+        Text { text: root.value-text; color: Theme.dark ? #fbbf24 : #d97706; font-size: 13px; font-weight: 700; font-family: "Menlo"; }
     }
     Slider {
         minimum: root.minimum;
@@ -111,7 +111,7 @@ component RangeRow inherits VerticalLayout {
         value: root.value;
         changed(v) => { root.value = round(v / root.step) * root.step; }
     }
-    if root.hint != "": Text { text: root.hint; color: Theme.text-muted; font-size: 10px; wrap: word-wrap; }
+    if root.hint != "": Text { text: root.hint; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
 }
 
 component PresetButton inherits Rectangle {
@@ -131,9 +131,9 @@ component PresetButton inherits Rectangle {
         padding-right: 4px;
         spacing: 1px;
         alignment: center;
-        Text { text: root.title; color: root.selected ? (Theme.dark ? #fbbf24 : #d97706) : Theme.text-muted; font-size: 12px; font-weight: root.selected ? 900 : 700; horizontal-alignment: center; }
-        if root.sub != "": Text { text: root.sub; color: Theme.text-muted; font-size: 10px; horizontal-alignment: center; }
-        if root.note != "": Text { text: root.note; color: Theme.primary.with-alpha(0.8); font-size: 9px; horizontal-alignment: center; }
+        Text { text: root.title; color: root.selected ? (Theme.dark ? #fbbf24 : #d97706) : Theme.text-muted; font-size: 13px; font-weight: root.selected ? 900 : 700; horizontal-alignment: center; }
+        if root.sub != "": Text { text: root.sub; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+        if root.note != "": Text { text: root.note; color: Theme.primary.with-alpha(0.8); font-size: 11px; horizontal-alignment: center; }
     }
     touch := TouchArea { mouse-cursor: pointer; clicked => { root.picked(); } }
 }
@@ -149,8 +149,8 @@ component OptionRow inherits HorizontalLayout {
     VerticalLayout {
         alignment: center;
         horizontal-stretch: 1;
-        Text { text: root.title; color: Theme.text; font-size: 12px; font-weight: 900; }
-        Text { text: root.sub; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+        Text { text: root.title; color: Theme.text; font-size: 13px; font-weight: 900; }
+        Text { text: root.sub; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
     }
     VerticalLayout { alignment: center; CheckBox { checked: root.checked; toggled => { root.toggled(); } } }
 }
@@ -295,7 +295,7 @@ component PrinterSettingsColumn inherits VerticalLayout {
                         ? "Deixe vazio para usar a padrão do sistema (" + RetaguardaStore.p-default-printer + ")."
                         : "O sistema não tem impressora padrão: escolha uma acima ou informe o IP da impressora de rede (porta 9100).");
                 color: Theme.text-muted;
-                font-size: 11px;
+                font-size: 13px;
                 wrap: word-wrap;
             }
             PrinterField {
@@ -316,11 +316,11 @@ component PrinterSettingsColumn inherits VerticalLayout {
                     VerticalLayout {
                         spacing: 2px;
                         horizontal-stretch: 1;
-                        Text { text: "IMPRESSÃO DE NF-E (MODELO 55 - FOLHA A4) DIFERENCIADA"; color: Theme.occupied; font-size: 11px; font-weight: 900; wrap: word-wrap; }
+                        Text { text: "IMPRESSÃO DE NF-E (MODELO 55 - FOLHA A4) DIFERENCIADA"; color: Theme.occupied; font-size: 13px; font-weight: 900; wrap: word-wrap; }
                         Text {
                             text: "A NF-e para fornecedores/empresas não é enviada para a impressora térmica do caixa. Ao imprimir a NF-e, o Bar ERP abre o PDF da nota (DANFE) para você imprimir na sua impressora A4 comum (Laser / Jato de Tinta) ou salvar.";
                             color: Theme.text;
-                            font-size: 12px;
+                            font-size: 13px;
                             wrap: word-wrap;
                         }
                     }
@@ -366,7 +366,7 @@ component PrinterSettingsColumn inherits VerticalLayout {
                 HorizontalLayout {
                     padding: 12px;
                     spacing: 12px;
-                    Text { text: "Largura Personalizada (mm):"; color: Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                    Text { text: "Largura Personalizada (mm):"; color: Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                     RInput {
                         width: 96px;
                         text: RetaguardaStore.p-paper;
@@ -377,7 +377,7 @@ component PrinterSettingsColumn inherits VerticalLayout {
                             if t.to-float() >= 40 && t.to-float() <= 120 { RetaguardaStore.p-paper = round(t.to-float()); }
                         }
                     }
-                    Text { text: "milímetros de largura física"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                    Text { text: "milímetros de largura física"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                 }
             }
         }
@@ -390,7 +390,7 @@ component PrinterSettingsColumn inherits VerticalLayout {
             spacing: 16px;
             HorizontalLayout {
                 SectionTitle { icon: RtIcons.sliders; text: "3. MARGENS & ALINHAMENTO MILIMÉTRICO"; horizontal-stretch: 1; }
-                Text { text: "Ajuste fino de bordas"; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                Text { text: "Ajuste fino de bordas"; color: Theme.dark ? #fbbf24 : #d97706; font-size: 13px; font-weight: 700; vertical-alignment: center; }
             }
             RangeRow {
                 label: "Margem Esquerda"; value-text: RetaguardaStore.p-margin-left + " mm"; minimum: 0; maximum: 15; step: 0.5;
@@ -421,9 +421,9 @@ component PrinterSettingsColumn inherits VerticalLayout {
             spacing: 16px;
             SectionTitle { icon: RtIcons.qr-code; text: "4. QR CODE DA SEFAZ & ESCALA DE TEXTO"; }
             HorizontalLayout {
-                Text { text: "TAMANHO DO QR CODE DA NFC-E:"; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
-                Text { text: RetaguardaStore.p-qr + "px"; color: Theme.primary; font-size: 12px; font-weight: 900; font-family: "Menlo"; }
-                Text { text: " (" + round(RetaguardaStore.p-qr / 96 * 25.4) + "mm aprox.)"; color: Theme.text-muted; font-size: 10px; vertical-alignment: center; }
+                Text { text: "TAMANHO DO QR CODE DA NFC-E:"; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-stretch: 1; }
+                Text { text: RetaguardaStore.p-qr + "px"; color: Theme.primary; font-size: 13px; font-weight: 900; font-family: "Menlo"; }
+                Text { text: " (" + round(RetaguardaStore.p-qr / 96 * 25.4) + "mm aprox.)"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
             }
             Slider {
                 minimum: 60;
@@ -442,13 +442,13 @@ component PrinterSettingsColumn inherits VerticalLayout {
             Text {
                 text: "💡 A SEFAZ recomenda QR Code entre 20mm e 28mm (~75px a 105px). Tamanhos menores economizam papel e mantêm a leitura instantânea pela câmera do celular.";
                 color: Theme.text-muted;
-                font-size: 11px;
+                font-size: 13px;
                 wrap: word-wrap;
             }
             Rectangle { height: 1px; background: Theme.surface-2; }
             HorizontalLayout {
-                Text { text: "ESCALA DO TEXTO DA IMPRESSÃO:"; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
-                Text { text: RetaguardaStore.p-font + "%"; color: Theme.primary; font-size: 12px; font-weight: 900; font-family: "Menlo"; }
+                Text { text: "ESCALA DO TEXTO DA IMPRESSÃO:"; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-stretch: 1; }
+                Text { text: RetaguardaStore.p-font + "%"; color: Theme.primary; font-size: 13px; font-weight: 900; font-family: "Menlo"; }
             }
             Slider {
                 minimum: 70;
@@ -468,7 +468,7 @@ component PrinterSettingsColumn inherits VerticalLayout {
             Text {
                 text: "💡 A escala em 85% ou 90% é excelente para impressoras de 80mm com margens estreitas, evitando quebras de linhas de produtos.";
                 color: Theme.text-muted;
-                font-size: 11px;
+                font-size: 13px;
                 wrap: word-wrap;
             }
         }
@@ -504,11 +504,11 @@ component SimulatorColumn inherits VerticalLayout {
     HorizontalLayout {
         spacing: 6px;
         VerticalLayout { alignment: center; RIcon { source: RtIcons.info; tint: Theme.primary; size: 14px; } }
-        Text { text: "SIMULADOR DA BOBINA EM TEMPO REAL"; color: Theme.text; font-size: 11px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
+        Text { text: "SIMULADOR DA BOBINA EM TEMPO REAL"; color: Theme.text; font-size: 13px; font-weight: 900; vertical-alignment: center; horizontal-stretch: 1; }
         Text {
             text: RetaguardaStore.p-paper + "mm • Margens: E:" + RetaguardaStore.p-margin-left + " D:" + RetaguardaStore.p-margin-right;
             color: Theme.text-muted;
-            font-size: 11px;
+            font-size: 13px;
             font-family: "Menlo";
             vertical-alignment: center;
         }
@@ -526,7 +526,7 @@ component SimulatorColumn inherits VerticalLayout {
             Text {
                 text: "Dica de Calibração: Se a impressão na sua impressora física estiver cortando à direita, aumente a Margem Direita para 2 ou 3 mm e certifique-se de que a bobina selecionada corresponde ao papel real (80mm ou 58mm).";
                 color: Theme.dark ? #fcd34d : #92400e;
-                font-size: 12px;
+                font-size: 13px;
                 wrap: word-wrap;
                 horizontal-stretch: 1;
             }

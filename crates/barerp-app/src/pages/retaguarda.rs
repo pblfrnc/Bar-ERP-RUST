@@ -22,7 +22,7 @@ use barerp_menu_publish::{DigitalMenuStatus, MenuPublisher};
 use crate::ctx::{open_external, AppCtx, Preferences};
 use crate::view::model;
 use crate::{
-    AppWindow, CardapioStore, MesasStore, Page, RetaguardaStore, RtAudit, RtBar, RtDevice, RtLowMargin, RtMenuCategory,
+    AppWindow, CardapioStore, MesasStore, Page, RetaguardaStore, RtAudit, RtBar, RtDelta, RtDevice, RtLowMargin, RtMenuCategory,
     RtMenuRow, RtTopProduct, RtView, RtWaiter,
 };
 
@@ -36,6 +36,10 @@ struct State {
     checking_remote: bool,
     margin_loaded: bool,
     day: NaiveDate,
+    /// Período do Painel em dias (1, 7 ou 30) terminando em `day`
+    period: u32,
+    /// Últimos números mostrados (para o Exportar)
+    shown: Option<(DashboardData, Option<DashboardData>)>,
     categories: Vec<(String, String)>,
     hidden: Vec<String>,
     menu: Option<DigitalMenuStatus>,
@@ -50,6 +54,8 @@ impl Default for State {
             checking_remote: false,
             margin_loaded: false,
             day: barerp_core::business_day::today(),
+            period: 1,
+            shown: None,
             categories: Vec::new(),
             hidden: Vec::new(),
             menu: None,
@@ -931,14 +937,58 @@ fn bind_menu(ctx: &AppCtx, s: &RetaguardaStore) {
 // Dashboard e auditoria
 // ======================================================================
 
-fn render_dashboard(ui: &AppWindow, day: NaiveDate, d: &DashboardData) {
+/// "12%" e o sinal da variação; sem base de comparação (anterior zerado) não mostra porcentagem.
+fn delta(now: f64, before: f64, prev_label: String) -> RtDelta {
+    if before <= 0.0 {
+        return RtDelta { text: if now > 0.0 { "novo".into() } else { SharedString::new() }, sign: 0, prev: prev_label.into() };
+    }
+    let pct = ((now - before) / before * 100.0).round() as i64;
+    RtDelta { text: format!("{}%", pct.abs()).into(), sign: pct.signum() as i32, prev: prev_label.into() }
+}
+
+/// Valor da escala do gráfico arredondado para cima ("R$ 1.200").
+fn axis_value(v: f64) -> String {
+    if v <= 0.0 {
+        return "0".into();
+    }
+    let step = 10f64.powi((v.log10().floor() as i32 - 1).max(0));
+    format!("{:.0}", (v / step).ceil() * step).as_bytes().rchunks(3).rev().map(|c| std::str::from_utf8(c).unwrap_or("")).collect::<Vec<_>>().join(".")
+}
+
+fn render_dashboard(ui: &AppWindow, day: NaiveDate, period: u32, d: &DashboardData, before: Option<&DashboardData>) {
     let s = store(ui);
     let today = barerp_core::business_day::today();
-    let label = if day == today {
+    let label = if period > 1 {
+        format!("{period} dias")
+    } else if day == today {
         "Hoje".to_string()
     } else {
         format!("{}, {}", WEEKDAYS[day.weekday().num_days_from_monday() as usize], day.format("%d/%m"))
     };
+    s.set_d_period(period as i32);
+    let compare = match (before, period) {
+        (None, _) => String::new(),
+        (Some(_), 1) => format!("vs. {} passada", WEEKDAYS[day.weekday().num_days_from_monday() as usize]),
+        (Some(_), n) => format!("vs. {n} dias anteriores"),
+    };
+    s.set_d_compare_label(compare.into());
+    let none = || RtDelta { text: SharedString::new(), sign: 0, prev: SharedString::new() };
+    match before {
+        Some(b) => {
+            s.set_d_delta_revenue(delta(d.today_revenue, b.today_revenue, brl(b.today_revenue)));
+            s.set_d_delta_orders(delta(
+                d.orders_completed_today as f64,
+                b.orders_completed_today as f64,
+                b.orders_completed_today.to_string(),
+            ));
+            s.set_d_delta_ticket(delta(d.average_ticket, b.average_ticket, brl(b.average_ticket)));
+        }
+        None => {
+            s.set_d_delta_revenue(none());
+            s.set_d_delta_orders(none());
+            s.set_d_delta_ticket(none());
+        }
+    }
     let lower = if day == today { "hoje".to_string() } else { label.clone() };
     s.set_d_date_label(label.into());
     s.set_d_date_text(day.format("%d/%m/%Y").to_string().into());
@@ -971,12 +1021,16 @@ fn render_dashboard(ui: &AppWindow, day: NaiveDate, d: &DashboardData) {
         .iter()
         .map(|(m, amt)| {
             let pct = (amt / total * 100.0).round();
-            RtBar { label: method_label(m).into(), value: format!("{} ({pct}%)", brl(*amt)).into(), pct: pct as f32 }
+            RtBar { label: method_label(m).into(), value: format!("{} ({pct}%)", brl(*amt)).into(), pct: pct as f32, prev: 0.0 }
         })
         .collect();
     s.set_d_methods(model(methods));
 
-    let max_hour = d.sales_by_hour.iter().map(|h| h.total).fold(1.0f64, f64::max);
+    // Mesmas horas do período anterior (barra cinza ao lado); a escala vale para as duas
+    let prev_of = |hour: &str| -> f64 {
+        before.and_then(|b| b.sales_by_hour.iter().find(|h| h.hour == hour)).map(|h| h.total).unwrap_or(0.0)
+    };
+    let max_hour = d.sales_by_hour.iter().map(|h| h.total.max(prev_of(&h.hour))).fold(1.0f64, f64::max);
     let hours: Vec<RtBar> = if d.sales_by_hour.iter().any(|h| h.total > 0.0) {
         d.sales_by_hour
             .iter()
@@ -984,12 +1038,15 @@ fn render_dashboard(ui: &AppWindow, day: NaiveDate, d: &DashboardData) {
                 label: h.hour.clone().into(),
                 value: format!("R$ {:.0}", h.total).into(),
                 pct: (h.total / max_hour * 100.0).round() as f32,
+                prev: (prev_of(&h.hour) / max_hour * 100.0).round() as f32,
             })
             .collect()
     } else {
         Vec::new()
     };
     s.set_d_hours(model(hours));
+    s.set_d_hours_top(axis_value(max_hour).into());
+    s.set_d_hours_mid(axis_value(max_hour / 2.0).into());
 
     let waiters = d
         .waiter_performance
@@ -1014,20 +1071,77 @@ fn render_dashboard(ui: &AppWindow, day: NaiveDate, d: &DashboardData) {
 
 fn load_dashboard(ctx: &AppCtx) {
     let Some(ui) = ctx.ui() else { return };
-    let day = with_state(|s| s.day);
+    let (day, period) = with_state(|s| (s.day, s.period));
     store(&ui).set_d_loading(true);
     let db = ctx.db.clone();
-    ctx.spawn(async move { dashboard::dashboard(&db, day).await }, move |ui, result| {
-        store(ui).set_d_loading(false);
-        // Resposta de um dia que já não está na tela (cliques rápidos nas setas)
-        if with_state(|s| s.day) != day {
-            return;
-        }
-        match result {
-            Ok(d) => render_dashboard(ui, day, &d),
-            Err(e) => tracing::warn!("Erro ao carregar dashboard: {e}"),
-        }
-    });
+    ctx.spawn(
+        async move {
+            let now = dashboard::dashboard_range(&db, day, period).await?;
+            // Um dia compara com o mesmo dia da semana passada; 7 e 30 dias, com o período logo antes
+            let back = if period == 1 { 7 } else { period as i64 };
+            let before = dashboard::dashboard_range(&db, day - chrono::Duration::days(back), period).await?;
+            Ok::<_, barerp_db::DbError>((now, before))
+        },
+        move |ui, result| {
+            store(ui).set_d_loading(false);
+            // Resposta de um dia ou período que já não está na tela (cliques rápidos nas setas)
+            if with_state(|s| (s.day, s.period)) != (day, period) {
+                return;
+            }
+            match result {
+                Ok((now, before)) => {
+                    render_dashboard(ui, day, period, &now, Some(&before));
+                    with_state(|s| s.shown = Some((now, Some(before))));
+                }
+                Err(e) => tracing::warn!("Erro ao carregar dashboard: {e}"),
+            }
+        },
+    );
+}
+
+/// CSV do Painel (separador ";" e vírgula decimal, como o Excel em português abre direto).
+fn dashboard_csv(day: NaiveDate, period: u32, d: &DashboardData, before: Option<&DashboardData>) -> String {
+    let money = |v: f64| format!("{v:.2}").replace('.', ",");
+    let mut out = String::from("\u{feff}");
+    let first = day - chrono::Duration::days(period as i64 - 1);
+    out += &format!("Painel BarERP;{} a {}\n\n", first.format("%d/%m/%Y"), day.format("%d/%m/%Y"));
+    out += "Indicador;Valor;Período anterior\n";
+    let prev = |f: fn(&DashboardData) -> String| before.map(f).unwrap_or_default();
+    out += &format!("Faturamento;{};{}\n", money(d.today_revenue), prev(|b| format!("{:.2}", b.today_revenue).replace('.', ",")));
+    out += &format!("Comandas pagas;{};{}\n", d.orders_completed_today, prev(|b| b.orders_completed_today.to_string()));
+    out += &format!("Ticket médio;{};{}\n", money(d.average_ticket), prev(|b| format!("{:.2}", b.average_ticket).replace('.', ",")));
+    out += "\nProduto;Quantidade;Total\n";
+    for p in &d.top_products {
+        out += &format!("{};{};{}\n", p.name, p.quantity, money(p.total));
+    }
+    out += "\nForma de pagamento;Total\n";
+    for (m, v) in &d.payment_methods_breakdown {
+        out += &format!("{};{}\n", method_label(m), money(*v));
+    }
+    out += "\nHora;Vendas\n";
+    for h in &d.sales_by_hour {
+        out += &format!("{};{}\n", h.hour, money(h.total));
+    }
+    out += "\nGarçom;Comandas;Total\n";
+    for w in &d.waiter_performance {
+        out += &format!("{};{};{}\n", w.name, w.count, money(w.total));
+    }
+    out
+}
+
+fn export_dashboard(ctx: &AppCtx) {
+    let (day, period, shown) = with_state(|s| (s.day, s.period, s.shown.clone()));
+    let Some((now, before)) = shown else { return };
+    let name = format!("painel-{}-{}d.csv", day.format("%Y-%m-%d"), period);
+    let Some(path) = rfd::FileDialog::new().set_title("Exportar Painel").set_file_name(&name).add_filter("CSV", &["csv"]).save_file()
+    else {
+        return;
+    };
+    let text = dashboard_csv(day, period, &now, before.as_ref());
+    match std::fs::write(&path, text) {
+        Ok(()) => ctx.status(format!("Painel exportado em {}", path.display()), false),
+        Err(e) => ctx.status(format!("Não foi possível salvar o arquivo: {e}"), true),
+    }
 }
 
 fn load_audit(ctx: &AppCtx) {
@@ -1350,6 +1464,13 @@ pub fn bind(ctx: &AppCtx) {
     let c = ctx.clone();
     s.on_d_refresh(move || load_dashboard(&c));
     let c = ctx.clone();
+    s.on_d_set_period(move |days| {
+        with_state(|s| s.period = days.clamp(1, 90) as u32);
+        load_dashboard(&c);
+    });
+    let c = ctx.clone();
+    s.on_d_export(move || export_dashboard(&c));
+    let c = ctx.clone();
     s.on_d_shift_day(move |delta| {
         let today = barerp_core::business_day::today();
         with_state(|s| {
@@ -1442,9 +1563,9 @@ pub mod preview {
         store(ui).set_view(RtView::Hub);
     }
 
-    pub fn dashboard(ui: &AppWindow, day: NaiveDate, data: &DashboardData) {
+    pub fn dashboard(ui: &AppWindow, day: NaiveDate, data: &DashboardData, before: Option<&DashboardData>) {
         with_state(|s| s.day = day);
-        render_dashboard(ui, day, data);
+        render_dashboard(ui, day, 1, data, before);
         store(ui).set_d_audit_tab(false);
         store(ui).set_view(RtView::Dashboard);
     }

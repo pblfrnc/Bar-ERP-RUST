@@ -33,9 +33,9 @@ component Stat inherits Rectangle {
     background: Theme.surface-2.with-alpha(0.6);
     VerticalLayout {
         padding: 10px;
-        Text { text: root.label; color: Theme.text-muted; font-size: 12px; }
+        Text { text: root.label; color: Theme.text-muted; font-size: 13px; }
         Text { text: root.value; color: Theme.text; font-size: 18px; font-weight: 900; }
-        if root.sub != "": Text { text: root.sub; color: Theme.text-muted; font-size: 10px; }
+        if root.sub != "": Text { text: root.sub; color: Theme.text-muted; font-size: 12px; }
     }
 }
 
@@ -73,7 +73,7 @@ export component ImportLegacyModal inherits Rectangle {
                         alignment: center;
                         horizontal-stretch: 1;
                         Text { text: "Importar do Sistema Antigo"; color: Theme.text; font-size: 16px; font-weight: 700; }
-                        Text { text: "XML de exportação de tabelas"; color: Theme.text-muted; font-size: 12px; }
+                        Text { text: "XML de exportação de tabelas"; color: Theme.text-muted; font-size: 13px; }
                     }
                     VerticalLayout {
                         alignment: center;
@@ -105,7 +105,7 @@ export component ImportLegacyModal inherits Rectangle {
                         Text {
                             text: "USO EXCLUSIVO DO DESENVOLVEDOR. Esta função importa dados em massa do sistema antigo. Usar sem orientação pode duplicar ou sobrescrever produtos e fornecedores.";
                             color: Theme.danger;
-                            font-size: 12px;
+                            font-size: 13px;
                             wrap: word-wrap;
                             horizontal-stretch: 1;
                         }
@@ -119,7 +119,7 @@ export component ImportLegacyModal inherits Rectangle {
                         Text {
                             text: "O arquivo deve ser o XML exportado pelo sistema antigo contendo Fornecedores, Categorias e Produtos. Os dados já existentes não serão duplicados.";
                             color: Theme.text-muted;
-                            font-size: 12px;
+                            font-size: 13px;
                             wrap: word-wrap;
                         }
                     }
@@ -143,7 +143,7 @@ export component ImportLegacyModal inherits Rectangle {
                             }
                         }
                         if ImportLegacyStore.file-name != "": Text { text: ImportLegacyStore.file-name; color: Theme.text; font-size: 14px; font-weight: 700; horizontal-alignment: center; }
-                        if ImportLegacyStore.file-name != "": Text { text: ImportLegacyStore.file-size + " — clique para trocar"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+                        if ImportLegacyStore.file-name != "": Text { text: ImportLegacyStore.file-size + " — clique para trocar"; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
                         if ImportLegacyStore.file-name == "": Text { text: "Clique para selecionar o arquivo XML"; color: root.sky; font-size: 14px; horizontal-alignment: center; }
                     }
                     pick-touch := TouchArea { mouse-cursor: pointer; clicked => { ImportLegacyStore.choose-file(); } }
@@ -181,14 +181,14 @@ export component ImportLegacyModal inherits Rectangle {
                             background: Theme.primary.with-alpha(0.1);
                             HorizontalLayout {
                                 padding: 10px;
-                                Text { text: "🍺 Bar (ml / bebidas): " + ImportLegacyStore.bar; color: Theme.text; font-size: 12px; horizontal-stretch: 1; }
-                                Text { text: "🍳 Cozinha: " + ImportLegacyStore.kitchen; color: Theme.text; font-size: 12px; }
+                                Text { text: "🍺 Bar (ml / bebidas): " + ImportLegacyStore.bar; color: Theme.text; font-size: 13px; horizontal-stretch: 1; }
+                                Text { text: "🍳 Cozinha: " + ImportLegacyStore.kitchen; color: Theme.text; font-size: 13px; }
                             }
                         }
                         if ImportLegacyStore.errors.length > 0: VerticalLayout {
                             spacing: 2px;
-                            Text { text: "⚠️ " + ImportLegacyStore.errors.length + " erros ignorados:"; color: Theme.primary; font-size: 12px; font-weight: 700; }
-                            for e in ImportLegacyStore.errors: Text { text: "• " + e; color: Theme.text-muted; font-size: 10px; wrap: word-wrap; }
+                            Text { text: "⚠️ " + ImportLegacyStore.errors.length + " erros ignorados:"; color: Theme.primary; font-size: 13px; font-weight: 700; }
+                            for e in ImportLegacyStore.errors: Text { text: "• " + e; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
                         }
                     }
                 }

@@ -12,7 +12,10 @@ export struct RtMenuCategory { id: string, name: string, hidden: bool }
 // Uma linha de chips (o Rust quebra as categorias em linhas pela largura estimada, como o flex-wrap)
 export struct RtMenuRow { cats: [RtMenuCategory] }
 export struct RtTopProduct { rank: int, name: string, station: string, value: string, pct: float }
-export struct RtBar { label: string, value: string, pct: float }
+// prev: barra do mesmo período anterior (só no gráfico de horas), em % do maior valor
+export struct RtBar { label: string, value: string, pct: float, prev: float }
+// Comparação de um indicador: "12%", sinal (1 subiu, -1 caiu, 0 sem base) e o valor anterior
+export struct RtDelta { text: string, sign: int, prev: string }
 export struct RtWaiter { rank: int, name: string, sub: string, total: string }
 export struct RtLowMargin { name: string, margin: string }
 // tone: 0 neutro · 1 vermelho (cancelamento) · 2 âmbar (desconto)
@@ -133,6 +136,18 @@ export global RetaguardaStore {
     in property <[RtBar]> d-hours;
     in property <[RtWaiter]> d-waiters;
     in property <[RtLowMargin]> d-low;
+    // Período do Painel: 1 (dia), 7 ou 30 dias terminando no dia escolhido
+    in-out property <int> d-period: 1;
+    // "vs. qua. passada" (dia) ou "vs. 7 dias anteriores"
+    in property <string> d-compare-label;
+    in property <RtDelta> d-delta-revenue;
+    in property <RtDelta> d-delta-orders;
+    in property <RtDelta> d-delta-ticket;
+    // Escala do gráfico de horas: valor do topo e da metade
+    in property <string> d-hours-top;
+    in property <string> d-hours-mid;
+    callback d-set-period(int);
+    callback d-export();
     callback d-refresh();
     callback d-shift-day(int);
     callback d-today();

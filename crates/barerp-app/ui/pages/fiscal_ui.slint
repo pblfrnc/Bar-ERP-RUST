@@ -22,7 +22,7 @@ export global FxCores {
 
 export component FxLabel inherits Text {
     color: Theme.text-muted;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 800;
     letter-spacing: 0.6px;
 }
@@ -46,7 +46,7 @@ export component FxBadge inherits Rectangle {
     badge-text := Text {
         text: root.text;
         color: FxCores.de(root.cor);
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 900;
         letter-spacing: 0.8px;
     }
@@ -295,7 +295,7 @@ export component FxSheet inherits Rectangle {
                     alignment: center;
                     horizontal-stretch: 1;
                     Text { text: root.titulo; color: Theme.text; font-size: 19px; font-weight: 900; wrap: word-wrap; }
-                    if root.subtitulo != "": Text { text: root.subtitulo; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                    if root.subtitulo != "": Text { text: root.subtitulo; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                 }
                 Rectangle {
                     width: 34px;

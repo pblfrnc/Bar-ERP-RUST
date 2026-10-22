@@ -86,7 +86,7 @@ component LinhaNota inherits Rectangle {
                 spacing: 10px;
                 alignment: start;
                 Text { text: root.modelo + " Nº " + (root.nota.numero == "" ? "S/N" : root.nota.numero); color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; }
-                Text { text: "Série " + (root.nota.serie == "" ? "1" : root.nota.serie); color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                Text { text: "Série " + (root.nota.serie == "" ? "1" : root.nota.serie); color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                 if !root.cancelamento: VerticalLayout { alignment: center; StatusNota { text: root.nota.status; cancelada: root.nota.cancelada; } }
                 if root.cancelamento: VerticalLayout {
                     alignment: center;
@@ -99,13 +99,13 @@ component LinhaNota inherits Rectangle {
             HorizontalLayout {
                 spacing: 14px;
                 alignment: start;
-                Text { text: (root.cancelamento ? "Emitida em: " : "") + root.nota.data; color: Theme.text-muted; font-size: 12px; }
-                Text { text: root.nota.valor; color: Theme.text; font-size: 12px; font-weight: 800; }
+                Text { text: (root.cancelamento ? "Emitida em: " : "") + root.nota.data; color: Theme.text-muted; font-size: 13px; }
+                Text { text: root.nota.valor; color: Theme.text; font-size: 13px; font-weight: 800; }
             }
             if root.cancelamento && root.nota.chave != "" && root.modelo == "NF-e": Text {
                 text: "Chave: " + root.nota.chave;
                 color: Theme.text-muted;
-                font-size: 11px;
+                font-size: 13px;
                 font-family: "Menlo";
                 overflow: elide;
             }
@@ -131,7 +131,7 @@ component ListaVazia inherits VerticalLayout {
     alignment: center;
     HorizontalLayout { alignment: center; Icon { source: root.icone; color: Theme.text-muted; size: 34px; } }
     Text { text: root.titulo; color: Theme.text; font-size: 14px; font-weight: 800; horizontal-alignment: center; wrap: word-wrap; }
-    if root.texto != "": Text { text: root.texto; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+    if root.texto != "": Text { text: root.texto; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; wrap: word-wrap; }
 }
 
 // ============================================================
@@ -204,9 +204,9 @@ export component ReimprimirNota inherits Rectangle {
                                 text: "Série: " + FiscalStore.rp-achada.serie + " • Status: " + FiscalStore.rp-achada.status
                                     + (root.nfe && FiscalStore.rp-achada.valor != "" ? " • Valor: " + FiscalStore.rp-achada.valor : "");
                                 color: Theme.text-muted;
-                                font-size: 12px;
+                                font-size: 13px;
                             }
-                            if FiscalStore.rp-achada.chave != "": Text { text: "Chave: " + FiscalStore.rp-achada.chave; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; wrap: word-wrap; }
+                            if FiscalStore.rp-achada.chave != "": Text { text: "Chave: " + FiscalStore.rp-achada.chave; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; wrap: word-wrap; }
                         }
                         VerticalLayout {
                             alignment: center;
@@ -229,7 +229,7 @@ export component ReimprimirNota inherits Rectangle {
                     spacing: 12px;
                     HorizontalLayout {
                         FxLabel { text: "NOTAS EMITIDAS RECENTEMENTE (" + FiscalStore.rp-notas.length + ")"; horizontal-stretch: 1; }
-                        Text { text: "Clique em qualquer nota para reimprimir"; color: Theme.text-muted; font-size: 11px; }
+                        Text { text: "Clique em qualquer nota para reimprimir"; color: Theme.text-muted; font-size: 13px; }
                     }
                     if FiscalStore.rp-carregando: ListaVazia { icone: FiscalIcons.loader-circle; titulo: "Carregando histórico recente..."; }
                     if !FiscalStore.rp-carregando && FiscalStore.rp-notas.length == 0: ListaVazia { icone: FiscalIcons.package; titulo: "Nenhuma nota emitida gravada no sistema ainda."; }
@@ -297,11 +297,11 @@ component ConfirmarCancelamento inherits FxSheet {
             Text {
                 text: root.letras + (root.nfe ? "/15 caracteres mínimos" : "/15 caracteres");
                 color: root.letras >= 15 ? Theme.available : Theme.danger;
-                font-size: 11px;
+                font-size: 13px;
                 font-weight: 800;
                 horizontal-stretch: 1;
             }
-            if root.letras < 15: Text { text: "A SEFAZ exige ao menos 15 letras."; color: Theme.text-muted; font-size: 11px; }
+            if root.letras < 15: Text { text: "A SEFAZ exige ao menos 15 letras."; color: Theme.text-muted; font-size: 13px; }
         }
     }
     HorizontalLayout {
@@ -363,7 +363,7 @@ export component CancelarNota inherits Rectangle {
                         VerticalLayout { alignment: center; Icon { source: FiscalIcons.search; color: Theme.danger; size: 16px; } }
                         Text { text: "Localizar NF-e por Número ou Chave para Cancelar"; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; }
                     }
-                    Text { text: "Caso a nota não apareça na listagem automática abaixo, informe o número e série para buscá-la e abrir o cancelamento:"; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                    Text { text: "Caso a nota não apareça na listagem automática abaixo, informe o número e série para buscá-la e abrir o cancelamento:"; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                     HorizontalLayout {
                         spacing: 12px;
                         FxInput { horizontal-stretch: 3; text <=> FiscalStore.cn-busca; placeholder: "Número da nota (ex: 1), referência ou chave de 44 dígitos"; mono: true; accepted => { FiscalStore.cn-localizar(); } }

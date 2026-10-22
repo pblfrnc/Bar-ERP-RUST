@@ -104,7 +104,7 @@ export component SefazBadge inherits Rectangle {
             border-radius: 4px;
             background: FxCores.de(root.cor);
         }
-        Text { text: FiscalStore.sefaz.rotulo; color: FxCores.de(root.cor); font-size: 12px; font-weight: 800; vertical-alignment: center; }
+        Text { text: FiscalStore.sefaz.rotulo; color: FxCores.de(root.cor); font-size: 13px; font-weight: 800; vertical-alignment: center; }
     }
     t := TouchArea {
         mouse-cursor: pointer;
@@ -127,7 +127,7 @@ export component SefazDetalhes inherits Rectangle {
         HorizontalLayout {
             spacing: 8px;
             VerticalLayout { alignment: center; Icon { source: FiscalIcons.wifi; color: Theme.text-muted; size: 14px; } }
-            Text { text: FiscalStore.sefaz.autorizador; color: Theme.text; font-size: 12px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
+            Text { text: FiscalStore.sefaz.autorizador; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-stretch: 1; vertical-alignment: center; }
             Rectangle {
                 width: 28px;
                 height: 28px;
@@ -145,10 +145,10 @@ export component SefazDetalhes inherits Rectangle {
         }
         if FiscalStore.sefaz.detalhe != "": FxAviso { text: FiscalStore.sefaz.detalhe; cor: FxCor.ambar; }
         if FiscalStore.sefaz.codigo != "": HorizontalLayout {
-            Text { text: "Código SEFAZ: " + FiscalStore.sefaz.codigo; color: Theme.text-muted; font-size: 11px; horizontal-stretch: 1; }
-            if FiscalStore.sefaz.latencia != "": Text { text: "Latência: " + FiscalStore.sefaz.latencia; color: Theme.text-muted; font-size: 11px; }
+            Text { text: "Código SEFAZ: " + FiscalStore.sefaz.codigo; color: Theme.text-muted; font-size: 13px; horizontal-stretch: 1; }
+            if FiscalStore.sefaz.latencia != "": Text { text: "Latência: " + FiscalStore.sefaz.latencia; color: Theme.text-muted; font-size: 13px; }
         }
-        Text { text: FiscalStore.sefaz.dica; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+        Text { text: FiscalStore.sefaz.dica; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
     }
 }
 
@@ -197,8 +197,8 @@ export component FiscalHub inherits Rectangle {
                         alignment: end;
                         horizontal-stretch: 1;
                         spacing: 12px;
-                        HorizontalLayout { spacing: 5px; Rectangle { width: 9px; height: 9px; y: (parent.height - 9px) / 2; border-radius: 5px; background: Theme.available; } Text { text: "XML Baixado"; color: Theme.text-muted; font-size: 11px; font-weight: 700; vertical-alignment: center; } }
-                        HorizontalLayout { spacing: 5px; Rectangle { width: 9px; height: 9px; y: (parent.height - 9px) / 2; border-radius: 5px; background: Theme.closing; } Text { text: "XML Pendente"; color: Theme.text-muted; font-size: 11px; font-weight: 700; vertical-alignment: center; } }
+                        HorizontalLayout { spacing: 5px; Rectangle { width: 9px; height: 9px; y: (parent.height - 9px) / 2; border-radius: 5px; background: Theme.available; } Text { text: "XML Baixado"; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; } }
+                        HorizontalLayout { spacing: 5px; Rectangle { width: 9px; height: 9px; y: (parent.height - 9px) / 2; border-radius: 5px; background: Theme.closing; } Text { text: "XML Pendente"; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; } }
                     }
                 }
             }
@@ -364,7 +364,7 @@ export component InutilizacaoSheet inherits FxSheet {
             Text {
                 text: root.letras + "/15 min";
                 color: root.letras >= 15 ? Theme.available : Theme.closing;
-                font-size: 11px;
+                font-size: 13px;
                 font-weight: 800;
             }
         }

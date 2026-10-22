@@ -104,6 +104,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.global::<KdsStore>().set_connected(false);
         preview::show(&ui, Vec::new(), 4);
         save(&window, &out.join(format!("k2-vazio-offline-{suffix}.png")))?;
+        // Modo cozinha: tela cheia, relógio e desfazer disponível
+        ui.global::<KdsStore>().set_connected(true);
+        ui.global::<KdsStore>().set_focus(true);
+        ui.global::<KdsStore>().set_clock("21:47".into());
+        ui.global::<KdsStore>().set_can_undo(true);
+        preview::show(&ui, items.clone(), 5);
+        save(&window, &out.join(format!("k3-cozinha-tela-cheia-{suffix}.png")))?;
+        ui.global::<KdsStore>().set_focus(false);
+        ui.global::<KdsStore>().set_can_undo(false);
     }
     Ok(())
 }

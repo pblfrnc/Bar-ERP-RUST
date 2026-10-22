@@ -36,14 +36,14 @@ component ActionChip inherits Rectangle {
         spacing: 6px;
         alignment: center;
         Icon { source: root.busy ? Icons.refresh-cw : root.icon; color: root.alert ? Theme.danger : root.tone; size: 14px; y: (parent.height - self.height) / 2; }
-        Text { text: root.text; color: root.alert ? Theme.danger : Theme.text; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+        Text { text: root.text; color: root.alert ? Theme.danger : Theme.text; font-size: 13px; font-weight: 600; vertical-alignment: center; }
         if root.badge != "": Rectangle {
             y: (parent.height - self.height) / 2;
             height: 16px;
             width: b.preferred-width + 10px;
             border-radius: 5px;
             background: root.alert ? Theme.danger : root.badge-tone.with-alpha(0.18);
-            b := Text { text: root.badge; color: root.alert ? #ffffff : root.badge-tone; font-size: 10px; font-weight: 800; font-family: "Menlo"; }
+            b := Text { text: root.badge; color: root.alert ? #ffffff : root.badge-tone; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
         }
     }
     touch := TouchArea { enabled: !root.busy; clicked => { root.clicked(); } }
@@ -84,14 +84,14 @@ component CategoryChip inherits Rectangle {
         x: 12px;
         spacing: 6px;
         alignment: center;
-        Text { text: root.data.name; color: root.fg; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+        Text { text: root.data.name; color: root.fg; font-size: 13px; font-weight: 700; vertical-alignment: center; }
         Rectangle {
             y: (parent.height - self.height) / 2;
             height: 16px;
             width: r.preferred-width + 8px;
             border-radius: 4px;
             background: root.data.active ? Theme.primary-text.with-alpha(0.18) : Theme.border;
-            r := Text { text: root.data.range; color: root.data.active ? Theme.primary-text : Theme.text-muted; font-size: 10px; font-weight: 800; font-family: "Menlo"; }
+            r := Text { text: root.data.range; color: root.data.active ? Theme.primary-text : Theme.text-muted; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
         }
         Rectangle {
             width: 22px;
@@ -116,7 +116,7 @@ component CategoryChip inherits Rectangle {
 
 component Th inherits Text {
     color: Theme.text-muted;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.6px;
     vertical-alignment: center;
@@ -157,7 +157,7 @@ component ProductRowView inherits Rectangle {
             HorizontalLayout {
                 spacing: 6px;
                 alignment: start;
-                if root.data.brand != "": Text { text: root.data.brand; color: Theme.primary; font-size: 11px; font-weight: 600; vertical-alignment: center; }
+                if root.data.brand != "": Text { text: root.data.brand; color: Theme.primary; font-size: 13px; font-weight: 600; vertical-alignment: center; }
                 if root.data.supplier != "": Rectangle {
                     height: 18px;
                     width: sr.preferred-width + 10px;
@@ -169,7 +169,7 @@ component ProductRowView inherits Rectangle {
                         x: 5px;
                         spacing: 3px;
                         Icon { source: CardapioIcons.truck; color: Theme.available; size: 11px; y: (parent.height - self.height) / 2; }
-                        Text { text: root.data.supplier; color: Theme.available; font-size: 10px; font-weight: 600; vertical-alignment: center; }
+                        Text { text: root.data.supplier; color: Theme.available; font-size: 12px; font-weight: 600; vertical-alignment: center; }
                     }
                 }
                 if root.data.ean != "": Rectangle {
@@ -183,13 +183,13 @@ component ProductRowView inherits Rectangle {
                         x: 5px;
                         spacing: 3px;
                         Icon { source: CardapioIcons.barcode; color: Theme.text-muted; size: 11px; y: (parent.height - self.height) / 2; }
-                        Text { text: root.data.ean; color: Theme.text-muted; font-size: 10px; font-family: "Menlo"; vertical-alignment: center; }
+                        Text { text: root.data.ean; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; vertical-alignment: center; }
                     }
                 }
                 if root.data.description != "": Text {
                     text: "• " + root.data.description;
                     color: Theme.text-muted;
-                    font-size: 11px;
+                    font-size: 13px;
                     overflow: elide;
                     horizontal-stretch: 1;
                     vertical-alignment: center;
@@ -205,7 +205,7 @@ component ProductRowView inherits Rectangle {
                 width: min(parent.width, cat.preferred-width + 14px);
                 border-radius: 7px;
                 background: Theme.surface-2;
-                cat := Text { text: root.data.category; color: Theme.text; font-size: 11px; overflow: elide; }
+                cat := Text { text: root.data.category; color: Theme.text; font-size: 13px; overflow: elide; }
             }
         }
         // Destino KDS
@@ -224,7 +224,7 @@ component ProductRowView inherits Rectangle {
                     x: 7px;
                     spacing: 4px;
                     Icon { source: root.data.kds == "BAR" ? Icons.beer : Icons.chef-hat; color: kds-box.tone; size: 12px; y: (parent.height - self.height) / 2; }
-                    Text { text: root.data.kds == "BAR" ? "Bar" : "Cozinha"; color: kds-box.tone; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+                    Text { text: root.data.kds == "BAR" ? "Bar" : "Cozinha"; color: kds-box.tone; font-size: 12px; font-weight: 800; vertical-alignment: center; }
                 }
             }
         }
@@ -237,7 +237,7 @@ component ProductRowView inherits Rectangle {
                 alignment: end;
                 spacing: 3px;
                 Icon { source: Icons.package; color: Theme.available; size: 11px; y: (parent.height - self.height) / 2; }
-                Text { text: root.data.box; color: Theme.available; font-size: 10px; }
+                Text { text: root.data.box; color: Theme.available; font-size: 12px; }
             }
         }
         // Custo
@@ -245,7 +245,7 @@ component ProductRowView inherits Rectangle {
             width: 110px;
             alignment: center;
             spacing: 3px;
-            Text { text: root.data.cost; color: Theme.text-muted; font-size: 12px; font-family: "Menlo"; horizontal-alignment: right; }
+            Text { text: root.data.cost; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; horizontal-alignment: right; }
             if root.data.margin != "": HorizontalLayout {
                 alignment: end;
                 Pill {
@@ -272,7 +272,7 @@ component ProductRowView inherits Rectangle {
                     Text {
                         text: root.data.composed ? "Composto (Ficha)" : root.data.stock;
                         color: stock-box.tone;
-                        font-size: 11px;
+                        font-size: 13px;
                         font-weight: 800;
                         font-family: root.data.composed ? "" : "Menlo";
                         vertical-alignment: center;
@@ -291,7 +291,7 @@ component ProductRowView inherits Rectangle {
                 height: 26px;
                 border-radius: 6px;
                 background: m1.has-hover ? Theme.border : Theme.surface-2;
-                Text { text: "-1"; color: Theme.text; font-size: 12px; font-family: "Menlo"; }
+                Text { text: "-1"; color: Theme.text; font-size: 13px; font-family: "Menlo"; }
                 m1 := TouchArea { clicked => { CardapioStore.quick-stock(root.data.id, -1); } }
             }
             if !root.data.composed: Rectangle {
@@ -300,7 +300,7 @@ component ProductRowView inherits Rectangle {
                 height: 26px;
                 border-radius: 6px;
                 background: p10.has-hover ? Theme.border : Theme.surface-2;
-                Text { text: "+10"; color: Theme.primary; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
+                Text { text: "+10"; color: Theme.primary; font-size: 13px; font-weight: 800; font-family: "Menlo"; }
                 p10 := TouchArea { clicked => { CardapioStore.quick-stock(root.data.id, 10); } }
             }
         }
@@ -349,7 +349,7 @@ component ProductsList inherits Rectangle {
                         horizontal-stretch: 1;
                         alignment: center;
                         Text { text: "Cardápio & Estoque"; color: Theme.text; font-size: 20px; font-weight: 900; }
-                        Text { text: "Controle de preços, códigos internos, EAN de barras e tributação fiscal"; color: Theme.text-muted; font-size: 12px; }
+                        Text { text: "Controle de preços, códigos internos, EAN de barras e tributação fiscal"; color: Theme.text-muted; font-size: 13px; }
                     }
                     Btn {
                         y: (parent.height - self.height) / 2;
@@ -441,7 +441,7 @@ component ProductsList inherits Rectangle {
                             all := Text {
                                 text: "Todas (" + CardapioStore.total-count + ")";
                                 color: CardapioStore.all-categories ? Theme.primary-text : Theme.text;
-                                font-size: 12px;
+                                font-size: 13px;
                                 font-weight: 700;
                             }
                             at := TouchArea { clicked => { CardapioStore.category-picked("ALL"); } }
@@ -489,7 +489,7 @@ component ProductsList inherits Rectangle {
                     Text {
                         text: "Isso acontece quando categorias compartilhavam a mesma faixa inicial (#1001). Clique no botão ao lado para renumerar e dar códigos exclusivos a cada um.";
                         color: Theme.danger.with-alpha(0.85);
-                        font-size: 11px;
+                        font-size: 13px;
                         wrap: word-wrap;
                     }
                 }
@@ -568,7 +568,7 @@ component ProductsList inherits Rectangle {
                         if CardapioStore.search-is-barcode: Text {
                             text: "Este código de barras ainda não está no cardápio. Deseja cadastrá-lo agora com preenchimento automático?";
                             color: Theme.text-muted;
-                            font-size: 12px;
+                            font-size: 13px;
                             horizontal-alignment: center;
                             wrap: word-wrap;
                         }

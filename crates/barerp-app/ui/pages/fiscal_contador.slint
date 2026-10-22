@@ -25,9 +25,9 @@ component Resumo inherits Rectangle {
                 spacing: 6px;
                 horizontal-stretch: 1;
                 VerticalLayout { alignment: center; Icon { source: root.icone; color: FxCores.de(root.cor); size: 14px; } }
-                Text { text: root.rotulo; color: FxCores.de(root.cor); font-size: 12px; font-weight: 900; horizontal-stretch: 1; }
+                Text { text: root.rotulo; color: FxCores.de(root.cor); font-size: 13px; font-weight: 900; horizontal-stretch: 1; }
             }
-            Text { text: FiscalStore.ct-carregando ? "..." : root.qtd + " nota(s)"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+            Text { text: FiscalStore.ct-carregando ? "..." : root.qtd + " nota(s)"; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
         }
         Text { text: FiscalStore.ct-carregando ? "..." : root.total; color: Theme.text; font-size: 22px; font-weight: 900; }
     }
@@ -96,7 +96,7 @@ export component PainelContador inherits Rectangle {
                                 horizontal-stretch: 1;
                                 alignment: center;
                                 Text { text: "Mês de Competência"; color: Theme.text; font-size: 14px; font-weight: 900; }
-                                Text { text: "Selecione o mês do fechamento contábil"; color: Theme.text-muted; font-size: 12px; }
+                                Text { text: "Selecione o mês do fechamento contábil"; color: Theme.text-muted; font-size: 13px; }
                             }
                             FxButton { text: "‹"; font-size: 18px; clicked => { FiscalStore.ct-mes-passo(-1); } }
                             VerticalLayout {
@@ -111,7 +111,7 @@ export component PainelContador inherits Rectangle {
                                     accepted => { FiscalStore.ct-mes-mudou(self.text); }
                                     edited(t) => { if t.character-count == 7 { FiscalStore.ct-mes-mudou(t); } }
                                 }
-                                Text { text: FiscalStore.ct-mes-rotulo; color: Theme.text-muted; font-size: 11px; horizontal-alignment: center; }
+                                Text { text: FiscalStore.ct-mes-rotulo; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
                             }
                             FxButton { text: "›"; font-size: 18px; clicked => { FiscalStore.ct-mes-passo(1); } }
                         }
@@ -158,7 +158,7 @@ export component PainelContador inherits Rectangle {
                                         horizontal-stretch: 1;
                                         spacing: 4px;
                                         Text { text: "Enviar posição do estoque no SPED / Fechamento"; color: Theme.text; font-size: 13px; font-weight: 800; }
-                                        Text { text: "Marque esta opção somente se o inventário físico estiver conferido e corrigido. Se desmarcado, o SPED/fechamento será gerado exclusivamente com as notas fiscais emitidas e recebidas."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                                        Text { text: "Marque esta opção somente se o inventário físico estiver conferido e corrigido. Se desmarcado, o SPED/fechamento será gerado exclusivamente com as notas fiscais emitidas e recebidas."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                                     }
                                 }
                                 TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.ct-incluir-estoque = !FiscalStore.ct-incluir-estoque; } }
@@ -173,7 +173,7 @@ export component PainelContador inherits Rectangle {
                                 spacing: 8px;
                                 HorizontalLayout {
                                     HorizontalLayout { spacing: 6px; horizontal-stretch: 1; VerticalLayout { alignment: center; Icon { source: FiscalIcons.tag; color: Theme.text-muted; size: 14px; } } Text { text: "Lucro Previsto por Categoria"; color: Theme.text; font-size: 13px; font-weight: 800; horizontal-stretch: 1; } }
-                                    Text { text: FiscalStore.ct-incluir-estoque ? "Incluído no fechamento CSV" : "Oculto no fechamento CSV"; color: Theme.text-muted; font-size: 11px; }
+                                    Text { text: FiscalStore.ct-incluir-estoque ? "Incluído no fechamento CSV" : "Oculto no fechamento CSV"; color: Theme.text-muted; font-size: 13px; }
                                 }
                                 for cat in FiscalStore.ct-categorias: Rectangle {
                                     border-radius: 12px;
@@ -185,8 +185,8 @@ export component PainelContador inherits Rectangle {
                                         padding: 12px;
                                         spacing: 12px;
                                         Text { text: cat.nome + " (" + cat.itens + " itens)"; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-stretch: 1; vertical-alignment: center; }
-                                        Text { text: "Custo: " + cat.custo; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
-                                        Text { text: "Lucro: " + cat.lucro + " (" + cat.margem + "%)"; color: Theme.available; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                                        Text { text: "Custo: " + cat.custo; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
+                                        Text { text: "Lucro: " + cat.lucro + " (" + cat.margem + "%)"; color: Theme.available; font-size: 13px; font-weight: 800; vertical-alignment: center; }
                                     }
                                 }
                             }
@@ -211,7 +211,7 @@ export component PainelContador inherits Rectangle {
                         enabled: !FiscalStore.ct-exportando;
                         clicked => { FiscalStore.ct-exportar(); }
                     }
-                    Text { text: "O arquivo .ZIP local inclui XMLs de Saídas/Entradas e planilha formatada para o contador (.CSV)."; color: Theme.text-muted; font-size: 11px; horizontal-alignment: center; wrap: word-wrap; }
+                    Text { text: "O arquivo .ZIP local inclui XMLs de Saídas/Entradas e planilha formatada para o contador (.CSV)."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; wrap: word-wrap; }
                 }
             }
 
@@ -227,7 +227,7 @@ export component PainelContador inherits Rectangle {
                         VerticalLayout {
                             horizontal-stretch: 1;
                             Text { text: "Backups Oficiais em Nuvem (Focus NFe)"; color: Theme.text; font-size: 16px; font-weight: 900; }
-                            Text { text: "Pacotes mensais e semanais compilados automaticamente pelos servidores da Focus"; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                            Text { text: "Pacotes mensais e semanais compilados automaticamente pelos servidores da Focus"; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                         }
                         FxButton { text: "Atualizar Nuvem"; busy: FiscalStore.ct-bk-carregando; clicked => { FiscalStore.ct-bk-atualizar(); } }
                     }
@@ -256,7 +256,7 @@ export component PainelContador inherits Rectangle {
                                     horizontal-stretch: 1;
                                     alignment: center;
                                     Text { text: "Competência " + b.rotulo; color: Theme.text; font-size: 14px; font-weight: 800; }
-                                    Text { text: "Pacote oficial homologado com DANFEs e XMLs"; color: Theme.text-muted; font-size: 11px; }
+                                    Text { text: "Pacote oficial homologado com DANFEs e XMLs"; color: Theme.text-muted; font-size: 13px; }
                                 }
                                 if b.xmls != "": VerticalLayout { alignment: center; FxButton { text: "Baixar XMLs"; icone: FiscalIcons.download; clicked => { FiscalStore.ct-abrir-url(b.xmls); } } }
                                 if b.danfes != "": VerticalLayout { alignment: center; FxButton { text: "Baixar DANFEs"; icone: FiscalIcons.download; clicked => { FiscalStore.ct-abrir-url(b.danfes); } } }

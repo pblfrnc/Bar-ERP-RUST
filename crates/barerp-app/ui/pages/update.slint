@@ -58,9 +58,9 @@ export component UpdateBanner inherits Rectangle {
                     width: nv.preferred-width + 12px;
                     border-radius: 5px;
                     background: #f59e0b;
-                    nv := Text { text: "NOVA VERSÃO"; color: #020617; font-size: 10px; font-weight: 900; }
+                    nv := Text { text: "NOVA VERSÃO"; color: #020617; font-size: 12px; font-weight: 900; }
                 }
-                Text { text: UpdateStore.latest-version; color: #94a3b8; font-size: 12px; font-family: "Menlo"; vertical-alignment: center; }
+                Text { text: UpdateStore.latest-version; color: #94a3b8; font-size: 13px; font-family: "Menlo"; vertical-alignment: center; }
             }
             Text { text: "Atualização do Bar ERP Disponível!"; color: #ffffff; font-size: 14px; font-weight: 900; overflow: elide; }
             Text {
@@ -68,7 +68,7 @@ export component UpdateBanner inherits Rectangle {
                     ? "Download pronto! Clique para reiniciar e atualizar."
                     : UpdateStore.downloading ? "Baixando: " + UpdateStore.percent + "%..." : "Novos recursos e melhorias fiscais prontos para instalar.";
                 color: #94a3b8;
-                font-size: 12px;
+                font-size: 13px;
                 wrap: word-wrap;
             }
             HorizontalLayout {
@@ -145,9 +145,9 @@ export component UpdateModal inherits Rectangle {
                                 width: at.preferred-width + 12px;
                                 border-radius: 5px;
                                 background: Theme.primary;
-                                at := Text { text: "ATUALIZAÇÃO DO SISTEMA"; color: #020617; font-size: 10px; font-weight: 900; }
+                                at := Text { text: "ATUALIZAÇÃO DO SISTEMA"; color: #020617; font-size: 12px; font-weight: 900; }
                             }
-                            Text { text: UpdateStore.latest-version; color: Theme.dark ? #fbbf24 : #d97706; font-size: 12px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
+                            Text { text: UpdateStore.latest-version; color: Theme.dark ? #fbbf24 : #d97706; font-size: 13px; font-weight: 700; font-family: "Menlo"; vertical-alignment: center; }
                         }
                         Text { text: "Nova Versão do Bar ERP Pronta!"; color: Theme.text; font-size: 18px; font-weight: 900; }
                     }
@@ -179,24 +179,24 @@ export component UpdateModal inherits Rectangle {
                         spacing: 12px;
                         VerticalLayout {
                             horizontal-stretch: 1;
-                            Text { text: "VERSÃO ATUAL:"; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
-                            Text { text: UpdateStore.current-version; color: Theme.text; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+                            Text { text: "VERSÃO ATUAL:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; }
+                            Text { text: UpdateStore.current-version; color: Theme.text; font-size: 13px; font-weight: 700; font-family: "Menlo"; }
                         }
                         VerticalLayout {
                             horizontal-stretch: 1;
-                            Text { text: "LANÇAMENTO NO GITHUB:"; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
+                            Text { text: "LANÇAMENTO NO GITHUB:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; }
                             HorizontalLayout {
                                 spacing: 4px;
                                 alignment: start;
                                 VerticalLayout { alignment: center; RIcon { source: RtIcons.clock; tint: Theme.available; size: 12px; } }
-                                Text { text: UpdateStore.release-date; color: Theme.available; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+                                Text { text: UpdateStore.release-date; color: Theme.available; font-size: 13px; font-weight: 700; font-family: "Menlo"; }
                             }
                         }
                     }
                 }
                 VerticalLayout {
                     spacing: 6px;
-                    Text { text: "NOVIDADES & MELHORIAS DESTA VERSÃO:"; color: Theme.text; font-size: 12px; font-weight: 700; }
+                    Text { text: "NOVIDADES & MELHORIAS DESTA VERSÃO:"; color: Theme.text; font-size: 13px; font-weight: 700; }
                     Rectangle {
                         height: min(144px, notes.preferred-height + 28px);
                         border-radius: 12px;
@@ -212,7 +212,7 @@ export component UpdateModal inherits Rectangle {
                                 width: parent.width - 28px;
                                 text: UpdateStore.notes;
                                 color: Theme.text-muted;
-                                font-size: 12px;
+                                font-size: 13px;
                                 wrap: word-wrap;
                             }
                         }
@@ -229,8 +229,8 @@ export component UpdateModal inherits Rectangle {
                         HorizontalLayout {
                             spacing: 8px;
                             VerticalLayout { alignment: center; Spinner { tint: Theme.primary; size: 14px; } }
-                            Text { text: "Baixando atualização do GitHub..."; color: Theme.text; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
-                            Text { text: UpdateStore.percent + "%"; color: Theme.primary; font-size: 12px; font-weight: 700; font-family: "Menlo"; }
+                            Text { text: "Baixando atualização do GitHub..."; color: Theme.text; font-size: 13px; font-weight: 700; horizontal-stretch: 1; }
+                            Text { text: UpdateStore.percent + "%"; color: Theme.primary; font-size: 13px; font-weight: 700; font-family: "Menlo"; }
                         }
                         Rectangle {
                             height: 12px;
@@ -246,8 +246,8 @@ export component UpdateModal inherits Rectangle {
                             }
                         }
                         HorizontalLayout {
-                            Text { text: UpdateStore.progress-text; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; horizontal-stretch: 1; }
-                            Text { text: UpdateStore.speed-text; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; }
+                            Text { text: UpdateStore.progress-text; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; horizontal-stretch: 1; }
+                            Text { text: UpdateStore.speed-text; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; }
                         }
                     }
                 }
@@ -267,7 +267,7 @@ export component UpdateModal inherits Rectangle {
                             Text {
                                 text: "O instalador já foi verificado e está pronto. Ao clicar abaixo, o Bar ERP fechará de forma limpa, aplicará a atualização e reiniciará em segundos.";
                                 color: Theme.text;
-                                font-size: 12px;
+                                font-size: 13px;
                                 wrap: word-wrap;
                             }
                         }
@@ -284,8 +284,8 @@ export component UpdateModal inherits Rectangle {
                         VerticalLayout { alignment: start; RIcon { source: RtIcons.circle-alert; tint: Theme.danger; size: 20px; } }
                         VerticalLayout {
                             horizontal-stretch: 1;
-                            Text { text: "Falha no Download"; color: Theme.danger; font-size: 12px; font-weight: 900; }
-                            Text { text: UpdateStore.error; color: Theme.text; font-size: 12px; wrap: word-wrap; }
+                            Text { text: "Falha no Download"; color: Theme.danger; font-size: 13px; font-weight: 900; }
+                            Text { text: UpdateStore.error; color: Theme.text; font-size: 13px; wrap: word-wrap; }
                         }
                     }
                 }
@@ -299,7 +299,7 @@ export component UpdateModal inherits Rectangle {
                         Text {
                             text: "Seus dados estão 100% seguros: Vendas, comandas, mesas abertas e configurações fiscais são preservadas intactas.";
                             color: Theme.text-muted;
-                            font-size: 11px;
+                            font-size: 13px;
                             wrap: word-wrap;
                             horizontal-stretch: 1;
                         }

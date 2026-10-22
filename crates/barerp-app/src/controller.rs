@@ -137,47 +137,37 @@ pub fn start(ui: &AppWindow, db: Db, rt: Handle, db_label: String, server: Optio
             ctx.spawn(async move { staff::login(&db, &user_id, &pin).await }, move |ui, result| {
                 ui.set_login_busy(false);
                 match result {
+                    Ok(user) => apply_user(ui, user, false),
+                    Err(e) => ui.set_login_error(e.to_string().into()),
+                }
+            });
+        }
+    });
+
+    ui.on_lock({
+        let ctx = ctx.clone();
+        move || {
+            if let Some(ui) = ctx.ui() {
+                ui.set_login_error(SharedString::new());
+                ui.set_locked(true);
+            }
+            load_staff(&ctx);
+        }
+    });
+
+    ui.on_unlock({
+        let ctx = ctx.clone();
+        move |user_id, pin| {
+            let Some(ui) = ctx.ui() else { return };
+            ui.set_login_busy(true);
+            ui.set_login_error(SharedString::new());
+            let db = ctx.db.clone();
+            ctx.spawn(async move { staff::login(&db, &user_id, &pin).await }, move |ui, result| {
+                ui.set_login_busy(false);
+                match result {
                     Ok(user) => {
-                        ui.set_user_name(user.name.clone().into());
-                        ui.set_user_role(user.role.clone().into());
-                        // Abas visíveis conforme as permissões (ADMIN vê tudo), como no Navbar original
-                        let allowed = |id: &str| user.role == "ADMIN" || user.permissions.iter().any(|p| p == id);
-                        let nav = crate::NavPerms {
-                            tables: allowed("tables"),
-                            kds: allowed("kds"),
-                            cash: allowed("cash"),
-                            products: allowed("products"),
-                            fiscal: allowed("fiscal"),
-                            settings: allowed("settings"),
-                        };
-                        ui.set_nav(nav.clone());
-                        if user.default_password {
-                            ui.set_password_hint(
-                                "Você entrou com a senha padrão 1234. Troque agora para ninguém mais entrar com o seu usuário."
-                                    .into(),
-                            );
-                            ui.set_password_error(SharedString::new());
-                            ui.set_password_dialog_open(true);
-                        }
-                        // "Operador / Responsável" do caixa já vem com quem entrou
-                        ui.global::<crate::CardapioStore>().set_is_admin(user.role == "ADMIN");
-                        let caixa = ui.global::<CaixaStore>();
-                        caixa.set_open_by(user.name.clone().into());
-                        caixa.set_close_by(user.name.clone().into());
-                        USER.with(|u| *u.borrow_mut() = Some(user));
-                        // Primeira aba permitida (o original abre em Mesas)
-                        let first = [
-                            (nav.tables, Page::Tables),
-                            (nav.kds, Page::Kds),
-                            (nav.cash, Page::Cash),
-                            (nav.products, Page::Products),
-                            (nav.fiscal, Page::Fiscal),
-                            (nav.settings, Page::Settings),
-                        ]
-                        .into_iter()
-                        .find_map(|(ok, page)| ok.then_some(page))
-                        .unwrap_or(Page::Tables);
-                        ui.set_page(first);
+                        apply_user(ui, user, true);
+                        ui.set_locked(false);
                     }
                     Err(e) => ui.set_login_error(e.to_string().into()),
                 }
@@ -226,6 +216,7 @@ pub fn start(ui: &AppWindow, db: Db, rt: Handle, db_label: String, server: Optio
         move || {
             USER.with(|u| *u.borrow_mut() = None);
             if let Some(ui) = ctx.ui() {
+                ui.set_locked(false);
                 ui.set_user_name(SharedString::new());
                 ui.set_user_role(SharedString::new());
                 ui.set_password_dialog_open(false);
@@ -268,4 +259,61 @@ pub fn start(ui: &AppWindow, db: Db, rt: Handle, db_label: String, server: Optio
         }
     });
     timer
+}
+
+/// Operador que entrou (login ou desbloqueio): nome, abas permitidas, senha padrão e o responsável do caixa.
+fn apply_user(ui: &AppWindow, user: LoggedUser, keep_page: bool) {
+    ui.set_user_name(user.name.clone().into());
+    ui.set_user_role(user.role.clone().into());
+    // Abas visíveis conforme as permissões (ADMIN vê tudo), como no Navbar original
+    let allowed = |id: &str| user.role == "ADMIN" || user.permissions.iter().any(|p| p == id);
+    let nav = crate::NavPerms {
+        tables: allowed("tables"),
+        kds: allowed("kds"),
+        cash: allowed("cash"),
+        products: allowed("products"),
+        fiscal: allowed("fiscal"),
+        settings: allowed("settings"),
+    };
+    ui.set_nav(nav.clone());
+    if user.default_password {
+        ui.set_password_hint(
+            "Você entrou com a senha padrão 1234. Troque agora para ninguém mais entrar com o seu usuário."
+                .into(),
+        );
+        ui.set_password_error(SharedString::new());
+        ui.set_password_dialog_open(true);
+    }
+    // "Operador / Responsável" do caixa já vem com quem entrou
+    ui.global::<crate::CardapioStore>().set_is_admin(user.role == "ADMIN");
+    let caixa = ui.global::<CaixaStore>();
+    caixa.set_open_by(user.name.clone().into());
+    caixa.set_close_by(user.name.clone().into());
+    USER.with(|u| *u.borrow_mut() = Some(user));
+    // Primeira aba permitida (o original abre em Mesas)
+    let first = [
+        (nav.tables, Page::Tables),
+        (nav.kds, Page::Kds),
+        (nav.cash, Page::Cash),
+        (nav.products, Page::Products),
+        (nav.fiscal, Page::Fiscal),
+        (nav.settings, Page::Settings),
+    ]
+    .into_iter()
+    .find_map(|(ok, page)| ok.then_some(page))
+    .unwrap_or(Page::Tables);
+    // Desbloqueio: continua na mesma tela se o operador novo tem acesso a ela
+    let keep = keep_page
+        && match ui.get_page() {
+            Page::Tables => nav.tables,
+            Page::Kds => nav.kds,
+            Page::Cash => nav.cash,
+            Page::Products => nav.products,
+            Page::Fiscal => nav.fiscal,
+            Page::Settings => nav.settings,
+            Page::Login => false,
+        };
+    if !keep {
+        ui.set_page(first);
+    }
 }

@@ -339,7 +339,7 @@ component Pill inherits Rectangle {
     background: root.tone.with-alpha(0.15);
     border-width: 1px;
     border-color: root.tone.with-alpha(0.35);
-    t := Text { text: root.text; color: root.tone; font-size: 10px; font-weight: 800; }
+    t := Text { text: root.text; color: root.tone; font-size: 12px; font-weight: 800; }
 }
 
 component Btn inherits Rectangle {
@@ -349,7 +349,7 @@ component Btn inherits Rectangle {
     in property <color> tone: Theme.text;
     in property <color> fill: Theme.surface-2;
     in property <bool> enabled: true;
-    in property <length> font-size: 12px;
+    in property <length> font-size: 13px;
     in property <int> weight: 700;
     callback clicked;
     min-height: 36px;
@@ -380,7 +380,7 @@ component CloseX inherits Rectangle {
 
 component Label inherits Text {
     color: Theme.text-muted;
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 800;
     letter-spacing: 0.5px;
 }
@@ -419,7 +419,7 @@ component Sheet inherits Rectangle {
                             spacing: 8px;
                             alignment: start;
                             if root.tag != "": Pill { text: root.tag; tone: root.tag-tone; }
-                            if root.caption != "": Text { text: root.caption; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                            if root.caption != "": Text { text: root.caption; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                         }
                         Text { text: root.title; color: Theme.text; font-size: 22px; font-weight: 900; overflow: elide; }
                     }
@@ -453,7 +453,7 @@ component KdsBadge inherits Rectangle {
         label := Text {
             text: root.status == "PREPARING" ? "Em Preparo" : root.status == "READY" ? "Pronto!" : root.status == "DELIVERED" ? "Entregue" : "Fila";
             color: root.tone;
-            font-size: 10px;
+            font-size: 12px;
             font-weight: 800;
             vertical-alignment: center;
         }
@@ -477,14 +477,14 @@ component DetailsSheet inherits Sheet {
         Pill { text: MesasModalStore.d-order; tone: Theme.text-muted; }
         if MesasModalStore.d-closing: Pill { text: "Em Fechamento"; tone: Theme.closing; }
         Icon { source: Icons.user; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
-        Text { text: MesasModalStore.d-customer; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
-        Text { text: "•"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+        Text { text: MesasModalStore.d-customer; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
+        Text { text: "•"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
         Icon { source: Icons.utensils; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
-        Text { text: MesasModalStore.d-waiter; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+        Text { text: MesasModalStore.d-waiter; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
         if MesasModalStore.d-elapsed != "": HorizontalLayout {
             spacing: 4px;
             Icon { source: Icons.clock; color: Theme.primary; size: 13px; y: (parent.height - self.height) / 2; }
-            Text { text: MesasModalStore.d-elapsed; color: Theme.primary; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+            Text { text: MesasModalStore.d-elapsed; color: Theme.primary; font-size: 13px; font-weight: 800; vertical-alignment: center; }
         }
     }
 
@@ -563,10 +563,10 @@ component DetailsSheet inherits Sheet {
                                 Text { text: line.name; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
                                 KdsBadge { status: line.kds; }
                             }
-                            if line.modifiers != "": Text { text: line.modifiers; color: Theme.occupied; font-size: 12px; font-weight: 600; wrap: word-wrap; }
-                            if line.promotion != "": Text { text: line.promotion; color: Theme.danger; font-size: 11px; font-weight: 800; }
-                            if line.notes != "": Text { text: "Obs: " + line.notes; color: Theme.closing; font-size: 12px; font-italic: true; wrap: word-wrap; }
-                            Text { text: line.unit-info; color: Theme.text-muted; font-size: 11px; }
+                            if line.modifiers != "": Text { text: line.modifiers; color: Theme.occupied; font-size: 13px; font-weight: 600; wrap: word-wrap; }
+                            if line.promotion != "": Text { text: line.promotion; color: Theme.danger; font-size: 13px; font-weight: 800; }
+                            if line.notes != "": Text { text: "Obs: " + line.notes; color: Theme.closing; font-size: 13px; font-italic: true; wrap: word-wrap; }
+                            Text { text: line.unit-info; color: Theme.text-muted; font-size: 13px; }
                         }
                         Text { text: line.total; color: Theme.text; font-size: 14px; font-weight: 900; vertical-alignment: center; }
                         Rectangle {
@@ -601,7 +601,7 @@ component DetailsSheet inherits Sheet {
                     if MesasModalStore.d-fee: Pill { text: "10% incluso"; tone: Theme.closing; }
                 }
                 Text { text: MesasModalStore.d-total; color: Theme.available; font-size: 26px; font-weight: 900; }
-                if MesasModalStore.d-haver != "": Text { text: MesasModalStore.d-haver; color: Theme.occupied; font-size: 12px; font-weight: 800; }
+                if MesasModalStore.d-haver != "": Text { text: MesasModalStore.d-haver; color: Theme.occupied; font-size: 13px; font-weight: 800; }
             }
             Btn {
                 y: (parent.height - self.height) / 2;
@@ -664,7 +664,7 @@ component OpenTableSheet inherits Sheet {
             if MesasModalStore.o-waiters.length > 0: Text {
                 text: MesasModalStore.o-custom-waiter ? "Selecionar da Lista" : "Digitar Outro";
                 color: Theme.primary;
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 700;
                 TouchArea { clicked => { MesasModalStore.o-custom-waiter = !MesasModalStore.o-custom-waiter; } }
             }
@@ -735,7 +735,7 @@ component TableChoiceSheet inherits Sheet {
                 VerticalLayout {
                     alignment: center;
                     Text { text: c.label; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-alignment: center; overflow: elide; }
-                    if c.detail != "": Text { text: c.detail; color: Theme.text-muted; font-size: 11px; horizontal-alignment: center; overflow: elide; }
+                    if c.detail != "": Text { text: c.detail; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; overflow: elide; }
                 }
                 ct := TouchArea { clicked => { MesasModalStore.t-selected = c.id; } }
             }
@@ -839,7 +839,7 @@ component CategoryChip inherits Rectangle {
         alignment: center;
         spacing: 5px;
         Icon { source: root.icon; color: root.active ? Theme.primary-text : Theme.text-muted; size: 14px; y: (parent.height - self.height) / 2; }
-        Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+        Text { text: root.text; color: root.active ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: 700; vertical-alignment: center; }
     }
     touch := TouchArea { clicked => { root.clicked(); } }
 }
@@ -859,13 +859,13 @@ component ProductCard inherits Rectangle {
         spacing: 3px;
         HorizontalLayout {
             Icon { source: p.station == "Bar" ? Icons.beer : Icons.chef-hat; color: Theme.text-muted; size: 11px; y: (parent.height - self.height) / 2; }
-            Text { text: p.station == "Bar" ? " BAR" : " COZINHA"; color: Theme.text-muted; font-size: 10px; font-weight: 800; horizontal-stretch: 1; }
+            Text { text: p.station == "Bar" ? " BAR" : " COZINHA"; color: Theme.text-muted; font-size: 12px; font-weight: 800; horizontal-stretch: 1; }
             if root.in-cart > 0: Rectangle {
                 height: 18px;
                 width: badge.preferred-width + 12px;
                 border-radius: 9px;
                 background: Theme.primary;
-                badge := Text { text: root.in-cart + "x"; color: Theme.primary-text; font-size: 10px; font-weight: 900; }
+                badge := Text { text: root.in-cart + "x"; color: Theme.primary-text; font-size: 12px; font-weight: 900; }
             }
         }
         Text { text: p.name; color: Theme.text; font-size: 13px; font-weight: 800; wrap: word-wrap; overflow: elide; max-height: 36px; }
@@ -880,18 +880,18 @@ component ProductCard inherits Rectangle {
                     x: 5px;
                     spacing: 3px;
                     Icon { source: Icons.tag; color: Theme.danger; size: 10px; y: (parent.height - self.height) / 2; }
-                    promo := Text { text: p.promotion; color: Theme.danger; font-size: 10px; font-weight: 900; vertical-alignment: center; }
+                    promo := Text { text: p.promotion; color: Theme.danger; font-size: 12px; font-weight: 900; vertical-alignment: center; }
                 }
             }
         }
-        if p.has-options: Text { text: "Com opções / adicionais"; color: Theme.occupied; font-size: 10px; font-weight: 700; }
-        if p.description != "": Text { text: p.description; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+        if p.has-options: Text { text: "Com opções / adicionais"; color: Theme.occupied; font-size: 12px; font-weight: 700; }
+        if p.description != "": Text { text: p.description; color: Theme.text-muted; font-size: 13px; overflow: elide; }
         Rectangle { vertical-stretch: 1; }
         Rectangle { height: 1px; background: Theme.surface-2; }
         if !p.has-box: HorizontalLayout {
             VerticalLayout {
                 horizontal-stretch: 1;
-                if p.base-price != "": Text { text: p.base-price; color: Theme.text-muted; font-size: 10px; font-weight: 700; }
+                if p.base-price != "": Text { text: p.base-price; color: Theme.text-muted; font-size: 12px; font-weight: 700; }
                 Text { text: p.price; color: Theme.primary; font-size: 14px; font-weight: 900; }
             }
             Rectangle {
@@ -914,9 +914,9 @@ component ProductCard inherits Rectangle {
                 border-color: Theme.surface-2;
                 VerticalLayout {
                     alignment: center;
-                    Text { text: "UNIDADE"; color: u.has-hover ? Theme.primary-text : Theme.text-muted; font-size: 9px; font-weight: 800; horizontal-alignment: center; }
-                    Text { text: p.price; color: u.has-hover ? Theme.primary-text : Theme.available; font-size: 12px; font-weight: 900; horizontal-alignment: center; }
-                    if p.unit-count > 0: Text { text: "(" + p.unit-count + "x)"; color: u.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 800; horizontal-alignment: center; }
+                    Text { text: "UNIDADE"; color: u.has-hover ? Theme.primary-text : Theme.text-muted; font-size: 11px; font-weight: 800; horizontal-alignment: center; }
+                    Text { text: p.price; color: u.has-hover ? Theme.primary-text : Theme.available; font-size: 13px; font-weight: 900; horizontal-alignment: center; }
+                    if p.unit-count > 0: Text { text: "(" + p.unit-count + "x)"; color: u.has-hover ? Theme.primary-text : Theme.primary; font-size: 11px; font-weight: 800; horizontal-alignment: center; }
                 }
                 u := TouchArea { clicked => { root.unit(); } }
             }
@@ -933,10 +933,10 @@ component ProductCard inherits Rectangle {
                         alignment: center;
                         spacing: 3px;
                         Icon { source: Icons.package; color: b.has-hover ? Theme.primary-text : Theme.closing; size: 10px; y: (parent.height - self.height) / 2; }
-                        Text { text: p.box-label; color: b.has-hover ? Theme.primary-text : Theme.closing; font-size: 9px; font-weight: 900; }
+                        Text { text: p.box-label; color: b.has-hover ? Theme.primary-text : Theme.closing; font-size: 11px; font-weight: 900; }
                     }
-                    Text { text: p.box-price; color: b.has-hover ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 900; horizontal-alignment: center; }
-                    if p.box-count > 0: Text { text: "(" + p.box-count + " cx)"; color: b.has-hover ? Theme.primary-text : Theme.primary; font-size: 9px; font-weight: 900; horizontal-alignment: center; }
+                    Text { text: p.box-price; color: b.has-hover ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: 900; horizontal-alignment: center; }
+                    if p.box-count > 0: Text { text: "(" + p.box-count + " cx)"; color: b.has-hover ? Theme.primary-text : Theme.primary; font-size: 11px; font-weight: 900; horizontal-alignment: center; }
                 }
                 b := TouchArea { clicked => { root.box(); } }
             }
@@ -1032,12 +1032,12 @@ component AddOrderSheet inherits Sheet {
                     VerticalLayout {
                         horizontal-stretch: 1;
                         Text { text: "ITENS A ENVIAR"; color: Theme.text; font-size: 13px; font-weight: 900; letter-spacing: 0.5px; }
-                        Text { text: MesasModalStore.a-cart.length + " produto(s) selecionado(s)"; color: Theme.text-muted; font-size: 12px; }
+                        Text { text: MesasModalStore.a-cart.length + " produto(s) selecionado(s)"; color: Theme.text-muted; font-size: 13px; }
                     }
                     if MesasModalStore.a-cart.length > 0: HorizontalLayout {
                         spacing: 4px;
                         Icon { source: Icons.trash-2; color: Theme.danger; size: 14px; y: (parent.height - self.height) / 2; }
-                        Text { text: "Limpar"; color: Theme.danger; font-size: 12px; font-weight: 700; vertical-alignment: center; TouchArea { clicked => { MesasModalStore.a-clear(); } } }
+                        Text { text: "Limpar"; color: Theme.danger; font-size: 13px; font-weight: 700; vertical-alignment: center; TouchArea { clicked => { MesasModalStore.a-clear(); } } }
                     }
                 }
                 Rectangle { height: 1px; background: Theme.surface-2; }
@@ -1049,11 +1049,12 @@ component AddOrderSheet inherits Sheet {
                         padding: 20px;
                         Icon { source: Icons.beer; color: Theme.border; size: 40px; x: (parent.width - self.width) / 2; }
                         Text { text: "Nenhum item selecionado"; color: Theme.text-muted; font-size: 14px; font-weight: 600; horizontal-alignment: center; }
-                        Text { text: "Toque nos produtos ao lado para adicionar à rodada."; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+                        Text { text: "Toque nos produtos ao lado para adicionar à rodada."; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; wrap: word-wrap; }
                     }
-                    Flickable {
+                    cart-flick := Flickable {
                         content-height: cart-list.preferred-height + 24px;
                         cart-list := VerticalLayout {
+                            width: cart-flick.width;
                             alignment: start;
                             padding: 12px;
                             spacing: 10px;
@@ -1074,12 +1075,12 @@ component AddOrderSheet inherits Sheet {
                                             HorizontalLayout {
                                                 spacing: 6px;
                                                 alignment: start;
-                                                Text { text: item.name; color: Theme.text; font-size: 12px; font-weight: 800; wrap: word-wrap; }
+                                                Text { text: item.name; color: Theme.text; font-size: 13px; font-weight: 800; wrap: word-wrap; }
                                                 Pill { text: item.is-box ? item.box-label : "Un"; tone: item.is-box ? Theme.closing : Theme.text-muted; }
                                             }
-                                            if item.options != "": Text { text: item.options; color: Theme.occupied; font-size: 10px; font-weight: 700; wrap: word-wrap; }
-                                            if item.promotion != "": Text { text: item.promotion; color: Theme.danger; font-size: 10px; font-weight: 800; }
-                                            Text { text: item.total; color: Theme.primary; font-size: 12px; font-weight: 800; }
+                                            if item.options != "": Text { text: item.options; color: Theme.occupied; font-size: 12px; font-weight: 700; wrap: word-wrap; }
+                                            if item.promotion != "": Text { text: item.promotion; color: Theme.danger; font-size: 12px; font-weight: 800; }
+                                            Text { text: item.total; color: Theme.primary; font-size: 13px; font-weight: 800; }
                                         }
                                         Rectangle {
                                             width: qty-row.preferred-width + 6px;
@@ -1098,21 +1099,34 @@ component AddOrderSheet inherits Sheet {
                                     }
                                     LineEdit {
                                         height: 34px;
-                                        font-size: 12px;
+                                        font-size: 13px;
                                         placeholder-text: "Observação (ex: sem gelo, bem passada)...";
                                         text: item.notes;
                                         edited(t) => { MesasModalStore.a-notes(i, t); }
                                     }
+                                    // Duas fileiras para caber na coluna de 360 px
                                     HorizontalLayout {
                                         spacing: 4px;
                                         alignment: start;
-                                        for chip in ["Com gelo e limão", "Sem gelo", "Bem gelada", "Sem cebola"]: Rectangle {
-                                            height: 22px;
-                                            width: chip-t.preferred-width + 12px;
-                                            border-radius: 5px;
+                                        for chip in ["Com gelo e limão", "Sem gelo"]: Rectangle {
+                                            height: 28px;
+                                            width: chip-t.preferred-width + 14px;
+                                            border-radius: 6px;
                                             background: chip-touch.has-hover ? Theme.border : Theme.surface-2;
-                                            chip-t := Text { text: "+ " + chip; color: Theme.text-muted; font-size: 10px; }
+                                            chip-t := Text { text: "+ " + chip; color: Theme.text-muted; font-size: 13px; }
                                             chip-touch := TouchArea { clicked => { MesasModalStore.a-chip(i, chip); } }
+                                        }
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        alignment: start;
+                                        for chip in ["Bem gelada", "Sem cebola"]: Rectangle {
+                                            height: 28px;
+                                            width: chip2-t.preferred-width + 14px;
+                                            border-radius: 6px;
+                                            background: chip2-touch.has-hover ? Theme.border : Theme.surface-2;
+                                            chip2-t := Text { text: "+ " + chip; color: Theme.text-muted; font-size: 13px; }
+                                            chip2-touch := TouchArea { clicked => { MesasModalStore.a-chip(i, chip); } }
                                         }
                                     }
                                 }
@@ -1130,7 +1144,7 @@ component AddOrderSheet inherits Sheet {
                             Label { text: "TOTAL DESTA RODADA"; vertical-alignment: center; horizontal-stretch: 1; }
                             Text { text: MesasModalStore.a-total; color: Theme.primary; font-size: 21px; font-weight: 900; }
                         }
-                        if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+                        if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
                         Btn {
                             min-height: 48px;
                             text: MesasModalStore.busy ? "ENVIANDO..." : "ENVIAR PARA BAR / COZINHA";
@@ -1170,7 +1184,7 @@ component ModifiersSheet inherits Sheet {
                 spacing: 6px;
                 HorizontalLayout {
                     Text { text: g.name; color: Theme.text; font-size: 15px; font-weight: 900; horizontal-stretch: 1; }
-                    Text { text: g.rule; color: g.missing ? Theme.danger : Theme.closing; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+                    Text { text: g.rule; color: g.missing ? Theme.danger : Theme.closing; font-size: 12px; font-weight: 800; vertical-alignment: center; }
                 }
                 for o[oi] in g.options: Rectangle {
                     height: 44px;
@@ -1229,7 +1243,7 @@ component Segment inherits Rectangle {
         alignment: center;
         spacing: 4px;
         if root.has-icon: Icon { source: root.icon; color: root.active ? Theme.text : Theme.text-muted; size: 12px; y: (parent.height - self.height) / 2; }
-        Text { text: root.text; color: root.active ? Theme.text : Theme.text-muted; font-size: 10px; font-weight: 800; vertical-alignment: center; }
+        Text { text: root.text; color: root.active ? Theme.text : Theme.text-muted; font-size: 12px; font-weight: 800; vertical-alignment: center; }
     }
     TouchArea { clicked => { root.clicked(); } }
 }
@@ -1249,7 +1263,7 @@ component MethodButton inherits Rectangle {
         padding-left: 12px;
         spacing: 8px;
         Icon { source: root.icon; color: Theme.primary; size: 16px; y: (parent.height - self.height) / 2; }
-        Text { text: root.text; color: active ? Theme.primary : Theme.text; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+        Text { text: root.text; color: active ? Theme.primary : Theme.text; font-size: 13px; font-weight: 800; vertical-alignment: center; }
     }
     mt := TouchArea { clicked => { MesasModalStore.c-method = root.method; MesasModalStore.c-changed(); } }
 }
@@ -1343,12 +1357,12 @@ component CheckoutSheet inherits Sheet {
                         spacing: 3px;
                         Rectangle { height: 1px; background: Theme.surface-2; }
                         HorizontalLayout {
-                            Text { text: "JÁ ABATIDO (HAVER)"; color: Theme.occupied; font-size: 11px; font-weight: 800; horizontal-stretch: 1; }
-                            Text { text: MesasModalStore.c-paid; color: Theme.occupied; font-size: 11px; font-weight: 800; }
+                            Text { text: "JÁ ABATIDO (HAVER)"; color: Theme.occupied; font-size: 13px; font-weight: 800; horizontal-stretch: 1; }
+                            Text { text: MesasModalStore.c-paid; color: Theme.occupied; font-size: 13px; font-weight: 800; }
                         }
                         for pay in MesasModalStore.c-payments: HorizontalLayout {
-                            Text { text: pay.when; color: Theme.text-muted; font-size: 11px; horizontal-stretch: 1; overflow: elide; }
-                            Text { text: pay.amount; color: Theme.text-muted; font-size: 11px; }
+                            Text { text: pay.when; color: Theme.text-muted; font-size: 13px; horizontal-stretch: 1; overflow: elide; }
+                            Text { text: pay.amount; color: Theme.text-muted; font-size: 13px; }
                         }
                     }
                 }
@@ -1363,7 +1377,7 @@ component CheckoutSheet inherits Sheet {
                     HorizontalLayout {
                         spacing: 6px;
                         Icon { source: Icons.users; color: Theme.primary; size: 16px; y: (parent.height - self.height) / 2; }
-                        Text { text: "RACHA-CONTA"; color: Theme.text; font-size: 12px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
+                        Text { text: "RACHA-CONTA"; color: Theme.text; font-size: 13px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; }
                         Rectangle {
                             width: segs.preferred-width + 6px;
                             height: 36px;
@@ -1388,11 +1402,11 @@ component CheckoutSheet inherits Sheet {
                                 horizontal-stretch: 1;
                                 border-radius: 11px;
                                 background: MesasModalStore.c-split-count == n ? Theme.primary : (sc.has-hover ? Theme.border : Theme.surface);
-                                Text { text: n + "x"; color: MesasModalStore.c-split-count == n ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 800; }
+                                Text { text: n + "x"; color: MesasModalStore.c-split-count == n ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: 800; }
                                 sc := TouchArea { clicked => { MesasModalStore.c-set-count(n); } }
                             }
                         }
-                        Text { text: MesasModalStore.c-per-person + " por pessoa"; color: Theme.primary; font-size: 12px; font-weight: 800; horizontal-alignment: right; }
+                        Text { text: MesasModalStore.c-per-person + " por pessoa"; color: Theme.primary; font-size: 13px; font-weight: 800; horizontal-alignment: right; }
                     }
                     if MesasModalStore.c-split-mode == "items": VerticalLayout {
                         spacing: 6px;
@@ -1409,8 +1423,8 @@ component CheckoutSheet inherits Sheet {
                                     alignment: center;
                                     horizontal-stretch: 1;
                                     Text { text: it.name; color: it.selected > 0 ? Theme.primary : Theme.text; font-size: 13px; font-weight: 800; overflow: elide; }
-                                    if it.modifiers != "": Text { text: it.modifiers; color: Theme.occupied; font-size: 10px; font-weight: 700; overflow: elide; }
-                                    Text { text: it.info; color: Theme.text-muted; font-size: 10px; }
+                                    if it.modifiers != "": Text { text: it.modifiers; color: Theme.occupied; font-size: 12px; font-weight: 700; overflow: elide; }
+                                    Text { text: it.info; color: Theme.text-muted; font-size: 12px; }
                                 }
                                 HorizontalLayout {
                                     spacing: 6px;
@@ -1428,7 +1442,7 @@ component CheckoutSheet inherits Sheet {
                     }
                     if MesasModalStore.c-split-mode == "amount": VerticalLayout {
                         spacing: 8px;
-                        Text { text: "O cliente paga só uma parte da conta (haver). Digite o valor em Valor deste Pagamento ou use um atalho:"; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+                        Text { text: "O cliente paga só uma parte da conta (haver). Digite o valor em Valor deste Pagamento ou use um atalho:"; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                         HorizontalLayout {
                             spacing: 6px;
                             for v in MesasModalStore.c-amount-shortcuts: Rectangle {
@@ -1438,11 +1452,11 @@ component CheckoutSheet inherits Sheet {
                                 background: am.has-hover ? Theme.border : Theme.surface;
                                 border-width: 1px;
                                 border-color: Theme.surface-2;
-                                Text { text: "R$ " + v; color: Theme.text; font-size: 12px; font-weight: 800; }
+                                Text { text: "R$ " + v; color: Theme.text; font-size: 13px; font-weight: 800; }
                                 am := TouchArea { clicked => { MesasModalStore.c-shortcut(v); } }
                             }
                         }
-                        if MesasModalStore.c-amount-preview != "": Text { text: MesasModalStore.c-amount-preview; color: Theme.primary; font-size: 12px; font-weight: 800; horizontal-alignment: right; }
+                        if MesasModalStore.c-amount-preview != "": Text { text: MesasModalStore.c-amount-preview; color: Theme.primary; font-size: 13px; font-weight: 800; horizontal-alignment: right; }
                     }
                 }
             }
@@ -1486,8 +1500,8 @@ component CheckoutSheet inherits Sheet {
                             HorizontalLayout {
                                 padding-left: 10px;
                                 padding-right: 10px;
-                                Text { text: c.label; color: Theme.text; font-size: 12px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
-                                Text { text: c.detail; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                                Text { text: c.label; color: Theme.text; font-size: 13px; font-weight: 800; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                                Text { text: c.detail; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                             }
                             TouchArea { clicked => { MesasModalStore.c-customer-id = c.id; MesasModalStore.c-new-customer = ""; } }
                         }
@@ -1515,8 +1529,8 @@ component CheckoutSheet inherits Sheet {
                     Label { text: "VALOR ENTREGUE PELO CLIENTE (R$)"; }
                     LineEdit { height: 42px; font-size: 16px; placeholder-text: "Ex: 100,00"; text <=> MesasModalStore.c-cash; edited => { MesasModalStore.c-changed(); } }
                     if MesasModalStore.c-change != "": HorizontalLayout {
-                        Text { text: "Troco a Devolver:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; horizontal-stretch: 1; }
-                        Text { text: MesasModalStore.c-change; color: Theme.available; font-size: 12px; font-weight: 900; }
+                        Text { text: "Troco a Devolver:"; color: Theme.text-muted; font-size: 13px; font-weight: 700; horizontal-stretch: 1; }
+                        Text { text: MesasModalStore.c-change; color: Theme.available; font-size: 13px; font-weight: 900; }
                     }
                 }
             }
@@ -1532,7 +1546,7 @@ component CheckoutSheet inherits Sheet {
                     width: parent.width - 24px;
                     spacing: 8px;
                     Icon { source: Icons.circle-alert; color: Theme.danger; size: 16px; }
-                    Text { text: MesasModalStore.c-over-warning; color: Theme.danger; font-size: 12px; wrap: word-wrap; horizontal-stretch: 1; }
+                    Text { text: MesasModalStore.c-over-warning; color: Theme.danger; font-size: 13px; wrap: word-wrap; horizontal-stretch: 1; }
                 }
             }
             if MesasModalStore.c-partial-warning != "": Rectangle {
@@ -1546,7 +1560,7 @@ component CheckoutSheet inherits Sheet {
                     width: parent.width - 24px;
                     spacing: 8px;
                     Icon { source: Icons.circle-alert; color: Theme.occupied; size: 16px; }
-                    Text { text: MesasModalStore.c-partial-warning; color: Theme.occupied; font-size: 12px; wrap: word-wrap; horizontal-stretch: 1; }
+                    Text { text: MesasModalStore.c-partial-warning; color: Theme.occupied; font-size: 13px; wrap: word-wrap; horizontal-stretch: 1; }
                 }
             }
             if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
@@ -1645,8 +1659,8 @@ component HistorySheet inherits Sheet {
                                     Text { text: r.place; color: Theme.text; font-weight: 800; overflow: elide; }
                                     if r.loss: Pill { text: "Calote / Perda"; tone: Theme.danger; }
                                 }
-                                Text { text: r.when; color: Theme.text-muted; font-size: 11px; }
-                                Text { text: r.info; color: Theme.text-muted; font-size: 11px; overflow: elide; }
+                                Text { text: r.when; color: Theme.text-muted; font-size: 13px; }
+                                Text { text: r.info; color: Theme.text-muted; font-size: 13px; overflow: elide; }
                             }
                             Text { text: r.total; color: r.loss ? Theme.danger : Theme.available; font-size: 15px; font-weight: 900; vertical-alignment: center; }
                         }
@@ -1708,10 +1722,10 @@ component HistorySheet inherits Sheet {
                                 VerticalLayout {
                                     horizontal-stretch: 1;
                                     Text { text: l.name; color: Theme.text; font-weight: 700; wrap: word-wrap; }
-                                    if l.modifiers != "": Text { text: l.modifiers; color: Theme.occupied; font-size: 11px; wrap: word-wrap; }
-                                    if l.notes != "": Text { text: "Obs: " + l.notes; color: Theme.closing; font-size: 11px; wrap: word-wrap; }
+                                    if l.modifiers != "": Text { text: l.modifiers; color: Theme.occupied; font-size: 13px; wrap: word-wrap; }
+                                    if l.notes != "": Text { text: "Obs: " + l.notes; color: Theme.closing; font-size: 13px; wrap: word-wrap; }
                                 }
-                                Text { text: l.quantity + " × " + l.unit-info; color: Theme.text-muted; font-size: 12px; }
+                                Text { text: l.quantity + " × " + l.unit-info; color: Theme.text-muted; font-size: 13px; }
                                 Text { text: l.total; color: Theme.text; font-weight: 800; min-width: 80px; horizontal-alignment: right; }
                             }
                         }
@@ -1731,8 +1745,8 @@ component HistorySheet inherits Sheet {
                                 Rectangle { height: 1px; background: Theme.surface-2; }
                                 Label { text: "FORMAS DE PAGAMENTO REGISTRADAS"; }
                                 for p in MesasModalStore.h-payments: HorizontalLayout {
-                                    Text { text: p.when; color: Theme.text-muted; font-size: 12px; horizontal-stretch: 1; overflow: elide; }
-                                    Text { text: p.amount; color: Theme.text; font-size: 12px; font-weight: 700; }
+                                    Text { text: p.when; color: Theme.text-muted; font-size: 13px; horizontal-stretch: 1; overflow: elide; }
+                                    Text { text: p.amount; color: Theme.text; font-size: 13px; font-weight: 700; }
                                 }
                             }
                         }
@@ -1755,7 +1769,7 @@ component CapacityPicker inherits HorizontalLayout {
         height: 32px;
         border-radius: 8px;
         background: root.value == n ? Theme.primary : (cp.has-hover ? Theme.border : Theme.surface-2);
-        Text { text: n; color: root.value == n ? Theme.primary-text : Theme.text; font-size: 12px; font-weight: 800; }
+        Text { text: n; color: root.value == n ? Theme.primary-text : Theme.text; font-size: 13px; font-weight: 800; }
         cp := TouchArea { clicked => { root.value = n; } }
     }
 }
@@ -1855,7 +1869,7 @@ component ManageSheet inherits Sheet {
                                 HorizontalLayout {
                                     spacing: 4px;
                                     Icon { source: Icons.users; color: Theme.text-muted; size: 13px; y: (parent.height - self.height) / 2; }
-                                    Text { text: t.capacity + " lugares"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                                    Text { text: t.capacity + " lugares"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                                 }
                                 if !t.free: Pill { y: (parent.height - self.height) / 2; text: "Ocupada"; tone: Theme.occupied; }
                                 if MesasModalStore.g-deleting-id != t.id: Btn {
@@ -1938,7 +1952,7 @@ component WaitersSheet inherits Sheet {
                 VerticalLayout { width: 110px; spacing: 4px; Label { text: "CÓDIGO"; } LineEdit { height: 40px; placeholder-text: "Ex: 01"; text <=> MesasModalStore.w-code; } }
                 VerticalLayout { width: 130px; spacing: 4px; Label { text: "COMISSÃO (%)"; } LineEdit { height: 40px; input-type: decimal; text <=> MesasModalStore.w-commission; } }
             }
-            if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+            if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
             HorizontalLayout {
                 spacing: 8px;
                 alignment: end;
@@ -1983,7 +1997,7 @@ component WaitersSheet inherits Sheet {
                             if w.code != "": Pill { text: "#" + w.code; tone: Theme.text-muted; }
                             if !w.active: Pill { text: "Inativo"; tone: Theme.danger; }
                         }
-                        Text { text: "Comissão: " + w.commission; color: Theme.text-muted; font-size: 12px; }
+                        Text { text: "Comissão: " + w.commission; color: Theme.text-muted; font-size: 13px; }
                     }
                     if MesasModalStore.w-deleting-id != w.id: Btn { y: (parent.height - self.height) / 2; text: w.active ? "Desativar" : "Ativar"; clicked => { MesasModalStore.w-toggle(w.id); } }
                     if MesasModalStore.w-deleting-id != w.id: Btn { y: (parent.height - self.height) / 2; text: "Editar"; icon: Icons.pencil; has-icon: true; clicked => { MesasModalStore.w-edit(w.id); } }
@@ -2062,12 +2076,12 @@ component StaffSheet inherits Sheet {
                         VerticalLayout {
                             alignment: center;
                             Text { text: perm.label; color: Theme.text; font-weight: 800; }
-                            Text { text: perm.desc; color: Theme.text-muted; font-size: 11px; }
+                            Text { text: perm.desc; color: Theme.text-muted; font-size: 13px; }
                         }
                     }
                     TouchArea { clicked => { MesasModalStore.s-toggle-perm(pi); } }
                 }
-                if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+                if MesasModalStore.error != "": Text { text: MesasModalStore.error; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
                 HorizontalLayout {
                     spacing: 8px;
                     alignment: end;
@@ -2101,8 +2115,8 @@ component StaffSheet inherits Sheet {
                             Text { text: st.name; color: Theme.text; font-weight: 900; horizontal-stretch: 1; overflow: elide; }
                             if !st.active: Pill { text: "Desativado"; tone: Theme.danger; }
                         }
-                        Text { text: st.role; color: Theme.primary; font-size: 12px; font-weight: 700; }
-                        Text { text: st.perms; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                        Text { text: st.role; color: Theme.primary; font-size: 13px; font-weight: 700; }
+                        Text { text: st.perms; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                         HorizontalLayout {
                             spacing: 6px;
                             alignment: end;
@@ -2114,7 +2128,7 @@ component StaffSheet inherits Sheet {
                         }
                     }
                 }
-                Text { text: "O único Administrador ativo não pode ser excluído nem desativado."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                Text { text: "O único Administrador ativo não pode ser excluído nem desativado."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
             }
         }
     }
@@ -2132,7 +2146,7 @@ component ConnectSheet inherits Sheet {
         padding: 22px;
         spacing: 12px;
         Text { text: "Conecte o celular na mesma rede Wi-Fi do computador do caixa e aponte a câmera para o QR Code."; color: Theme.text; wrap: word-wrap; }
-        Text { text: "Abra o app no celular. Na tela de IP, digite " + MesasModalStore.x-status + " e clique em Salvar e Conectar. Ou abra o Chrome no celular e acesse direto: " + MesasModalStore.x-url; color: Theme.text-muted; font-size: 12px; wrap: word-wrap; }
+        Text { text: "Abra o app no celular. Na tela de IP, digite " + MesasModalStore.x-status + " e clique em Salvar e Conectar. Ou abra o Chrome no celular e acesse direto: " + MesasModalStore.x-url; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
         HorizontalLayout {
             spacing: 18px;
             Rectangle {
@@ -2147,7 +2161,7 @@ component ConnectSheet inherits Sheet {
                 alignment: center;
                 Label { text: "IP DO COMPUTADOR DO CAIXA:"; }
                 Text { text: MesasModalStore.x-url; color: Theme.primary; font-size: 20px; font-weight: 900; wrap: word-wrap; }
-                for ip in MesasModalStore.x-ips: Text { text: ip; color: Theme.text-muted; font-size: 12px; }
+                for ip in MesasModalStore.x-ips: Text { text: ip; color: Theme.text-muted; font-size: 13px; }
             }
         }
         Card {
@@ -2156,8 +2170,8 @@ component ConnectSheet inherits Sheet {
                 padding: 12px;
                 spacing: 4px;
                 Text { text: "O celular não achou o computador? (Firewall do Windows)"; color: Theme.text; font-weight: 800; }
-                Text { text: "Abra o Prompt de Comando (CMD) como Administrador e rode:"; color: Theme.text-muted; font-size: 12px; }
-                Text { text: "netsh advfirewall firewall add rule name=\"BarERP\" dir=in action=allow protocol=TCP localport=3001"; color: Theme.closing; font-size: 11px; font-family: "Menlo"; wrap: word-wrap; }
+                Text { text: "Abra o Prompt de Comando (CMD) como Administrador e rode:"; color: Theme.text-muted; font-size: 13px; }
+                Text { text: "netsh advfirewall firewall add rule name=\"BarERP\" dir=in action=allow protocol=TCP localport=3001"; color: Theme.closing; font-size: 13px; font-family: "Menlo"; wrap: word-wrap; }
             }
         }
         HorizontalLayout { alignment: end; Btn { text: "Fechar"; clicked => { MesasModalStore.close(); } } }

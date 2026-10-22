@@ -24,11 +24,11 @@ component Metrica inherits Rectangle {
         padding: 18px;
         spacing: 4px;
         HorizontalLayout {
-            Text { text: root.rotulo; color: Theme.text-muted; font-size: 11px; font-weight: 900; horizontal-stretch: 1; }
+            Text { text: root.rotulo; color: Theme.text-muted; font-size: 13px; font-weight: 900; horizontal-stretch: 1; }
             Icon { source: root.icone; color: FxCores.de(root.cor); size: 16px; }
         }
         Text { text: root.valor; color: root.cor == FxCor.neutro ? Theme.text : FxCores.de(root.cor); font-size: 28px; font-weight: 900; }
-        Text { text: root.legenda; color: Theme.text-muted; font-size: 11px; }
+        Text { text: root.legenda; color: Theme.text-muted; font-size: 13px; }
     }
     t := TouchArea { mouse-cursor: root.clicavel ? pointer : default; clicked => { root.clicked(); } }
 }
@@ -80,26 +80,26 @@ component LinhaPendente inherits Rectangle {
                         alignment: center;
                         spacing: 6px;
                         VerticalLayout { alignment: center; Bolinha { verde: root.n.xml; } }
-                        Text { text: root.n.xml ? "XML Baixado" : "XML Pendente"; color: root.n.xml ? Theme.available : Theme.closing; font-size: 11px; font-weight: 800; vertical-alignment: center; }
+                        Text { text: root.n.xml ? "XML Baixado" : "XML Pendente"; color: root.n.xml ? Theme.available : Theme.closing; font-size: 13px; font-weight: 800; vertical-alignment: center; }
                     }
                 }
                 FxBadge {
                     text: root.n.estado == 0 ? "PENDENTE (AGUARDANDO 1º BIP)" : root.n.estado == 1 ? "RECEBIDA (AGUARDANDO 2º BIP)" : "FINALIZADA (NO ESTOQUE)";
                     cor: root.n.estado == 0 ? FxCor.ambar : root.n.estado == 1 ? FxCor.azul : FxCor.verde;
                 }
-                Text { text: root.n.nf; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                Text { text: root.n.nf; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
             }
             HorizontalLayout {
                 spacing: 8px;
                 alignment: start;
                 VerticalLayout { alignment: center; Icon { source: FiscalIcons.building-2; color: Theme.text-muted; size: 15px; } }
                 Text { text: root.n.emitente; color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; overflow: elide; }
-                if root.n.cnpj != "": Text { text: "• CNPJ: " + root.n.cnpj; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
+                if root.n.cnpj != "": Text { text: "• CNPJ: " + root.n.cnpj; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
             }
             HorizontalLayout {
                 spacing: 8px;
                 alignment: start;
-                Text { text: root.n.chave-fmt; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; vertical-alignment: center; }
+                Text { text: root.n.chave-fmt; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; vertical-alignment: center; }
                 Rectangle {
                     width: 26px;
                     height: 22px;
@@ -108,7 +108,7 @@ component LinhaPendente inherits Rectangle {
                     Icon { source: FiscalStore.pd-copiada == root.n.chave ? FiscalIcons.check : FiscalIcons.copy; color: FiscalStore.pd-copiada == root.n.chave ? Theme.available : Theme.text-muted; size: 13px; }
                     c := TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.pd-copiar(root.n.chave); } }
                 }
-                Text { text: "•  Emissão: " + root.n.data; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                Text { text: "•  Emissão: " + root.n.data; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
             }
         }
         VerticalLayout {
@@ -245,7 +245,7 @@ export component NotasPendentes inherits Rectangle {
                         spacing: 8px;
                         alignment: start;
                         VerticalLayout { alignment: center; Icon { source: FiscalIcons.calendar; color: Theme.text-muted; size: 14px; } }
-                        Text { text: "Período rápido:"; color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                        Text { text: "Período rápido:"; color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                         FxButton { text: "Hoje"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-periodo("hoje"); } }
                         FxButton { text: "Últimos 7 dias"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-periodo("7d"); } }
                         FxButton { text: "Últimos 30 dias"; tipo: FxBotao.fantasma; clicked => { FiscalStore.pd-periodo("30d"); } }
@@ -255,17 +255,17 @@ export component NotasPendentes inherits Rectangle {
             }
             HorizontalLayout {
                 spacing: 18px;
-                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: true; } } Text { text: "Bolinha Verde: XML baixado e pronto para entrada"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; } }
-                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: false; } } Text { text: "Bolinha Amarela: XML pendente de liberação SEFAZ"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; } }
+                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: true; } } Text { text: "Bolinha Verde: XML baixado e pronto para entrada"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; } }
+                HorizontalLayout { spacing: 6px; VerticalLayout { alignment: center; Bolinha { verde: false; } } Text { text: "Bolinha Amarela: XML pendente de liberação SEFAZ"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; } }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: "Exibindo " + FiscalStore.pd-notas.length + " de " + FiscalStore.pd-total + " notas"; color: Theme.text-muted; font-size: 11px; font-weight: 700; }
+                Text { text: "Exibindo " + FiscalStore.pd-notas.length + " de " + FiscalStore.pd-total + " notas"; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
             }
             if FiscalStore.pd-carregando: VerticalLayout {
                 padding: 40px;
                 spacing: 6px;
                 HorizontalLayout { alignment: center; Icon { source: FiscalIcons.refresh-cw; color: Theme.closing; size: 30px; } }
                 Text { text: "Carregando notas pendentes..."; color: Theme.text; font-size: 14px; font-weight: 800; horizontal-alignment: center; }
-                Text { text: "Consultando registros e status fiscais"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; }
+                Text { text: "Consultando registros e status fiscais"; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
             }
             if !FiscalStore.pd-carregando && FiscalStore.pd-notas.length == 0: FxCard {
                 height: vazio.preferred-height;

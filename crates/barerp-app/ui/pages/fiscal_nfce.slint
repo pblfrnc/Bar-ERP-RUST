@@ -14,7 +14,7 @@ component Kbd inherits Rectangle {
     background: Theme.surface-2;
     border-width: 1px;
     border-color: Theme.border;
-    k := Text { text: root.text; color: Theme.text; font-size: 10px; font-weight: 800; }
+    k := Text { text: root.text; color: Theme.text; font-size: 12px; font-weight: 800; }
 }
 
 component QtdBotao inherits Rectangle {
@@ -44,7 +44,7 @@ component LinhaItem inherits Rectangle {
             HorizontalLayout {
                 spacing: 8px;
                 Text { text: root.item.nome; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
-                if root.item.codigo != "": Text { text: "#" + root.item.codigo; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; vertical-alignment: center; }
+                if root.item.codigo != "": Text { text: "#" + root.item.codigo; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; vertical-alignment: center; }
             }
             HorizontalLayout {
                 spacing: 8px;
@@ -88,9 +88,9 @@ export component BuscaProdutos inherits FxCard {
                 spacing: 8px;
                 VerticalLayout { alignment: center; Icon { source: FiscalIcons.search; color: Theme.text-muted; size: 14px; } }
                 FxLabel { text: "BUSCA RÁPIDA DE PRODUTOS (INICIAIS, CÓDIGO OU BARCODE)"; horizontal-stretch: 1; vertical-alignment: center; }
-                Text { text: "Pressione"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                Text { text: "Pressione"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
                 VerticalLayout { alignment: center; Kbd { text: "Enter"; } }
-                Text { text: "para adicionar"; color: Theme.text-muted; font-size: 11px; vertical-alignment: center; }
+                Text { text: "para adicionar"; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; }
             }
             HorizontalLayout {
                 spacing: 8px;
@@ -109,7 +109,7 @@ export component BuscaProdutos inherits FxCard {
                 }
                 if FiscalStore.nf-busca != "": HorizontalLayout {
                     spacing: 8px;
-                    Text { text: FiscalStore.nf-qtd-encontrados + (FiscalStore.nf-qtd-encontrados == 1 ? " item" : " itens"); color: Theme.text-muted; font-size: 12px; font-weight: 700; vertical-alignment: center; }
+                    Text { text: FiscalStore.nf-qtd-encontrados + (FiscalStore.nf-qtd-encontrados == 1 ? " item" : " itens"); color: Theme.text-muted; font-size: 13px; font-weight: 700; vertical-alignment: center; }
                     FxButton { text: "×"; font-size: 18px; tipo: FxBotao.fantasma; clicked => { FiscalStore.nf-busca = ""; FiscalStore.nf-lista-aberta = false; busca.focus(); } }
                 }
             }
@@ -140,21 +140,21 @@ export component BuscaProdutos inherits FxCard {
                                 HorizontalLayout {
                                     spacing: 8px;
                                     Text { text: p.nome; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
-                                    if p.codigo != "": Text { text: "#" + p.codigo; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; vertical-alignment: center; }
+                                    if p.codigo != "": Text { text: "#" + p.codigo; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; vertical-alignment: center; }
                                 }
                                 HorizontalLayout {
                                     spacing: 10px;
                                     alignment: start;
-                                    if p.marca != "": Text { text: p.marca; color: Theme.text-muted; font-size: 11px; }
-                                    if p.ncm != "": Text { text: "NCM: " + p.ncm; color: Theme.text-muted; font-size: 11px; }
-                                    if p.cfop != "": Text { text: "CFOP: " + p.cfop; color: Theme.text-muted; font-size: 11px; }
+                                    if p.marca != "": Text { text: p.marca; color: Theme.text-muted; font-size: 13px; }
+                                    if p.ncm != "": Text { text: "NCM: " + p.ncm; color: Theme.text-muted; font-size: 13px; }
+                                    if p.cfop != "": Text { text: "CFOP: " + p.cfop; color: Theme.text-muted; font-size: 13px; }
                                 }
                             }
                             Text { text: p.preco; color: Theme.available; font-size: 14px; font-weight: 900; vertical-alignment: center; }
                             HorizontalLayout {
                                 spacing: 4px;
                                 VerticalLayout { alignment: center; Icon { source: FiscalIcons.plus; color: Theme.primary; size: 14px; } }
-                                Text { text: "Adicionar"; color: Theme.primary; font-size: 12px; font-weight: 800; vertical-alignment: center; }
+                                Text { text: "Adicionar"; color: Theme.primary; font-size: 13px; font-weight: 800; vertical-alignment: center; }
                             }
                         }
                         tp := TouchArea { mouse-cursor: pointer; clicked => { FiscalStore.nf-adicionar(i); busca.focus(); } }
@@ -183,7 +183,7 @@ export component ItensNota inherits FxCard {
                 spacing: 8px;
                 HorizontalLayout { alignment: center; Icon { source: FiscalIcons.package; color: Theme.text-muted; size: 36px; } }
                 Text { text: "Nenhum produto adicionado ainda"; color: Theme.text; font-size: 14px; font-weight: 800; horizontal-alignment: center; }
-                Text { text: root.vazio; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; wrap: word-wrap; }
+                Text { text: root.vazio; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; wrap: word-wrap; }
             }
             if FiscalStore.nf-itens.length > 0: HorizontalLayout {
                 padding-left: 12px;
@@ -281,7 +281,7 @@ export component EmissorNfce inherits Rectangle {
                                         : FiscalStore.nf-doc-ok != "" ? FiscalStore.nf-doc-ok
                                         : "Se informado, o cupom fiscal constará o documento do comprador.";
                                     color: FiscalStore.nf-doc-erro != "" ? Theme.danger : FiscalStore.nf-doc-ok != "" ? Theme.available : Theme.text-muted;
-                                    font-size: 11px;
+                                    font-size: 13px;
                                     wrap: word-wrap;
                                 }
                             }
@@ -310,7 +310,7 @@ export component EmissorNfce inherits Rectangle {
                                 VerticalLayout {
                                     horizontal-stretch: 1;
                                     FxLabel { text: "TOTAL A EMITIR"; }
-                                    Text { text: FiscalStore.nf-unidades + " itens adicionados"; color: Theme.text-muted; font-size: 11px; }
+                                    Text { text: FiscalStore.nf-unidades + " itens adicionados"; color: Theme.text-muted; font-size: 13px; }
                                 }
                                 Text { text: FiscalStore.nf-total; color: Theme.text; font-size: 28px; font-weight: 900; vertical-alignment: center; }
                             }
@@ -323,7 +323,7 @@ export component EmissorNfce inherits Rectangle {
                                 enabled: !FiscalStore.nf-emitindo && FiscalStore.nf-itens.length > 0;
                                 clicked => { FiscalStore.nf-emitir(); }
                             }
-                            Text { text: "Ao clicar em emitir, os dados dos produtos, NCM, tributos e pagamento são assinados com certificado digital A1 e validados pelos servidores da SEFAZ estadual."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; horizontal-alignment: center; }
+                            Text { text: "Ao clicar em emitir, os dados dos produtos, NCM, tributos e pagamento são assinados com certificado digital A1 e validados pelos servidores da SEFAZ estadual."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; horizontal-alignment: center; }
                         }
                     }
                 }
@@ -377,16 +377,16 @@ export component EmissorNfce inherits Rectangle {
                             Text { text: FiscalStore.nf-venda.total; color: Theme.text; font-size: 22px; font-weight: 900; }
                         }
                         HorizontalLayout {
-                            Text { text: "Forma de Pagamento:"; color: Theme.text-muted; font-size: 12px; horizontal-stretch: 1; }
-                            Text { text: FiscalStore.nf-venda.forma; color: Theme.text; font-size: 12px; font-weight: 800; }
+                            Text { text: "Forma de Pagamento:"; color: Theme.text-muted; font-size: 13px; horizontal-stretch: 1; }
+                            Text { text: FiscalStore.nf-venda.forma; color: Theme.text; font-size: 13px; font-weight: 800; }
                         }
                         if FiscalStore.nf-venda.chave != "": VerticalLayout {
                             spacing: 4px;
                             HorizontalLayout {
                                 FxLabel { text: "CHAVE DE ACESSO SEFAZ"; horizontal-stretch: 1; vertical-alignment: center; }
-                                FxButton { text: FiscalStore.nf-copiada ? "✓ Copiado!" : "Copiar Chave"; icone: FiscalStore.nf-copiada ? FiscalIcons.check : FiscalIcons.copy; tipo: FxBotao.fantasma; font-size: 12px; clicked => { FiscalStore.nf-copiar-chave(); } }
+                                FxButton { text: FiscalStore.nf-copiada ? "✓ Copiado!" : "Copiar Chave"; icone: FiscalStore.nf-copiada ? FiscalIcons.check : FiscalIcons.copy; tipo: FxBotao.fantasma; font-size: 13px; clicked => { FiscalStore.nf-copiar-chave(); } }
                             }
-                            Text { text: FiscalStore.nf-venda.chave; color: Theme.text; font-size: 11px; font-family: "Menlo"; wrap: word-wrap; }
+                            Text { text: FiscalStore.nf-venda.chave; color: Theme.text; font-size: 13px; font-family: "Menlo"; wrap: word-wrap; }
                         }
                     }
                 }
@@ -423,8 +423,8 @@ export component EmissorNfce inherits Rectangle {
                             clicked => { FiscalStore.nf-enviar-email(); }
                         }
                     }
-                    if FiscalStore.nf-email-ok: Text { text: "✓ E-mail com XML e DANFE enviado com sucesso!"; color: Theme.available; font-size: 12px; font-weight: 700; }
-                    if FiscalStore.nf-email-erro != "": Text { text: FiscalStore.nf-email-erro; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+                    if FiscalStore.nf-email-ok: Text { text: "✓ E-mail com XML e DANFE enviado com sucesso!"; color: Theme.available; font-size: 13px; font-weight: 700; }
+                    if FiscalStore.nf-email-erro != "": Text { text: FiscalStore.nf-email-erro; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
                 }
                 FxButton {
                     text: "Nova Venda (Zerar)   Enter";

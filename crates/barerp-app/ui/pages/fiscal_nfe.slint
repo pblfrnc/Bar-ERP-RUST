@@ -12,7 +12,7 @@ component Rotulo inherits HorizontalLayout {
     in property <bool> obrigatorio;
     spacing: 6px;
     FxLabel { text: root.text; horizontal-stretch: 1; }
-    if root.obrigatorio: Text { text: "OBRIGATÓRIO"; color: Theme.danger; font-size: 9px; font-weight: 900; }
+    if root.obrigatorio: Text { text: "OBRIGATÓRIO"; color: Theme.danger; font-size: 11px; font-weight: 900; }
 }
 
 export component EmissaoNfe inherits Rectangle {
@@ -82,14 +82,14 @@ export component EmissaoNfe inherits Rectangle {
                                 VerticalLayout {
                                     horizontal-stretch: 1;
                                     Text { text: "Identificação do Destinatário"; color: Theme.text; font-size: 15px; font-weight: 900; }
-                                    Text { text: "Exigência obrigatória da SEFAZ para NF-e (Modelo 55)"; color: Theme.text-muted; font-size: 11px; }
+                                    Text { text: "Exigência obrigatória da SEFAZ para NF-e (Modelo 55)"; color: Theme.text-muted; font-size: 13px; }
                                 }
                             }
                             VerticalLayout {
                                 spacing: 6px;
                                 HorizontalLayout {
                                     FxLabel { text: "CPF / CNPJ DO COMPRADOR *"; horizontal-stretch: 1; }
-                                    if FiscalStore.ne-buscando-doc: Text { text: "Buscando Receita..."; color: Theme.occupied; font-size: 11px; font-weight: 700; }
+                                    if FiscalStore.ne-buscando-doc: Text { text: "Buscando Receita..."; color: Theme.occupied; font-size: 13px; font-weight: 700; }
                                 }
                                 HorizontalLayout {
                                     spacing: 8px;
@@ -118,7 +118,7 @@ export component EmissaoNfe inherits Rectangle {
                                 spacing: 6px;
                                 Rotulo { text: "NOME DO CLIENTE OU RAZÃO SOCIAL *"; obrigatorio: true; }
                                 FxInput { text <=> FiscalStore.ne-nome; placeholder: "Ex: João da Silva ou Bar e Restaurante LTDA"; }
-                                Text { text: "Nome completo exigido pela SEFAZ para autorização da NF-e Modelo 55."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; }
+                                Text { text: "Nome completo exigido pela SEFAZ para autorização da NF-e Modelo 55."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; }
                             }
                             VerticalLayout {
                                 spacing: 10px;
@@ -126,7 +126,7 @@ export component EmissaoNfe inherits Rectangle {
                                     spacing: 6px;
                                     VerticalLayout { alignment: center; Icon { source: FiscalIcons.map-pin; color: Theme.text-muted; size: 13px; } }
                                     FxLabel { text: "ENDEREÇO DO DESTINATÁRIO *"; horizontal-stretch: 1; vertical-alignment: center; }
-                                    Text { text: FiscalStore.ne-doc.character-count == 18 ? "Preenchido pela Receita" : "Preencha o CEP para auto-completar"; color: Theme.text-muted; font-size: 10px; vertical-alignment: center; }
+                                    Text { text: FiscalStore.ne-doc.character-count == 18 ? "Preenchido pela Receita" : "Preencha o CEP para auto-completar"; color: Theme.text-muted; font-size: 12px; vertical-alignment: center; }
                                 }
                                 HorizontalLayout {
                                     spacing: 10px;
@@ -173,7 +173,7 @@ export component EmissaoNfe inherits Rectangle {
                                 VerticalLayout {
                                     horizontal-stretch: 1;
                                     FxLabel { text: "TOTAL A EMITIR"; }
-                                    Text { text: FiscalStore.nf-unidades + " itens adicionados"; color: Theme.text-muted; font-size: 11px; }
+                                    Text { text: FiscalStore.nf-unidades + " itens adicionados"; color: Theme.text-muted; font-size: 13px; }
                                 }
                                 Text { text: FiscalStore.nf-total; color: Theme.text; font-size: 28px; font-weight: 900; vertical-alignment: center; }
                             }
@@ -186,7 +186,7 @@ export component EmissaoNfe inherits Rectangle {
                                 enabled: !FiscalStore.nf-emitindo && FiscalStore.nf-itens.length > 0;
                                 clicked => { FiscalStore.ne-emitir(); }
                             }
-                            Text { text: "A NF‑e (Modelo 55) é assinada digitalmente com certificado A1 e transmitida à SEFAZ com os dados fiscais do comprador e tributação homologada."; color: Theme.text-muted; font-size: 11px; wrap: word-wrap; horizontal-alignment: center; }
+                            Text { text: "A NF‑e (Modelo 55) é assinada digitalmente com certificado A1 e transmitida à SEFAZ com os dados fiscais do comprador e tributação homologada."; color: Theme.text-muted; font-size: 13px; wrap: word-wrap; horizontal-alignment: center; }
                         }
                     }
                 }
@@ -247,16 +247,16 @@ export component EmissaoNfe inherits Rectangle {
                             Text { text: FiscalStore.ne-nota.total; color: Theme.text; font-size: 22px; font-weight: 900; }
                         }
                         HorizontalLayout {
-                            Text { text: "Forma de Pagamento:"; color: Theme.text-muted; font-size: 12px; horizontal-stretch: 1; }
-                            Text { text: FiscalStore.ne-nota.forma; color: Theme.text; font-size: 12px; font-weight: 800; }
+                            Text { text: "Forma de Pagamento:"; color: Theme.text-muted; font-size: 13px; horizontal-stretch: 1; }
+                            Text { text: FiscalStore.ne-nota.forma; color: Theme.text; font-size: 13px; font-weight: 800; }
                         }
                         if FiscalStore.ne-nota.chave != "": VerticalLayout {
                             spacing: 4px;
                             HorizontalLayout {
                                 FxLabel { text: "CHAVE DE ACESSO SEFAZ"; horizontal-stretch: 1; vertical-alignment: center; }
-                                FxButton { text: FiscalStore.nf-copiada ? "✓ Copiado!" : "Copiar Chave"; icone: FiscalStore.nf-copiada ? FiscalIcons.check : FiscalIcons.copy; tipo: FxBotao.fantasma; font-size: 12px; clicked => { FiscalStore.nf-copiar-chave(); } }
+                                FxButton { text: FiscalStore.nf-copiada ? "✓ Copiado!" : "Copiar Chave"; icone: FiscalStore.nf-copiada ? FiscalIcons.check : FiscalIcons.copy; tipo: FxBotao.fantasma; font-size: 13px; clicked => { FiscalStore.nf-copiar-chave(); } }
                             }
-                            Text { text: FiscalStore.ne-nota.chave; color: Theme.text; font-size: 11px; font-family: "Menlo"; wrap: word-wrap; }
+                            Text { text: FiscalStore.ne-nota.chave; color: Theme.text; font-size: 13px; font-family: "Menlo"; wrap: word-wrap; }
                         }
                     }
                 }
@@ -282,8 +282,8 @@ export component EmissaoNfe inherits Rectangle {
                         FxInput { horizontal-stretch: 1; text <=> FiscalStore.nf-email; placeholder: "email.do.cliente@exemplo.com"; accepted => { FiscalStore.nf-enviar-email(); } }
                         FxButton { text: "Enviar"; icone: FiscalIcons.send; busy: FiscalStore.nf-enviando-email; enabled: FiscalStore.nf-email != ""; clicked => { FiscalStore.nf-enviar-email(); } }
                     }
-                    if FiscalStore.nf-email-ok: Text { text: "✓ E-mail com XML e DANFE enviado com sucesso!"; color: Theme.available; font-size: 12px; font-weight: 700; }
-                    if FiscalStore.nf-email-erro != "": Text { text: FiscalStore.nf-email-erro; color: Theme.danger; font-size: 12px; wrap: word-wrap; }
+                    if FiscalStore.nf-email-ok: Text { text: "✓ E-mail com XML e DANFE enviado com sucesso!"; color: Theme.available; font-size: 13px; font-weight: 700; }
+                    if FiscalStore.nf-email-erro != "": Text { text: FiscalStore.nf-email-erro; color: Theme.danger; font-size: 13px; wrap: word-wrap; }
                 }
                 FxButton {
                     text: "Nova Emissão (Zerar)   Enter";
