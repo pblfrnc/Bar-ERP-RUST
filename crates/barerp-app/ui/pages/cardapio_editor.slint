@@ -303,7 +303,9 @@ export component ProductEditor inherits Rectangle {
                     spacing: 14px;
 
                     // ================= COLUNA ESQUERDA =================
+                    // Largura mínima zerada: com a letra maior, o mínimo calculado das colunas passava da janela
                     VerticalLayout {
+                        min-width: 0px;
                         horizontal-stretch: 7;
                         spacing: 14px;
                         alignment: start;
@@ -754,6 +756,7 @@ export component ProductEditor inherits Rectangle {
 
                     // ================= COLUNA DIREITA =================
                     VerticalLayout {
+                        min-width: 0px;
                         horizontal-stretch: 5;
                         spacing: 14px;
                         alignment: start;

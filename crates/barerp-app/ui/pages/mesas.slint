@@ -273,7 +273,7 @@ component MesaTile inherits Rectangle {
                 background: Theme.surface-2;
                 Icon { source: Icons.users; color: body.has-hover ? Theme.available : Theme.text-muted; size: 22px; }
             }
-            Text { text: "Capacidade: " + data.capacity + " lugares"; color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
+            Text { text: "Capacidade: " + data.capacity + (data.capacity == 1 ? " lugar" : " lugares"); color: Theme.text-muted; font-size: 13px; horizontal-alignment: center; }
         }
 
         if !root.free: VerticalLayout {
@@ -384,7 +384,7 @@ component PlanTile inherits Rectangle {
                 }
             }
         }
-        if root.free: Text { text: data.capacity + " lugares"; color: Theme.text-muted; font-size: 13px; }
+        if root.free: Text { text: data.capacity + (data.capacity == 1 ? " lugar" : " lugares"); color: Theme.text-muted; font-size: 13px; }
         if !root.free: Text { text: data.total; color: Theme.available; font-size: 16px; font-weight: 900; overflow: elide; }
         if !root.free: Text {
             text: root.idle ? data.idle + " sem pedir" : data.elapsed;
@@ -452,7 +452,7 @@ export component MesasAreaPage inherits Rectangle {
                     LineEdit {
                         horizontal-stretch: 1;
                         height: 42px;
-                        placeholder-text: "Buscar mesa ou cliente — ou digite o número da mesa e Enter em qualquer lugar";
+                        placeholder-text: "Buscar mesa ou cliente (ou digite o nº da mesa + Enter)";
                         text <=> MesasStore.search;
                         edited => { MesasStore.filters-changed(); }
                     }
@@ -541,8 +541,8 @@ export component MesasAreaPage inherits Rectangle {
                 property <length> pw: 136px;
                 property <length> ph: 112px;
                 if MesasStore.plan-edit: Text {
-                    x: 16px;
-                    y: 12px;
+                    x: parent.width - self.width - 16px;
+                    y: parent.height - self.height - 12px;
                     text: "Arraste as mesas para a posição real do salão e toque em Pronto";
                     color: Theme.primary;
                     font-size: 14px;

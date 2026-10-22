@@ -352,21 +352,6 @@ export component RetaguardaDashboard inherits Rectangle {
                             }
                             GhostButton { icon: RtIcons.chevron-right; pad: 10px; width: 40px; enabled: !RetaguardaStore.d-is-today; clicked => { RetaguardaStore.d-shift-day(1); } }
                             if !RetaguardaStore.d-is-today: GhostButton { text: "Hoje"; clicked => { RetaguardaStore.d-today(); } }
-                            Rectangle {
-                                height: 46px;
-                                width: periods.preferred-width + 8px;
-                                border-radius: 12px;
-                                background: Theme.dark ? Theme.bg : #e2e8f0;
-                                periods := HorizontalLayout {
-                                    x: 4px;
-                                    spacing: 2px;
-                                    alignment: center;
-                                    PeriodButton { text: "Dia"; active: RetaguardaStore.d-period == 1; clicked => { RetaguardaStore.d-set-period(1); } }
-                                    PeriodButton { text: "7 dias"; active: RetaguardaStore.d-period == 7; clicked => { RetaguardaStore.d-set-period(7); } }
-                                    PeriodButton { text: "30 dias"; active: RetaguardaStore.d-period == 30; clicked => { RetaguardaStore.d-set-period(30); } }
-                                }
-                            }
-                            if !RetaguardaStore.d-audit-tab: GhostButton { icon: RtIcons.download; text: "Exportar"; clicked => { RetaguardaStore.d-export(); } }
                             GhostButton {
                                 icon: RtIcons.refresh;
                                 spin: RetaguardaStore.d-loading;
@@ -379,15 +364,17 @@ export component RetaguardaDashboard inherits Rectangle {
                 }
             }
 
-            // Abas
+            // Abas, período e exportação
             HorizontalLayout {
-                alignment: start;
+                spacing: 10px;
                 Rectangle {
+                    horizontal-stretch: 0;
+                    width: tabs-row.preferred-width;
                     border-radius: 16px;
                     background: Theme.dark ? Theme.surface : #f1f5f9;
                     border-width: 1px;
                     border-color: Theme.surface-2;
-                    HorizontalLayout {
+                    tabs-row := HorizontalLayout {
                         padding: 6px;
                         spacing: 8px;
                         RButton {
@@ -409,6 +396,29 @@ export component RetaguardaDashboard inherits Rectangle {
                             clicked => { RetaguardaStore.d-audit-tab = true; RetaguardaStore.a-refresh(); }
                         }
                     }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                if !RetaguardaStore.d-audit-tab: VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 46px;
+                        width: periods.preferred-width + 8px;
+                        border-radius: 12px;
+                        background: Theme.dark ? Theme.surface : #e2e8f0;
+                        periods := HorizontalLayout {
+                            x: 4px;
+                            y: 4px;
+                            height: 38px;
+                            spacing: 2px;
+                            PeriodButton { text: "Dia"; active: RetaguardaStore.d-period == 1; clicked => { RetaguardaStore.d-set-period(1); } }
+                            PeriodButton { text: "7 dias"; active: RetaguardaStore.d-period == 7; clicked => { RetaguardaStore.d-set-period(7); } }
+                            PeriodButton { text: "30 dias"; active: RetaguardaStore.d-period == 30; clicked => { RetaguardaStore.d-set-period(30); } }
+                        }
+                    }
+                }
+                if !RetaguardaStore.d-audit-tab: VerticalLayout {
+                    alignment: center;
+                    GhostButton { icon: RtIcons.download; text: "Exportar"; clicked => { RetaguardaStore.d-export(); } }
                 }
             }
 

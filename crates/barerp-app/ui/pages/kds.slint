@@ -163,12 +163,13 @@ component KdsItemRow inherits Rectangle {
                 font-weight: 800;
                 wrap: word-wrap;
             }
-            HorizontalLayout {
-                spacing: 6px;
-                alignment: start;
-                Text { text: root.item.station; color: Theme.text-muted; font-size: 13px; font-weight: 700; }
-                if root.preparing: Text { text: "• em preparo"; color: Theme.orange; font-size: 13px; font-weight: 800; }
-                if root.ready: Text { text: "• pronto, aguardando entrega"; color: Theme.available; font-size: 13px; font-weight: 800; }
+            // Praça e andamento numa linha só, cortada com "…" (texto longo empurrava o botão para fora)
+            Text {
+                text: root.item.station + (root.preparing ? " • em preparo" : root.ready ? " • pronto p/ entregar" : "");
+                color: root.preparing ? Theme.orange : root.ready ? Theme.available : Theme.text-muted;
+                font-size: 13px;
+                font-weight: root.preparing || root.ready ? 800 : 700;
+                overflow: elide;
             }
             // Observações com destaque
             if root.item.notes != "": Rectangle {
@@ -348,6 +349,8 @@ export component KdsAreaPage inherits Rectangle {
                         border-color: Theme.surface-2;
                         stations := HorizontalLayout {
                             x: 4px;
+                            y: 4px;
+                            height: 40px;
                             spacing: 2px;
                             alignment: center;
                             StationButton { text: "Todas"; active: KdsStore.station == "ALL"; clicked => { KdsStore.set-station("ALL"); } }

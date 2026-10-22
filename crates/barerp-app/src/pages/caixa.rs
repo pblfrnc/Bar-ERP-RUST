@@ -1306,6 +1306,47 @@ fn run_nfce(ctx: &AppCtx, venda: VendaNfce, fallback_receipt: Option<String>) {
     });
 }
 
+/// Para os prints das telas (`examples/caixa_shots.rs`): venda rápida aberta com o cardápio dado.
+pub mod preview {
+    use super::*;
+
+    /// `cart`: (posição do produto em `products`, quantidade).
+    pub fn quick_sale(
+        ctx: &AppCtx,
+        products: Vec<PdvProduct>,
+        categories: Vec<Category>,
+        top: Vec<String>,
+        cart: &[(usize, i64)],
+        method: &str,
+        tendered: &str,
+        emit_nfce: bool,
+    ) {
+        let Some(ui) = ctx.ui() else { return };
+        let store = ui.global::<CaixaStore>();
+        with_state(|s| {
+            s.is_open = true;
+            s.cart = cart
+                .iter()
+                .map(|(i, qty)| {
+                    let id = products[*i].id.clone();
+                    CartItem { key: cart_key(&id, false, &[]), product_id: id, is_box: false, options: Vec::new(), qty: *qty, notes: None }
+                })
+                .collect();
+            s.products = products;
+            s.categories = categories;
+            store.set_has_top(!top.is_empty());
+            s.top = top;
+            s.quick_loaded = true;
+        });
+        store.set_category("TOP".into());
+        store.set_method(method.into());
+        store.set_tendered(tendered.into());
+        store.set_emit_nfce(emit_nfce);
+        store.set_quick_visible(true);
+        render_quick(ctx);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

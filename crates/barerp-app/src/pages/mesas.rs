@@ -165,7 +165,7 @@ fn render(ui: &AppWindow, s: &State) {
             // Mesa ainda sem lugar na planta: fileiras de 6, na ordem do número
             if card.px < 0.0 || card.py < 0.0 {
                 card.px = (i % 6) as f32 / 5.0;
-                card.py = ((i / 6) as f32 / 4.0).min(1.0);
+                card.py = ((i / 6) as f32 * 0.3).min(1.0);
             }
             card
         })
