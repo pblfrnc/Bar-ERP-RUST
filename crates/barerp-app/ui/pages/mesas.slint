@@ -420,7 +420,15 @@ export component MesasAreaPage inherits Rectangle {
 
     property <length> min-tile: 236px;
     property <length> gap: 14px;
-    property <length> tile-h: 232px;
+    // Altura do cartão medida num cartão de mesa ocupada com haver: com a fonte do Windows (Segoe UI, de linhas
+    // mais altas que a dos prints) a altura fixa de 232px deixava os botões Pedido/Conta para fora do cartão
+    property <length> tile-h: max(232px, probe.preferred-height);
+    probe := MesaTile {
+        visible: false;
+        width: root.tile-w;
+        data: { number: 10, name: "Mesa 10", section: "Salão", status: "CLOSING", customer: "Cliente", people: 4,
+                elapsed: "1h 5m", items: 3, total: "R$ 100,00", haver: "Haver R$ 20,00", fee: true };
+    }
     property <int> cols: max(1, floor((grid.width + gap) / (min-tile + gap)));
     property <length> tile-w: (grid.width - (cols - 1) * gap) / cols;
 

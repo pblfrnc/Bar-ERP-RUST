@@ -73,7 +73,7 @@ export component EmissaoNfe inherits Rectangle {
                 }
                 // Largura fixa: a lista de itens fica com o resto (com o menu do Módulo Fiscal ela ficava espremida)
                 VerticalLayout {
-                    width: 460px;
+                    width: root.width < 1050px ? 360px : 460px;
                     spacing: 18px;
                     FxCard {
                         height: dest.preferred-height;

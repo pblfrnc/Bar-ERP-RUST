@@ -804,6 +804,7 @@ fn render_quick(ctx: &AppCtx) {
         (products, categories, format!("Todos ({})", s.products.len()), cart, count, s.submitting)
     });
 
+    store.set_has_box_products(products.iter().any(|p| p.sells_box));
     store.set_products(model(products));
     store.set_categories(model(categories));
     store.set_all_label(all_label.into());

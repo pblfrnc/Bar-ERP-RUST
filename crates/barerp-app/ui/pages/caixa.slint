@@ -87,6 +87,8 @@ export global CaixaStore {
     in-out property <string> category: "ALL";
     in property <bool> has-top;
     in property <[CxProduct]> products;
+    // Algum produto da lista vende caixa fechada (cartão mais alto, com os botões unidade/caixa)
+    in property <bool> has-box-products;
     in-out property <string> search;
     in property <int> focus-search-tick;
     in property <[CxCartLine]> cart;
@@ -452,12 +454,14 @@ component ProductCard inherits Rectangle {
     VerticalLayout {
         padding: 12px;
         spacing: 6px;
+        // Atalho e código numa linha própria: dividindo a linha com eles, o nome ficava em "CERV..." com a fonte do
+        // Windows (Segoe UI, mais larga e de linhas mais altas que a dos prints)
         HorizontalLayout {
             spacing: 6px;
-            Text { text: root.data.name; color: Theme.text; font-size: 15px; font-weight: 800; wrap: word-wrap; max-height: 40px; overflow: elide; horizontal-stretch: 1; }
+            alignment: end;
             if root.hotkey > 0: Rectangle {
-                height: 22px;
-                width: 22px;
+                height: 20px;
+                width: 20px;
                 border-radius: 5px;
                 border-width: 1px;
                 border-color: Theme.border;
@@ -465,13 +469,15 @@ component ProductCard inherits Rectangle {
                 Text { text: root.hotkey; color: Theme.text-muted; font-size: 12px; font-weight: 800; font-family: "Menlo"; }
             }
             if root.data.code != "": Rectangle {
-                height: 18px;
+                height: 20px;
                 width: ct.preferred-width + 8px;
                 border-radius: 4px;
                 background: Theme.surface-2;
                 ct := Text { text: "#" + root.data.code; color: Theme.text-muted; font-size: 11px; font-family: "Menlo"; }
             }
         }
+        // Até 3 linhas do nome
+        Text { text: root.data.name; color: Theme.text; font-size: 14px; font-weight: 800; wrap: word-wrap; max-height: 3 * 14px * 1.4; overflow: elide; }
         if root.data.description != "": Text { text: root.data.description; color: Theme.text-muted; font-size: 12px; overflow: elide; }
         Rectangle { vertical-stretch: 1; }
         Rectangle { height: 1px; background: Theme.border.with-alpha(0.6); }
@@ -1012,7 +1018,24 @@ component QuickSale inherits Rectangle {
                         property <length> gap: 10px;
                         property <int> cols: max(2, floor((self.width - 32px + gap) / (180px + gap)));
                         property <length> card-w: (self.width - 32px - (cols - 1) * gap) / cols;
-                        property <length> card-h: 150px;
+                        // Altura medida num cartão com nome de 3 linhas (a fonte do Windows é mais alta); o de caixa
+                        // fechada só entra na conta quando a lista tem produto vendido por caixa
+                        property <length> card-h: max(150px, CaixaStore.has-box-products ? probe.preferred-height : probe-un.preferred-height);
+                        probe-un := ProductCard {
+                            visible: false;
+                            width: parent.card-w;
+                            hotkey: 1;
+                            data: { name: "CERVEJA ARTESANAL PILSEN LATA 350 ML UNIDADE GELADA", code: "5001", price: "R$ 10,00",
+                                    track-stock: true, stock: "10" };
+                        }
+                        probe := ProductCard {
+                            visible: false;
+                            width: parent.card-w;
+                            hotkey: 1;
+                            data: { name: "CERVEJA ARTESANAL PILSEN LATA 350 ML UNIDADE GELADA", code: "5001", description: "Descrição",
+                                    price: "R$ 10,00", sells-box: true, box-label: "CX 12", box-price: "R$ 100,00",
+                                    box-per-unit: "R$ 8,33/un", track-stock: true, stock: "10", units: 1, boxes: 1 };
+                        }
                         if CaixaStore.quick-loading: Text { text: "Carregando cardápio..."; color: Theme.text-muted; font-size: 14px; }
                         if !CaixaStore.quick-loading && CaixaStore.products.length == 0: VerticalLayout {
                             alignment: center;
@@ -1063,9 +1086,11 @@ component QuickSale inherits Rectangle {
                                 }
                             }
                         }
+                        // Mínimos baixos: em notebook 1366x768 com escala de 125% do Windows a soma passava da altura
+                        // da janela e o botão de concluir a venda ficava fora da tela
                         Rectangle {
                             vertical-stretch: 1;
-                            min-height: 190px;
+                            min-height: 110px;
                             if CaixaStore.cart.length == 0: VerticalLayout {
                                 alignment: center;
                                 spacing: 8px;
@@ -1090,7 +1115,7 @@ component QuickSale inherits Rectangle {
                         Rectangle {
                             background: Theme.surface;
                             vertical-stretch: 0;
-                            min-height: min(pay-body.preferred-height, 240px) + 66px;
+                            min-height: min(pay-body.preferred-height, 150px) + 66px;
                             preferred-height: pay-body.preferred-height + 66px;
                             Rectangle { y: 0; height: 1px; background: Theme.border; }
                             VerticalLayout {

@@ -39,31 +39,37 @@ component LinhaItem inherits Rectangle {
         padding: 12px;
         spacing: 14px;
         VerticalLayout {
-            horizontal-stretch: 4;
+            horizontal-stretch: 1;
             min-width: 0px;
             spacing: 4px;
-            HorizontalLayout {
-                spacing: 8px;
-                Text { text: root.item.nome; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
-                if root.item.codigo != "": Text { text: "#" + root.item.codigo; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; vertical-alignment: center; }
-            }
+            // Nome em até 2 linhas e o código junto dos selos: na mesma linha do código o nome era cortado nas
+            // telas de notebook com a fonte do Windows
+            Text { text: root.item.nome; color: Theme.text; font-size: 14px; font-weight: 800; wrap: word-wrap; max-height: 2 * 14px * 1.4; overflow: elide; }
             HorizontalLayout {
                 spacing: 8px;
                 alignment: start;
+                if root.item.codigo != "": Text { text: "#" + root.item.codigo; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; vertical-alignment: center; }
                 FxBadge { text: root.item.ncm-ok ? "NCM: " + root.item.ncm : "NCM PENDENTE"; cor: root.item.ncm-ok ? FxCor.neutro : FxCor.ambar; }
                 FxBadge { text: "CFOP: " + root.item.cfop; cor: FxCor.neutro; }
             }
         }
+        // Quantidade e valores com largura fixa: o nome e os selos ficam com o resto (com colunas proporcionais o
+        // botão − ficava em cima do selo de CFOP nas telas de notebook)
         HorizontalLayout {
-            horizontal-stretch: 2;
+            width: 104px;
             spacing: 8px;
             alignment: center;
             VerticalLayout { alignment: center; QtdBotao { text: "−"; clicked => { FiscalStore.nf-quantidade(root.indice, -1); } } }
             Text { text: root.item.qtd; color: Theme.text; font-size: 15px; font-weight: 900; vertical-alignment: center; min-width: 26px; horizontal-alignment: center; }
             VerticalLayout { alignment: center; QtdBotao { text: "+"; clicked => { FiscalStore.nf-quantidade(root.indice, 1); } } }
         }
-        Text { horizontal-stretch: 2; text: root.item.unitario; color: Theme.text-muted; font-size: 13px; vertical-alignment: center; horizontal-alignment: right; }
-        Text { horizontal-stretch: 2; text: root.item.subtotal; color: Theme.text; font-size: 14px; font-weight: 900; vertical-alignment: center; horizontal-alignment: right; }
+        VerticalLayout {
+            width: 96px;
+            alignment: center;
+            spacing: 2px;
+            Text { text: root.item.subtotal; color: Theme.text; font-size: 14px; font-weight: 900; horizontal-alignment: right; }
+            Text { text: root.item.unitario + " un"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: right; }
+        }
         VerticalLayout {
             alignment: center;
             Rectangle {
@@ -137,14 +143,11 @@ export component BuscaProdutos inherits FxCard {
                             VerticalLayout {
                                 horizontal-stretch: 1;
                                 spacing: 3px;
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    Text { text: p.nome; color: Theme.text; font-size: 14px; font-weight: 800; overflow: elide; }
-                                    if p.codigo != "": Text { text: "#" + p.codigo; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; vertical-alignment: center; }
-                                }
+                                Text { text: p.nome; color: Theme.text; font-size: 14px; font-weight: 800; wrap: word-wrap; max-height: 2 * 14px * 1.4; overflow: elide; }
                                 HorizontalLayout {
                                     spacing: 10px;
                                     alignment: start;
+                                    if p.codigo != "": Text { text: "#" + p.codigo; color: Theme.text-muted; font-size: 13px; font-family: "Menlo"; }
                                     if p.marca != "": Text { text: p.marca; color: Theme.text-muted; font-size: 13px; }
                                     if p.ncm != "": Text { text: "NCM: " + p.ncm; color: Theme.text-muted; font-size: 13px; }
                                     if p.cfop != "": Text { text: "CFOP: " + p.cfop; color: Theme.text-muted; font-size: 13px; }
@@ -189,10 +192,9 @@ export component ItensNota inherits FxCard {
                 padding-left: 12px;
                 padding-right: 12px;
                 spacing: 14px;
-                FxLabel { horizontal-stretch: 4; text: "PRODUTO & DADOS FISCAIS"; }
-                FxLabel { horizontal-stretch: 2; text: "QTD"; horizontal-alignment: center; }
-                FxLabel { horizontal-stretch: 2; text: "UNITÁRIO"; horizontal-alignment: right; }
-                FxLabel { horizontal-stretch: 2; text: "SUBTOTAL"; horizontal-alignment: right; }
+                FxLabel { horizontal-stretch: 1; text: "PRODUTO & DADOS FISCAIS"; overflow: elide; }
+                FxLabel { width: 104px; text: "QTD"; horizontal-alignment: center; }
+                FxLabel { width: 96px; text: "SUBTOTAL"; horizontal-alignment: right; }
                 FxLabel { width: 34px; text: ""; }
             }
             for it[i] in FiscalStore.nf-itens: LinhaItem { item: it; indice: i; }
@@ -259,7 +261,7 @@ export component EmissorNfce inherits Rectangle {
                 // Coluna direita: consumidor, pagamento e emissão
                 // Largura fixa: a lista de itens fica com o resto (com o menu do Módulo Fiscal ela ficava espremida)
                 VerticalLayout {
-                    width: 400px;
+                    width: root.width < 1050px ? 340px : 400px;
                     spacing: 18px;
                     FxCard {
                         height: cdados.preferred-height;
